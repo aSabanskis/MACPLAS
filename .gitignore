@@ -30,3 +30,14 @@
 *.exe
 *.out
 *.app
+
+# Temporary files and directories
+*.dir
+CMakeFiles
+CMakeCache.txt
+*cmake*
+[Mm]akefile
+*project
+
+# Data files
+*.vtk
