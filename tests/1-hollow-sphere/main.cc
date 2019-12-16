@@ -74,9 +74,20 @@ void
 Problem::initialize()
 {
   dof_handler.distribute_dofs(fe);
-  std::cout << "Number of degrees of freedom: " << dof_handler.n_dofs() << "\n";
+  const unsigned int n_dofs = dof_handler.n_dofs();
+  std::cout << "Number of degrees of freedom: " << n_dofs << "\n";
 
-  temperature.reinit(dof_handler.n_dofs());
+  temperature.reinit(n_dofs);
+
+  std::vector<Point<2>> support_points(n_dofs);
+  DoFTools::map_dofs_to_support_points(MappingQ1<2>(),
+                                       dof_handler,
+                                       support_points);
+
+  for (unsigned int i = 0; i < n_dofs; ++i)
+    {
+      temperature[i] = support_points[i].norm();
+    }
 }
 
 void
