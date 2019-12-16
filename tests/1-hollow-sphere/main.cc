@@ -4,6 +4,7 @@
 #include <deal.II/fe/fe_q.h>
 
 #include <deal.II/grid/grid_generator.h>
+#include <deal.II/grid/manifold_lib.h>
 #include <deal.II/grid/tria.h>
 
 #include <deal.II/numerics/data_out.h>
@@ -23,10 +24,15 @@ public:
 private:
   void
   make_grid();
+
   void
   initialize();
+
   void
   output_results() const;
+
+  Point<2>                   center;
+  const SphericalManifold<2> manifold;
 
   Triangulation<2> triangulation;
   FE_Q<2>          fe;
@@ -36,7 +42,9 @@ private:
 };
 
 Problem::Problem()
-  : fe(2)
+  : center(Point<2>())
+  , manifold(SphericalManifold<2>(center))
+  , fe(2)
   , dof_handler(triangulation)
 {}
 
@@ -51,9 +59,11 @@ Problem::run()
 void
 Problem::make_grid()
 {
-  const Point<2> center; // all coordinates will be 0
-
   GridGenerator::hyper_shell(triangulation, center, 0.5, 1.0, 0, true);
+
+  triangulation.set_manifold(0, manifold);
+  triangulation.set_manifold(1, manifold);
+
   triangulation.refine_global(3);
 
   std::cout << "Number of active cells: " << triangulation.n_active_cells()
