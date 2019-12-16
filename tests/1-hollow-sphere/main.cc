@@ -1,76 +1,92 @@
-#include <deal.II/grid/tria.h>
 #include <deal.II/dofs/dof_handler.h>
-#include <deal.II/grid/grid_generator.h>
+#include <deal.II/dofs/dof_tools.h>
 
 #include <deal.II/fe/fe_q.h>
 
-#include <deal.II/dofs/dof_tools.h>
+#include <deal.II/grid/grid_generator.h>
+#include <deal.II/grid/tria.h>
+
+#include <deal.II/numerics/data_out.h>
 
 #include <fstream>
-#include <deal.II/numerics/data_out.h>
 
 using namespace dealii;
 
-class Problem {
+class Problem
+{
 public:
-	Problem();
+  Problem();
 
-	void run();
+  void
+  run();
 
 private:
-	void make_grid();
-	void initialize();
-	void output_results() const;
+  void
+  make_grid();
+  void
+  initialize();
+  void
+  output_results() const;
 
-	Triangulation<2> triangulation;
-	FE_Q<2> fe;
-	DoFHandler<2> dof_handler;
+  Triangulation<2> triangulation;
+  FE_Q<2>          fe;
+  DoFHandler<2>    dof_handler;
 
-	Vector<double> temperature;
+  Vector<double> temperature;
 };
 
-Problem::Problem() :
-		fe(2), dof_handler(triangulation) {
+Problem::Problem()
+  : fe(2)
+  , dof_handler(triangulation)
+{}
+
+void
+Problem::run()
+{
+  make_grid();
+  initialize();
+  output_results();
 }
 
-void Problem::run() {
-	make_grid();
-	initialize();
-	output_results();
+void
+Problem::make_grid()
+{
+  const Point<2> center; // all coordinates will be 0
+
+  GridGenerator::hyper_shell(triangulation, center, 0.5, 1.0, 0, true);
+  triangulation.refine_global(3);
+
+  std::cout << "Number of active cells: " << triangulation.n_active_cells()
+            << "\n";
 }
 
-void Problem::make_grid() {
-	const Point<2> center; // all coordinates will be 0
+void
+Problem::initialize()
+{
+  dof_handler.distribute_dofs(fe);
+  std::cout << "Number of degrees of freedom: " << dof_handler.n_dofs() << "\n";
 
-	GridGenerator::hyper_shell(triangulation, center, 0.5, 1.0, 0, true);
-	triangulation.refine_global(3);
-
-	std::cout << "Number of active cells: " << triangulation.n_active_cells()
-			<< "\n";
+  temperature.reinit(dof_handler.n_dofs());
 }
 
-void Problem::initialize() {
-	dof_handler.distribute_dofs(fe);
-	std::cout << "Number of degrees of freedom: " << dof_handler.n_dofs()
-			<< "\n";
+void
+Problem::output_results() const
+{
+  DataOut<2> data_out;
 
-	temperature.reinit(dof_handler.n_dofs());
+  data_out.attach_dof_handler(dof_handler);
+  data_out.add_data_vector(temperature, "T");
+
+  data_out.build_patches();
+  std::ofstream output("result.vtk");
+  data_out.write_vtk(output);
 }
 
-void Problem::output_results() const {
-	DataOut<2> data_out;
+int
+main()
+{
+  Problem p;
+  p.run();
 
-	data_out.attach_dof_handler(dof_handler);
-	data_out.add_data_vector(temperature, "T");
-
-	data_out.build_patches();
-	std::ofstream output("result.vtk");
-	data_out.write_vtk(output);
-}
-
-int main() {
-	Problem p;
-	p.run();
-
-	return 0;
+  return 0;
 }
