@@ -1,6 +1,7 @@
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
 #include <deal.II/base/polynomial.h>
+#include <deal.II/base/parameter_handler.h>
 
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/full_matrix.h>
@@ -68,8 +69,11 @@ private:
 
   Polynomials::Polynomial<double> lambda;
 
-  // boundary condition data
+  // Boundary condition data
   std::map<unsigned int, double> bc1_data;
+
+  // Parameters
+  ParameterHandler prm;
 };
 
 template <int dim>
@@ -77,13 +81,35 @@ TemperatureSolver<dim>::TemperatureSolver(unsigned int order)
   : fe(order)
   , dh(triangulation)
   , lambda(0)
-{}
+{
+  prm.declare_entry("Max absolute change",
+                    "1e-3",
+                    Patterns::Double(),
+                    "Max magnitute of Newton update");
+
+  prm.declare_entry("Max Newton iterations",
+                    "6",
+                    Patterns::Integer(),
+                    "Max number of Newton iterations (0 - unlimited)");
+
+  try
+  {
+    prm.parse_input("temperature.prm");
+  }
+  catch (std::exception &e)
+  {
+    std::cout << e.what() << "\n";
+
+    std::ofstream of("temperature-default.prm");
+    prm.print_parameters(of, ParameterHandler::Text);
+  }
+}
 
 template <int dim>
 void
 TemperatureSolver<dim>::solve()
 {
-  for (int i=0; i<6; ++i)
+  for (int i=1; ; ++i)
   {
     prepare_for_solve();
     assemble_system();
@@ -94,9 +120,17 @@ TemperatureSolver<dim>::solve()
 
     // Using step length 1
     temperature += temperature_update;
+
+    // Check convergence
+    const double max_abs_dT = temperature_update.linfty_norm();
     std::cout << "Newton iteration " << i
-              << " max change: " << temperature_update.linfty_norm()
-              << "\n";
+              << " max T change: " << max_abs_dT << " K\n";
+    if (max_abs_dT < prm.get_double("Max absolute change"))
+      break;
+
+    const int N = prm.get_integer("Max Newton iterations");
+    if (N >= 1 && i >= N)
+      break;
   }
 }
 
@@ -213,7 +247,7 @@ template <int dim>
 void
 TemperatureSolver<dim>::assemble_system()
 {
-  const QGauss<dim> quadrature(fe.degree+1);
+  const QGauss<dim> quadrature(fe.degree+1+lambda.degree()/2);
 
   system_matrix = 0;
   system_rhs = 0;
@@ -251,7 +285,7 @@ TemperatureSolver<dim>::assemble_system()
 
     for (unsigned int q = 0; q < n_q_points; ++q)
     {
-      lambda.value(temperature[q], lambda_data);
+      lambda.value(T_q[q], lambda_data);
       const double lambda_q = lambda_data[0];
       const double grad_lambda_q = lambda_data[1];
 
