@@ -47,7 +47,8 @@ Problem<dim>::run()
 {
   make_grid();
   initialize();
-  output_results();
+  solver.solve();
+  solver.output_results();
 }
 
 template <int dim>
@@ -72,13 +73,9 @@ Problem<dim>::initialize()
   const double l0 = 22;
   const Polynomials::Polynomial<double> lambda({l0*4.495, -l0*7.222/T0, l0*3.728/T0/T0});
   solver.initialize(lambda);
-}
 
-template <int dim>
-void
-Problem<dim>::output_results() const
-{
-  solver.output_results();
+  solver.set_bc1(0, T0);
+  solver.set_bc1(1, 1000);
 }
 
 int
