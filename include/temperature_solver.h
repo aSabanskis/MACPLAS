@@ -30,7 +30,7 @@ class TemperatureSolver
 public:
   TemperatureSolver(unsigned int order = 2);
 
-  void
+  bool
   solve();
 
   const Triangulation<dim> &mesh() const;
@@ -65,6 +65,7 @@ private:
   Vector<double>       system_rhs;
 
   Vector<double> temperature;
+  Vector<double> temperature_prev;
   Vector<double> temperature_update;
 
   Polynomials::Polynomial<double> lambda;
@@ -74,6 +75,10 @@ private:
 
   // Parameters
   ParameterHandler prm;
+
+  // Time stepping
+  bool first;
+  int current_step;
 };
 
 template <int dim>
@@ -81,6 +86,8 @@ TemperatureSolver<dim>::TemperatureSolver(unsigned int order)
   : fe(order)
   , dh(triangulation)
   , lambda(0)
+  , first(true)
+  , current_step(0)
 {
   prm.declare_entry("Max absolute change",
                     "1e-3",
@@ -91,6 +98,26 @@ TemperatureSolver<dim>::TemperatureSolver(unsigned int order)
                     "6",
                     Patterns::Integer(),
                     "Max number of Newton iterations (0 - unlimited)");
+
+  prm.declare_entry("Time step",
+                    "1",
+                    Patterns::Double(),
+                    "Time step in seconds (0 - steady-state)");
+
+  prm.declare_entry("Max time",
+                    "10",
+                    Patterns::Double(),
+                    "Max time in seconds");
+
+  prm.declare_entry("Density",
+                    "1000",
+                    Patterns::Double(),
+                    "Density in kg/m^3");
+
+  prm.declare_entry("Specific heat capacity",
+                    "1000",
+                    Patterns::Double(),
+                    "Specific heat capacity in J/kg/K");
 
   try
   {
@@ -106,9 +133,15 @@ TemperatureSolver<dim>::TemperatureSolver(unsigned int order)
 }
 
 template <int dim>
-void
+bool
 TemperatureSolver<dim>::solve()
 {
+  current_step++;
+  const double dt = prm.get_double("Time step");
+  const double t = dt * current_step;
+
+  temperature_prev = temperature;
+
   for (int i=1; ; ++i)
   {
     prepare_for_solve();
@@ -123,8 +156,9 @@ TemperatureSolver<dim>::solve()
 
     // Check convergence
     const double max_abs_dT = temperature_update.linfty_norm();
-    std::cout << "Newton iteration " << i
-              << " max T change: " << max_abs_dT << " K\n";
+    std::cout << "Time " << t << " s"
+              << "  Newton iteration " << i
+              << "  max T change " << max_abs_dT << " K\n";
     if (max_abs_dT < prm.get_double("Max absolute change"))
       break;
 
@@ -132,6 +166,12 @@ TemperatureSolver<dim>::solve()
     if (N >= 1 && i >= N)
       break;
   }
+  if (dt > 0 && t >= prm.get_double("Max time"))
+    return false;
+
+  first = false;
+
+  return dt > 0;
 }
 
 template <int dim>
@@ -201,12 +241,16 @@ TemperatureSolver<dim>::output_results() const
   {
     l[i] = lambda.value(temperature[i]);
   }
-
   data_out.add_data_vector(l, "lambda");
 
   data_out.build_patches();
 
-  const std::string file_name = "result-" + std::to_string(dim) + "d.vtk";
+  const double dt = prm.get_double("Time step");
+  const double t = dt * current_step;
+
+  std::stringstream ss;
+  ss << "result-" << dim << "d-t=" << t << "s.vtk";
+  const std::string file_name = ss.str();
   std::cout << "Saving to " << file_name << "\n";
 
   std::ofstream output(file_name);
@@ -247,6 +291,12 @@ template <int dim>
 void
 TemperatureSolver<dim>::assemble_system()
 {
+  const double dt = prm.get_double("Time step");
+  const double inv_dt = dt==0 ? 0 : 1/dt;
+
+  const double rho = prm.get_double("Density");
+  const double c_p = prm.get_double("Specific heat capacity");
+
   const QGauss<dim> quadrature(fe.degree+1+lambda.degree()/2);
 
   system_matrix = 0;
@@ -266,6 +316,7 @@ TemperatureSolver<dim>::assemble_system()
 
   std::vector<double>        lambda_data(2);
   std::vector<double>        T_q(n_q_points);
+  std::vector<double>        T_prev_q(n_q_points);
   std::vector<Tensor<1,dim>> grad_T_q(n_q_points);
 
   std::vector<types::global_dof_index> local_dof_indices(dofs_per_cell);
@@ -281,6 +332,7 @@ TemperatureSolver<dim>::assemble_system()
     fe_values.reinit(cell);
 
     fe_values.get_function_values(temperature, T_q);
+    fe_values.get_function_values(temperature_prev, T_prev_q);
     fe_values.get_function_gradients(temperature, grad_T_q);
 
     for (unsigned int q = 0; q < n_q_points; ++q)
@@ -291,6 +343,7 @@ TemperatureSolver<dim>::assemble_system()
 
       for (unsigned int i=0; i<dofs_per_cell; ++i)
       {
+        const double &phi_i = fe_values.shape_value(i, q);
         const Tensor<1, dim> &grad_phi_i = fe_values.shape_grad(i, q);
 
         for (unsigned int j=0; j<dofs_per_cell; ++j)
@@ -306,12 +359,16 @@ TemperatureSolver<dim>::assemble_system()
                                   grad_lambda_q * phi_j* grad_T_q[q]
                                   )
                                   * grad_phi_i
+                                  +
+                                  inv_dt * rho * c_p * phi_j * phi_i
                                 )
                                 * fe_values.JxW(q);
         }
 
         cell_rhs(i) -= (
                         lambda_q * grad_T_q[q] * grad_phi_i
+                        +
+                        inv_dt * rho * c_p * (T_q[q] - T_prev_q[q]) * phi_i
                         )
                         * fe_values.JxW(q);
       }

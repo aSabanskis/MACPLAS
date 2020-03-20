@@ -47,8 +47,15 @@ Problem<dim>::run()
 {
   make_grid();
   initialize();
-  solver.solve();
-  solver.output_results();
+  
+  while (true)
+  {
+    const bool keep_going = solver.solve();
+    solver.output_results();
+
+    if (!keep_going)
+      break;
+  };
 }
 
 template <int dim>
@@ -81,6 +88,9 @@ Problem<dim>::initialize()
 int
 main()
 {
+  Problem<1> p1d;
+  p1d.run();
+
   Problem<2> p2d;
   p2d.run();
 
