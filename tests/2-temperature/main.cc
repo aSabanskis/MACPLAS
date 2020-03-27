@@ -83,7 +83,18 @@ Problem<dim>::initialize()
   solver.initialize(lambda);
 
   solver.set_bc1(0, T0);
-  solver.set_bc1(1, 1000);
+  // solver.set_bc1(1, 1000);
+
+  std::vector<Point<dim>> points;
+  std::vector<bool>       boundary_dofs;
+  solver.get_boundary_points(1, points, boundary_dofs);
+  Vector<double> q(points.size());
+  for (unsigned int i = 0; i < q.size(); ++i)
+    {
+      if (boundary_dofs[i])
+        q[i] = 1e4;
+    }
+  solver.set_bc2(1, q);
 }
 
 int

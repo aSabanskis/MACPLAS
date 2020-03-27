@@ -24,6 +24,11 @@
 
 using namespace dealii;
 
+struct heat_flux_data
+{
+  Vector<double> q_in;
+};
+
 template <int dim>
 class TemperatureSolver
 {
@@ -48,7 +53,15 @@ public:
   initialize(const Polynomials::Polynomial<double> &l);
 
   void
+  get_boundary_points(unsigned int             id,
+                      std::vector<Point<dim>> &points,
+                      std::vector<bool> &      boundary_dofs);
+
+  void
   set_bc1(unsigned int id, double val);
+
+  void
+  set_bc2(unsigned int id, const Vector<double> &val);
 
   void
   output_results() const;
@@ -75,7 +88,8 @@ private:
   Polynomials::Polynomial<double> lambda;
 
   // Boundary condition data
-  std::map<unsigned int, double> bc1_data;
+  std::map<unsigned int, double>         bc1_data;
+  std::map<unsigned int, heat_flux_data> bc2_data;
 
   // Parameters
   ParameterHandler prm;
@@ -222,9 +236,30 @@ TemperatureSolver<dim>::initialize(const Polynomials::Polynomial<double> &l)
 
 template <int dim>
 void
+TemperatureSolver<dim>::get_boundary_points(unsigned int             id,
+                                            std::vector<Point<dim>> &points,
+                                            std::vector<bool> &boundary_dofs)
+{
+  const unsigned int n_dofs = dh.n_dofs();
+  points.resize(n_dofs);
+  boundary_dofs.resize(n_dofs);
+
+  DoFTools::map_dofs_to_support_points(MappingQ1<dim>(), dh, points);
+  DoFTools::extract_boundary_dofs(dh, ComponentMask(), boundary_dofs, {id});
+}
+
+template <int dim>
+void
 TemperatureSolver<dim>::set_bc1(unsigned int id, double val)
 {
   bc1_data[id] = val;
+}
+
+template <int dim>
+void
+TemperatureSolver<dim>::set_bc2(unsigned int id, const Vector<double> &val)
+{
+  bc2_data[id].q_in = val;
 }
 
 template <int dim>
@@ -273,7 +308,7 @@ TemperatureSolver<dim>::prepare_for_solve()
   sparsity_pattern.copy_from(dsp);
   system_matrix.reinit(sparsity_pattern);
 
-  // Apply dirichlet boundary conditions
+  // Apply Dirichlet boundary conditions
   std::map<types::global_dof_index, double> boundary_values;
   for (const auto &bc : bc1_data)
     {
@@ -298,7 +333,8 @@ TemperatureSolver<dim>::assemble_system()
   const double rho = prm.get_double("Density");
   const double c_p = prm.get_double("Specific heat capacity");
 
-  const QGauss<dim> quadrature(fe.degree + 1 + lambda.degree() / 2);
+  const QGauss<dim>     quadrature(fe.degree + 1 + lambda.degree() / 2);
+  const QGauss<dim - 1> face_quadrature(fe.degree + 1 + lambda.degree() / 2);
 
   system_matrix = 0;
   system_rhs    = 0;
@@ -308,8 +344,14 @@ TemperatureSolver<dim>::assemble_system()
                           update_values | update_gradients |
                             update_quadrature_points | update_JxW_values);
 
-  const unsigned int dofs_per_cell = fe.dofs_per_cell;
-  const unsigned int n_q_points    = quadrature.size();
+  FEFaceValues<dim> fe_face_values(fe,
+                                   face_quadrature,
+                                   update_values | update_JxW_values);
+
+  const unsigned int dofs_per_cell   = fe.dofs_per_cell;
+  const unsigned int n_q_points      = quadrature.size();
+  const unsigned int n_face_q_points = face_quadrature.size();
+
 
   FullMatrix<double> cell_matrix(dofs_per_cell, dofs_per_cell);
   Vector<double>     cell_rhs(dofs_per_cell);
@@ -318,6 +360,7 @@ TemperatureSolver<dim>::assemble_system()
   std::vector<double>         T_q(n_q_points);
   std::vector<double>         T_prev_q(n_q_points);
   std::vector<Tensor<1, dim>> grad_T_q(n_q_points);
+  std::vector<double>         heat_flux_in_face(n_face_q_points);
 
   std::vector<types::global_dof_index> local_dof_indices(dofs_per_cell);
 
@@ -362,6 +405,32 @@ TemperatureSolver<dim>::assemble_system()
                 (lambda_q * grad_T_q[q] * grad_phi_i +
                  inv_dt * rho * c_p * (T_q[q] - T_prev_q[q]) * phi_i) *
                 fe_values.JxW(q);
+            }
+        }
+
+      for (unsigned int face_number = 0;
+           face_number < GeometryInfo<dim>::faces_per_cell;
+           ++face_number)
+        {
+          if (!cell->face(face_number)->at_boundary())
+            continue;
+
+          auto it = bc2_data.find(cell->face(face_number)->boundary_id());
+          if (it == bc2_data.end())
+            continue;
+
+          fe_face_values.reinit(cell, face_number);
+          fe_face_values.get_function_values(it->second.q_in,
+                                             heat_flux_in_face);
+
+          for (unsigned int q = 0; q < n_face_q_points; ++q)
+            {
+              for (unsigned int i = 0; i < dofs_per_cell; ++i)
+                {
+                  cell_rhs(i) -= -heat_flux_in_face[q] *
+                                 fe_face_values.shape_value(i, q) *
+                                 fe_face_values.JxW(q);
+                }
             }
         }
 
