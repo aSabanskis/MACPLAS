@@ -1,5 +1,3 @@
-#include "../../include/temperature_solver.h"
-
 #include <deal.II/base/polynomial.h>
 
 #include <deal.II/dofs/dof_handler.h>
@@ -11,6 +9,8 @@
 #include <deal.II/grid/tria.h>
 
 #include <deal.II/numerics/data_out.h>
+
+#include "../../include/temperature_solver.h"
 
 using namespace dealii;
 
@@ -47,15 +47,15 @@ Problem<dim>::run()
 {
   make_grid();
   initialize();
-  
-  while (true)
-  {
-    const bool keep_going = solver.solve();
-    solver.output_results();
 
-    if (!keep_going)
-      break;
-  };
+  while (true)
+    {
+      const bool keep_going = solver.solve();
+      solver.output_results();
+
+      if (!keep_going)
+        break;
+    };
 }
 
 template <int dim>
@@ -77,8 +77,9 @@ Problem<dim>::initialize()
   const double T0 = 1685;
   solver.initialize(T0);
 
-  const double l0 = 22;
-  const Polynomials::Polynomial<double> lambda({l0*4.495, -l0*7.222/T0, l0*3.728/T0/T0});
+  const double                          l0 = 22;
+  const Polynomials::Polynomial<double> lambda(
+    {l0 * 4.495, -l0 * 7.222 / T0, l0 * 3.728 / T0 / T0});
   solver.initialize(lambda);
 
   solver.set_bc1(0, T0);

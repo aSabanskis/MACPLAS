@@ -1,24 +1,24 @@
-#include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
-#include <deal.II/base/polynomial.h>
 #include <deal.II/base/parameter_handler.h>
-
-#include <deal.II/lac/dynamic_sparsity_pattern.h>
-#include <deal.II/lac/full_matrix.h>
-#include <deal.II/lac/sparse_matrix.h>
-#include <deal.II/lac/sparse_direct.h>
+#include <deal.II/base/polynomial.h>
+#include <deal.II/base/quadrature_lib.h>
 
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/dofs/dof_tools.h>
 
-#include <deal.II/fe/fe_values.h>
 #include <deal.II/fe/fe_q.h>
+#include <deal.II/fe/fe_values.h>
 
 #include <deal.II/grid/tria.h>
 
-#include <deal.II/numerics/vector_tools.h>
-#include <deal.II/numerics/matrix_tools.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
+#include <deal.II/lac/full_matrix.h>
+#include <deal.II/lac/sparse_direct.h>
+#include <deal.II/lac/sparse_matrix.h>
+
 #include <deal.II/numerics/data_out.h>
+#include <deal.II/numerics/matrix_tools.h>
+#include <deal.II/numerics/vector_tools.h>
 
 #include <fstream>
 
@@ -33,8 +33,10 @@ public:
   bool
   solve();
 
-  const Triangulation<dim> &mesh() const;
-  Triangulation<dim> &mesh();
+  const Triangulation<dim> &
+  mesh() const;
+  Triangulation<dim> &
+  mesh();
 
   void
   initialize(const Vector<double> &t);
@@ -52,9 +54,11 @@ public:
   output_results() const;
 
 private:
-  void prepare_for_solve();
+  void
+  prepare_for_solve();
 
-  void assemble_system();
+  void
+  assemble_system();
 
   Triangulation<dim> triangulation;
   FE_Q<dim>          fe;
@@ -78,7 +82,7 @@ private:
 
   // Time stepping
   bool first;
-  int current_step;
+  int  current_step;
 };
 
 template <int dim>
@@ -109,10 +113,7 @@ TemperatureSolver<dim>::TemperatureSolver(unsigned int order)
                     Patterns::Double(),
                     "Max time in seconds");
 
-  prm.declare_entry("Density",
-                    "1000",
-                    Patterns::Double(),
-                    "Density in kg/m^3");
+  prm.declare_entry("Density", "1000", Patterns::Double(), "Density in kg/m^3");
 
   prm.declare_entry("Specific heat capacity",
                     "1000",
@@ -120,16 +121,16 @@ TemperatureSolver<dim>::TemperatureSolver(unsigned int order)
                     "Specific heat capacity in J/kg/K");
 
   try
-  {
-    prm.parse_input("temperature.prm");
-  }
+    {
+      prm.parse_input("temperature.prm");
+    }
   catch (std::exception &e)
-  {
-    std::cout << e.what() << "\n";
+    {
+      std::cout << e.what() << "\n";
 
-    std::ofstream of("temperature-default.prm");
-    prm.print_parameters(of, ParameterHandler::Text);
-  }
+      std::ofstream of("temperature-default.prm");
+      prm.print_parameters(of, ParameterHandler::Text);
+    }
 }
 
 template <int dim>
@@ -138,34 +139,34 @@ TemperatureSolver<dim>::solve()
 {
   current_step++;
   const double dt = prm.get_double("Time step");
-  const double t = dt * current_step;
+  const double t  = dt * current_step;
 
   temperature_prev = temperature;
 
-  for (int i=1; ; ++i)
-  {
-    prepare_for_solve();
-    assemble_system();
+  for (int i = 1;; ++i)
+    {
+      prepare_for_solve();
+      assemble_system();
 
-    SparseDirectUMFPACK A;
-    A.initialize(system_matrix);
-    A.vmult(temperature_update, system_rhs);
+      SparseDirectUMFPACK A;
+      A.initialize(system_matrix);
+      A.vmult(temperature_update, system_rhs);
 
-    // Using step length 1
-    temperature += temperature_update;
+      // Using step length 1
+      temperature += temperature_update;
 
-    // Check convergence
-    const double max_abs_dT = temperature_update.linfty_norm();
-    std::cout << "Time " << t << " s"
-              << "  Newton iteration " << i
-              << "  max T change " << max_abs_dT << " K\n";
-    if (max_abs_dT < prm.get_double("Max absolute change"))
-      break;
+      // Check convergence
+      const double max_abs_dT = temperature_update.linfty_norm();
+      std::cout << "Time " << t << " s"
+                << "  Newton iteration " << i << "  max T change " << max_abs_dT
+                << " K\n";
+      if (max_abs_dT < prm.get_double("Max absolute change"))
+        break;
 
-    const int N = prm.get_integer("Max Newton iterations");
-    if (N >= 1 && i >= N)
-      break;
-  }
+      const int N = prm.get_integer("Max Newton iterations");
+      if (N >= 1 && i >= N)
+        break;
+    }
   if (dt > 0 && t >= prm.get_double("Max time"))
     return false;
 
@@ -196,7 +197,7 @@ TemperatureSolver<dim>::initialize(const Vector<double> &t)
   const unsigned int n_dofs = dh.n_dofs();
   std::cout << "Number of degrees of freedom: " << n_dofs << "\n";
 
-  AssertDimension(n_dofs, t.size())
+  AssertDimension(n_dofs, t.size());
   temperature = t;
 }
 
@@ -238,15 +239,15 @@ TemperatureSolver<dim>::output_results() const
 
   Vector<double> l(temperature.size());
   for (unsigned int i = 0; i < l.size(); ++i)
-  {
-    l[i] = lambda.value(temperature[i]);
-  }
+    {
+      l[i] = lambda.value(temperature[i]);
+    }
   data_out.add_data_vector(l, "lambda");
 
   data_out.build_patches();
 
   const double dt = prm.get_double("Time step");
-  const double t = dt * current_step;
+  const double t  = dt * current_step;
 
   std::stringstream ss;
   ss << "result-" << dim << "d-t=" << t << "s.vtk";
@@ -273,40 +274,39 @@ TemperatureSolver<dim>::prepare_for_solve()
   system_matrix.reinit(sparsity_pattern);
 
   // Apply dirichlet boundary conditions
-  std::map<types::global_dof_index,double> boundary_values;
+  std::map<types::global_dof_index, double> boundary_values;
   for (const auto &bc : bc1_data)
-  {
-    VectorTools::interpolate_boundary_values(dh,
-                                             bc.first,
-                                             ConstantFunction<dim>(bc.second),
-                                             boundary_values);
-  }
+    {
+      VectorTools::interpolate_boundary_values(dh,
+                                               bc.first,
+                                               ConstantFunction<dim>(bc.second),
+                                               boundary_values);
+    }
   for (const auto &bv : boundary_values)
-  {
-    temperature[bv.first] = bv.second;
-  }
+    {
+      temperature[bv.first] = bv.second;
+    }
 }
 
 template <int dim>
 void
 TemperatureSolver<dim>::assemble_system()
 {
-  const double dt = prm.get_double("Time step");
-  const double inv_dt = dt==0 ? 0 : 1/dt;
+  const double dt     = prm.get_double("Time step");
+  const double inv_dt = dt == 0 ? 0 : 1 / dt;
 
   const double rho = prm.get_double("Density");
   const double c_p = prm.get_double("Specific heat capacity");
 
-  const QGauss<dim> quadrature(fe.degree+1+lambda.degree()/2);
+  const QGauss<dim> quadrature(fe.degree + 1 + lambda.degree() / 2);
 
   system_matrix = 0;
-  system_rhs = 0;
+  system_rhs    = 0;
 
-  FEValues<dim> fe_values(fe, quadrature,
-                          update_values            |
-                          update_gradients         |
-                          update_quadrature_points |
-                          update_JxW_values);
+  FEValues<dim> fe_values(fe,
+                          quadrature,
+                          update_values | update_gradients |
+                            update_quadrature_points | update_JxW_values);
 
   const unsigned int dofs_per_cell = fe.dofs_per_cell;
   const unsigned int n_q_points    = quadrature.size();
@@ -314,87 +314,78 @@ TemperatureSolver<dim>::assemble_system()
   FullMatrix<double> cell_matrix(dofs_per_cell, dofs_per_cell);
   Vector<double>     cell_rhs(dofs_per_cell);
 
-  std::vector<double>        lambda_data(2);
-  std::vector<double>        T_q(n_q_points);
-  std::vector<double>        T_prev_q(n_q_points);
-  std::vector<Tensor<1,dim>> grad_T_q(n_q_points);
+  std::vector<double>         lambda_data(2);
+  std::vector<double>         T_q(n_q_points);
+  std::vector<double>         T_prev_q(n_q_points);
+  std::vector<Tensor<1, dim>> grad_T_q(n_q_points);
 
   std::vector<types::global_dof_index> local_dof_indices(dofs_per_cell);
 
-  typename DoFHandler<dim>::active_cell_iterator
-  cell = dh.begin_active(),
-  endc = dh.end();
-  for (; cell!=endc; ++cell)
-  {
-    cell_matrix = 0;
-    cell_rhs = 0;
-
-    fe_values.reinit(cell);
-
-    fe_values.get_function_values(temperature, T_q);
-    fe_values.get_function_values(temperature_prev, T_prev_q);
-    fe_values.get_function_gradients(temperature, grad_T_q);
-
-    for (unsigned int q = 0; q < n_q_points; ++q)
+  typename DoFHandler<dim>::active_cell_iterator cell = dh.begin_active(),
+                                                 endc = dh.end();
+  for (; cell != endc; ++cell)
     {
-      lambda.value(T_q[q], lambda_data);
-      const double lambda_q = lambda_data[0];
-      const double grad_lambda_q = lambda_data[1];
+      cell_matrix = 0;
+      cell_rhs    = 0;
 
-      for (unsigned int i=0; i<dofs_per_cell; ++i)
-      {
-        const double &phi_i = fe_values.shape_value(i, q);
-        const Tensor<1, dim> &grad_phi_i = fe_values.shape_grad(i, q);
+      fe_values.reinit(cell);
 
-        for (unsigned int j=0; j<dofs_per_cell; ++j)
+      fe_values.get_function_values(temperature, T_q);
+      fe_values.get_function_values(temperature_prev, T_prev_q);
+      fe_values.get_function_gradients(temperature, grad_T_q);
+
+      for (unsigned int q = 0; q < n_q_points; ++q)
         {
-          const double &phi_j = fe_values.shape_value(j, q);
-          const Tensor<1, dim> &grad_phi_j = fe_values.shape_grad(j, q);
+          lambda.value(T_q[q], lambda_data);
+          const double lambda_q      = lambda_data[0];
+          const double grad_lambda_q = lambda_data[1];
 
-          // Newthon's method
-          cell_matrix(i, j) += (
-                                 (
-                                  lambda_q * grad_phi_j
-                                  +
-                                  grad_lambda_q * phi_j* grad_T_q[q]
-                                  )
-                                  * grad_phi_i
-                                  +
-                                  inv_dt * rho * c_p * phi_j * phi_i
-                                )
-                                * fe_values.JxW(q);
+          for (unsigned int i = 0; i < dofs_per_cell; ++i)
+            {
+              const double &        phi_i      = fe_values.shape_value(i, q);
+              const Tensor<1, dim> &grad_phi_i = fe_values.shape_grad(i, q);
+
+              for (unsigned int j = 0; j < dofs_per_cell; ++j)
+                {
+                  const double &        phi_j = fe_values.shape_value(j, q);
+                  const Tensor<1, dim> &grad_phi_j = fe_values.shape_grad(j, q);
+
+                  // Newthon's method
+                  cell_matrix(i, j) += ((lambda_q * grad_phi_j +
+                                         grad_lambda_q * phi_j * grad_T_q[q]) *
+                                          grad_phi_i +
+                                        inv_dt * rho * c_p * phi_j * phi_i) *
+                                       fe_values.JxW(q);
+                }
+
+              cell_rhs(i) -=
+                (lambda_q * grad_T_q[q] * grad_phi_i +
+                 inv_dt * rho * c_p * (T_q[q] - T_prev_q[q]) * phi_i) *
+                fe_values.JxW(q);
+            }
         }
 
-        cell_rhs(i) -= (
-                        lambda_q * grad_T_q[q] * grad_phi_i
-                        +
-                        inv_dt * rho * c_p * (T_q[q] - T_prev_q[q]) * phi_i
-                        )
-                        * fe_values.JxW(q);
-      }
-    }
+      cell->get_dof_indices(local_dof_indices);
+      for (unsigned int i = 0; i < dofs_per_cell; ++i)
+        {
+          for (unsigned int j = 0; j < dofs_per_cell; ++j)
+            system_matrix.add(local_dof_indices[i],
+                              local_dof_indices[j],
+                              cell_matrix(i, j));
 
-    cell->get_dof_indices(local_dof_indices);
-    for (unsigned int i=0; i<dofs_per_cell; ++i)
-    {
-      for (unsigned int j=0; j<dofs_per_cell; ++j)
-        system_matrix.add(local_dof_indices[i],
-                          local_dof_indices[j],
-                          cell_matrix(i,j));
-
-        system_rhs(local_dof_indices[i]) += cell_rhs(i);
+          system_rhs(local_dof_indices[i]) += cell_rhs(i);
+        }
     }
-  }
 
   // Apply boundary conditions for Newton update
-  std::map<types::global_dof_index,double> boundary_values;
+  std::map<types::global_dof_index, double> boundary_values;
   for (const auto &bc : bc1_data)
-  {
-    VectorTools::interpolate_boundary_values(dh,
-                                             bc.first,
-                                             ZeroFunction<dim>(),
-                                             boundary_values);
-  }
+    {
+      VectorTools::interpolate_boundary_values(dh,
+                                               bc.first,
+                                               ZeroFunction<dim>(),
+                                               boundary_values);
+    }
 
   MatrixTools::apply_boundary_values(boundary_values,
                                      system_matrix,
