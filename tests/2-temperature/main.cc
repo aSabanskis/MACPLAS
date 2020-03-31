@@ -94,7 +94,16 @@ Problem<dim>::initialize()
       if (boundary_dofs[i])
         q[i] = 1e4;
     }
-  solver.set_bc2(1, q);
+  const double                  emissivity0 = 0.46;
+  std::function<double(double)> emissivity  = [=](double T) {
+    const double t = T / T0;
+    return emissivity0 * (t < 0.593 ? 1.39 : 1.96 - 0.96 * t);
+  };
+  std::function<double(double)> emissivity_deriv = [=](double T) {
+    const double t = T / T0;
+    return emissivity0 * (t < 0.593 ? 0 : -0.96 / T0);
+  };
+  solver.set_bc_rad_mixed(1, q, emissivity, emissivity_deriv);
 }
 
 int

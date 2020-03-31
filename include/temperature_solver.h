@@ -24,9 +24,15 @@
 
 using namespace dealii;
 
+// Stefan–Boltzmann constant, W/m^2/K^4
+static const double sigma_SB = 5.67e-8;
+
 struct heat_flux_data
 {
   Vector<double> q_in;
+
+  std::function<double(double)> emissivity;
+  std::function<double(double)> emissivity_deriv;
 };
 
 template <int dim>
@@ -61,7 +67,10 @@ public:
   set_bc1(unsigned int id, double val);
 
   void
-  set_bc2(unsigned int id, const Vector<double> &val);
+  set_bc_rad_mixed(unsigned int                  id,
+                   const Vector<double> &        q_in,
+                   std::function<double(double)> emissivity,
+                   std::function<double(double)> emissivity_deriv);
 
   void
   output_results() const;
@@ -89,7 +98,7 @@ private:
 
   // Boundary condition data
   std::map<unsigned int, double>         bc1_data;
-  std::map<unsigned int, heat_flux_data> bc2_data;
+  std::map<unsigned int, heat_flux_data> bc_rad_mixed_data;
 
   // Parameters
   ParameterHandler prm;
@@ -257,9 +266,15 @@ TemperatureSolver<dim>::set_bc1(unsigned int id, double val)
 
 template <int dim>
 void
-TemperatureSolver<dim>::set_bc2(unsigned int id, const Vector<double> &val)
+TemperatureSolver<dim>::set_bc_rad_mixed(
+  unsigned int                  id,
+  const Vector<double> &        q_in,
+  std::function<double(double)> emissivity,
+  std::function<double(double)> emissivity_deriv)
 {
-  bc2_data[id].q_in = val;
+  bc_rad_mixed_data[id].q_in             = q_in;
+  bc_rad_mixed_data[id].emissivity       = emissivity;
+  bc_rad_mixed_data[id].emissivity_deriv = emissivity_deriv;
 }
 
 template <int dim>
@@ -278,6 +293,35 @@ TemperatureSolver<dim>::output_results() const
       l[i] = lambda.value(temperature[i]);
     }
   data_out.add_data_vector(l, "lambda");
+
+  std::map<unsigned int, Vector<double>> q_rad, emissivity;
+  for (const auto &data : bc_rad_mixed_data)
+    {
+      Vector<double> &q = q_rad[data.first];
+      Vector<double> &e = emissivity[data.first];
+
+      q.reinit(temperature);
+      e.reinit(temperature);
+
+      std::vector<bool> boundary_dofs(temperature.size(), false);
+      DoFTools::extract_boundary_dofs(dh,
+                                      ComponentMask(),
+                                      boundary_dofs,
+                                      {data.first});
+
+      for (unsigned int i = 0; i < temperature.size(); ++i)
+        {
+          if (!boundary_dofs[i])
+            continue;
+          e[i] = data.second.emissivity(temperature[i]);
+          q[i] = sigma_SB * e[i] * std::pow(temperature[i], 4);
+        }
+
+      data_out.add_data_vector(data.second.q_in,
+                               "q_in_" + std::to_string(data.first));
+      data_out.add_data_vector(q, "q_rad_" + std::to_string(data.first));
+      data_out.add_data_vector(e, "emissivity_" + std::to_string(data.first));
+    }
 
   data_out.build_patches();
 
@@ -360,7 +404,8 @@ TemperatureSolver<dim>::assemble_system()
   std::vector<double>         T_q(n_q_points);
   std::vector<double>         T_prev_q(n_q_points);
   std::vector<Tensor<1, dim>> grad_T_q(n_q_points);
-  std::vector<double>         heat_flux_in_face(n_face_q_points);
+  std::vector<double>         T_face_q(n_face_q_points);
+  std::vector<double>         heat_flux_in_face_q(n_face_q_points);
 
   std::vector<types::global_dof_index> local_dof_indices(dofs_per_cell);
 
@@ -415,19 +460,39 @@ TemperatureSolver<dim>::assemble_system()
           if (!cell->face(face_number)->at_boundary())
             continue;
 
-          auto it = bc2_data.find(cell->face(face_number)->boundary_id());
-          if (it == bc2_data.end())
+          auto it =
+            bc_rad_mixed_data.find(cell->face(face_number)->boundary_id());
+          if (it == bc_rad_mixed_data.end())
             continue;
 
           fe_face_values.reinit(cell, face_number);
+
+          fe_face_values.get_function_values(temperature, T_face_q);
           fe_face_values.get_function_values(it->second.q_in,
-                                             heat_flux_in_face);
+                                             heat_flux_in_face_q);
 
           for (unsigned int q = 0; q < n_face_q_points; ++q)
             {
+              const double net_heat_flux =
+                sigma_SB * it->second.emissivity(T_face_q[q]) *
+                  std::pow(T_face_q[q], 4) -
+                heat_flux_in_face_q[q];
+
               for (unsigned int i = 0; i < dofs_per_cell; ++i)
                 {
-                  cell_rhs(i) -= -heat_flux_in_face[q] *
+                  for (unsigned int j = 0; j < dofs_per_cell; ++j)
+                    {
+                      cell_matrix(i, j) +=
+                        sigma_SB *
+                        (it->second.emissivity(T_face_q[q]) * 4.0 *
+                           std::pow(T_face_q[q], 3) +
+                         it->second.emissivity_deriv(T_face_q[q]) *
+                           std::pow(T_face_q[q], 4)) *
+                        fe_face_values.shape_value(i, q) *
+                        fe_face_values.shape_value(j, q) *
+                        fe_face_values.JxW(q);
+                    }
+                  cell_rhs(i) -= net_heat_flux *
                                  fe_face_values.shape_value(i, q) *
                                  fe_face_values.JxW(q);
                 }
