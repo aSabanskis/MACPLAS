@@ -31,9 +31,10 @@ CMakeCache.txt
 *cmake*
 [Mm]akefile
 *project
+log
 
 # Data files
-*.vtk
+*.vt[uk]
 
 # Parameter files
 *.prm

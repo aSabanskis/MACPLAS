@@ -1,3 +1,6 @@
+#ifndef macplas_temperature_solver_h
+#define macplas_temperature_solver_h
+
 #include <deal.II/base/function.h>
 #include <deal.II/base/parameter_handler.h>
 #include <deal.II/base/polynomial.h>
@@ -526,3 +529,5 @@ TemperatureSolver<dim>::assemble_system()
                                      temperature_update,
                                      system_rhs);
 }
+
+#endif
