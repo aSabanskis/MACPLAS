@@ -2,10 +2,12 @@
 #define macplas_utilities_h
 
 #include <deal.II/base/point.h>
+#include <deal.II/base/tensor.h>
 #include <deal.II/base/utilities.h>
 
 #include <array>
 #include <fstream>
+#include <iomanip>
 #include <map>
 #include <string>
 #include <vector>
@@ -16,7 +18,10 @@ class Interpolator3D
 {
 public:
   void
-  read_vtk(const std::string &file_name);
+  read_vtu(const std::string &file_name);
+
+  void
+  write_vtu(const std::string &file_name);
 
 private:
   constexpr static unsigned int dim = 3; // everything is in 3D
@@ -32,15 +37,22 @@ private:
 
   // fields defined on points
   std::map<std::string, std::vector<double>> point_fields;
+
+  // vector fields defined on cells
+  std::map<std::string, std::vector<Point<dim>>> cell_vector_fields;
+
+  void
+  preprocess();
 };
 
 void
-Interpolator3D::read_vtk(const std::string &file_name)
+Interpolator3D::read_vtu(const std::string &file_name)
 {
   points.clear();
   triangles.clear();
   cell_fields.clear();
   point_fields.clear();
+  cell_vector_fields.clear();
 
   std::ifstream vtk(file_name);
 
@@ -175,6 +187,120 @@ Interpolator3D::read_vtk(const std::string &file_name)
   for (const auto &it : point_fields)
     std::cout << "PointData " << it.first << " " << it.second.size() << " "
               << it.second.back() << "\n";
+
+  preprocess();
+}
+
+void
+Interpolator3D::write_vtu(const std::string &file_name)
+{
+  std::ofstream f_out(file_name);
+
+  const unsigned int n_points    = points.size();
+  const unsigned int n_triangles = triangles.size();
+
+  f_out
+    << "<?xml version=\"1.0\"?>\n"
+       "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" byte_order=\"LittleEndian\">\n"
+       "<UnstructuredGrid>\n"
+       "<Piece NumberOfPoints=\""
+    << n_points << "\" NumberOfCells=\"" << n_triangles << "\">\n";
+
+
+  f_out << "<CellData>\n";
+  for (const auto &it : cell_fields)
+    {
+      f_out << "<DataArray type=\"Float64\" Name=\"" << it.first
+            << "\" format=\"ascii\">\n";
+      for (const auto &x : it.second)
+        f_out << std::scientific << std::setprecision(14) << x << " ";
+      f_out << "\n</DataArray>\n";
+    }
+  for (const auto &it : cell_vector_fields)
+    {
+      f_out << "<DataArray type=\"Float64\" Name=\"" << it.first
+            << "\" NumberOfComponents=\"3\" format=\"ascii\">\n";
+      for (const auto &x : it.second)
+        f_out << std::scientific << std::setprecision(14) << x << "\n";
+      f_out << "</DataArray>\n";
+    }
+  f_out << "</CellData>\n";
+
+
+  f_out << "<PointData>\n";
+  for (const auto &it : point_fields)
+    {
+      f_out << "<DataArray type=\"Float64\" Name=\"" << it.first
+            << "\" format=\"ascii\">\n";
+      for (const auto &x : it.second)
+        f_out << std::scientific << std::setprecision(14) << x << " ";
+      f_out << "\n</DataArray>\n";
+    }
+  f_out << "</PointData>\n";
+
+
+  f_out << "<Points>\n";
+  f_out
+    << "<DataArray type=\"Float32\" NumberOfComponents=\"3\" format=\"ascii\">\n";
+  for (const auto &p : points)
+    f_out << std::scientific << std::setprecision(14) << p << "\n";
+  f_out << "</DataArray>\n";
+  f_out << "</Points>\n";
+
+
+  f_out << "<Cells>\n";
+
+  f_out
+    << "<DataArray type=\"Int32\" Name=\"connectivity\" format=\"ascii\">\n";
+  for (const auto &t : triangles)
+    {
+      for (const auto &v : t)
+        f_out << v << " ";
+      f_out << "\n";
+    }
+  f_out << "</DataArray>\n";
+
+  f_out << "<DataArray type=\"Int32\" Name=\"offsets\" format=\"ascii\">\n";
+  for (unsigned int i = 0; i < n_triangles; ++i)
+    f_out << 3 * (i + 1) << " ";
+  f_out << "\n</DataArray>\n";
+
+  f_out << "<DataArray type=\"UInt8\" Name=\"types\" format=\"ascii\">\n";
+  for (unsigned int i = 0; i < n_triangles; ++i)
+    f_out << "5 "; // VTK_TRIANGLE
+  f_out << "\n</DataArray>\n";
+
+  f_out << "</Cells>\n";
+
+
+  f_out << "</Piece>\n"
+           "</UnstructuredGrid>\n"
+           "</VTKFile>\n";
+}
+
+void
+Interpolator3D::preprocess()
+{
+  const unsigned int n_points    = points.size();
+  const unsigned int n_triangles = triangles.size();
+
+  auto &area   = cell_fields["area"];
+  auto &normal = cell_vector_fields["normal"];
+
+  normal.resize(n_triangles);
+  area.resize(n_triangles);
+
+  for (unsigned int i = 0; i < n_triangles; ++i)
+    {
+      const auto &v     = triangles[i];
+      const auto  a     = points[v[1]] - points[v[0]];
+      const auto  b     = points[v[2]] - points[v[0]];
+      const auto  a_x_b = cross_product_3d(a, b);
+      const auto  norm  = a_x_b.norm();
+
+      area[i]   = 0.5 * norm;
+      normal[i] = Point<dim>(a_x_b / norm);
+    }
 }
 
 #endif
