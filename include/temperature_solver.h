@@ -236,6 +236,7 @@ TemperatureSolver<dim>::initialize(double t)
   std::cout << "Number of degrees of freedom: " << n_dofs << "\n";
 
   temperature.reinit(n_dofs);
+  temperature_update.reinit(n_dofs);
   temperature.add(t);
 }
 
@@ -326,7 +327,7 @@ TemperatureSolver<dim>::output_results() const
       data_out.add_data_vector(e, "emissivity_" + std::to_string(data.first));
     }
 
-  data_out.build_patches();
+  data_out.build_patches(fe.degree);
 
   const double dt = prm.get_double("Time step");
   const double t  = dt * current_step;

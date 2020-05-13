@@ -14,22 +14,38 @@
 
 using namespace dealii;
 
-class Interpolator3D
+// Class for interpolation of boundary conditions from external cell or point
+// data defined on a triangulated surface.
+class SurfaceInterpolator3D
 {
-public:
-  void
-  read_vtu(const std::string &file_name);
-
-  void
-  write_vtu(const std::string &file_name);
-
 private:
   constexpr static unsigned int dim = 3; // everything is in 3D
 
+public:
+  // read mesh and fields from vtk file
+  void
+  read_vtk(const std::string &file_name);
+
+  // read mesh and fields from vtu file
+  void
+  read_vtu(const std::string &file_name);
+
+  // write mesh and fields to vtu file
+  void
+  write_vtu(const std::string &file_name);
+
+  // interpolate cell field to the specified points
+  void
+  interpolate_cell(const std::string &            field_name,
+                   const std::vector<Point<dim>> &target_points,
+                   const std::vector<bool> &      markers,
+                   Vector<double> &               target_values);
+
+private:
   // list of points (x,y,z)
   std::vector<Point<dim>> points;
 
-  // connectivity matrix (v0,v1,v2)
+  // connectivity matrix (v0,v1,v2) - only triangles
   std::vector<std::array<unsigned int, 3>> triangles;
 
   // fields defined on cells
@@ -41,29 +57,137 @@ private:
   // vector fields defined on cells
   std::map<std::string, std::vector<Point<dim>>> cell_vector_fields;
 
+  // clear all data
+  void
+  clear();
+
+  // print mesh and field information
+  void
+  info();
+
+  // compute auxiliary data (cell areas, centers, normals)
   void
   preprocess();
 };
 
+
 void
-Interpolator3D::read_vtu(const std::string &file_name)
+SurfaceInterpolator3D::read_vtk(const std::string &file_name)
 {
-  points.clear();
-  triangles.clear();
-  cell_fields.clear();
-  point_fields.clear();
-  cell_vector_fields.clear();
+  clear();
 
-  std::ifstream vtk(file_name);
+  std::ifstream file(file_name);
 
-  if (!vtk.is_open())
-    return;
+  if (!file.is_open())
+    {
+      std::cout << "Could not open '" << file_name << "'\n";
+      return;
+    }
+
+  std::string s, data_type, data_name;
+
+  // First line should be "# vtk DataFile Version 4.2"
+  while (file >> s)
+    {
+      if (s == "POINTS")
+        {
+          int n;
+          file >> n >> s /*data type*/;
+          points.resize(n);
+
+          for (unsigned int i = 0; i < n; ++i)
+            {
+              file >> points[i][0] >> points[i][1] >> points[i][2];
+            }
+        }
+      else if (s == "CELLS")
+        {
+          int n;
+          file >> n >> s /*size*/;
+          triangles.resize(n);
+
+          for (unsigned int i = 0; i < n; ++i)
+            {
+              file >> s;
+              if (s != "3")
+                throw std::runtime_error("Triangle expected, numPoints=" + s +
+                                         "found");
+              file >> triangles[i][0] >> triangles[i][1] >> triangles[i][2];
+            }
+        }
+      else
+        {
+          if (s == "CELL_DATA" || s == "POINT_DATA")
+            data_type = s;
+
+          if (s == "SCALARS")
+            {
+              file >> data_name >> s /*data type*/;
+              file >> s >> s; // LOOKUP_TABLE
+
+              unsigned int N =
+                data_type == "CELL_DATA" ? triangles.size() : points.size();
+
+              std::cout << data_type << " " << data_name << " " << N << "\n";
+
+              std::vector<double> &f = data_type == "CELL_DATA" ?
+                                         cell_fields[data_name] :
+                                         point_fields[data_name];
+              f.resize(N);
+
+              for (unsigned int i = 0; i < N; ++i)
+                file >> f[i];
+            }
+
+          if (s == "FIELD")
+            {
+              int n_fields;
+              file >> s /*FieldData*/ >> n_fields;
+
+              for (unsigned int k = 0; k < n_fields; ++k)
+                {
+                  file >> data_name >> s >> s >> s;
+
+                  unsigned int N =
+                    data_type == "CELL_DATA" ? triangles.size() : points.size();
+
+                  std::cout << data_type << " " << data_name << " " << N
+                            << "\n";
+
+                  std::vector<double> &f = data_type == "CELL_DATA" ?
+                                             cell_fields[data_name] :
+                                             point_fields[data_name];
+                  f.resize(N);
+
+                  for (unsigned int i = 0; i < N; ++i)
+                    file >> f[i];
+                }
+            }
+        }
+    }
+
+  info();
+  preprocess();
+}
+
+void
+SurfaceInterpolator3D::read_vtu(const std::string &file_name)
+{
+  clear();
+
+  std::ifstream file(file_name);
+
+  if (!file.is_open())
+    {
+      std::cout << "Could not open '" << file_name << "'\n";
+      return;
+    }
 
   std::string s, data_type, data_name;
 
   bool data_start = false;
 
-  while (vtk >> s)
+  while (file >> s)
     {
       // get number of points and cells
       if (Utilities::match_at_string_start(s, "NumberOf"))
@@ -100,7 +224,7 @@ Interpolator3D::read_vtu(const std::string &file_name)
 
           std::vector<std::string> data;
 
-          while (vtk >> s)
+          while (file >> s)
             {
               // end of data array reached, process it
               if (s == "</DataArray>")
@@ -177,22 +301,12 @@ Interpolator3D::read_vtu(const std::string &file_name)
         }
     }
 
-  std::cout << "n_points:" << points.size() << " "
-            << "n_triangles:" << triangles.size() << "\n";
-
-  for (const auto &it : cell_fields)
-    std::cout << "CellData " << it.first << " " << it.second.size() << " "
-              << it.second.back() << "\n";
-
-  for (const auto &it : point_fields)
-    std::cout << "PointData " << it.first << " " << it.second.size() << " "
-              << it.second.back() << "\n";
-
+  info();
   preprocess();
 }
 
 void
-Interpolator3D::write_vtu(const std::string &file_name)
+SurfaceInterpolator3D::write_vtu(const std::string &file_name)
 {
   std::ofstream f_out(file_name);
 
@@ -279,16 +393,80 @@ Interpolator3D::write_vtu(const std::string &file_name)
 }
 
 void
-Interpolator3D::preprocess()
+SurfaceInterpolator3D::interpolate_cell(
+  const std::string &            field_name,
+  const std::vector<Point<dim>> &target_points,
+  const std::vector<bool> &      markers,
+  Vector<double> &               target_values)
 {
-  const unsigned int n_points    = points.size();
+  const auto &it = cell_fields.find(field_name);
+  if (it == cell_fields.end())
+    throw std::runtime_error("Field '" + field_name + "' does not exist.");
+
+  const std::vector<double> &    f = it->second;
+  const std::vector<Point<dim>> &c = cell_vector_fields["center"];
+
+  const unsigned int n_triangles = triangles.size();
+  const unsigned int n_values    = target_points.size();
+  target_values.reinit(n_values);
+
+  for (unsigned int i = 0; i < n_values; ++i)
+    {
+      if (!markers[i])
+        continue;
+
+      // for now, find the closest triangle midpoint
+      unsigned int j_min = 0;
+      double       d_min = c[j_min].distance(target_points[i]);
+      for (unsigned int j = 1; j < n_triangles; ++j)
+        {
+          double d = c[j].distance(target_points[i]);
+          if (d < d_min)
+            {
+              d_min = d;
+              j_min = j;
+            }
+        }
+
+      target_values[i] = f[j_min];
+    }
+}
+
+void
+SurfaceInterpolator3D::clear()
+{
+  points.clear();
+  triangles.clear();
+  cell_fields.clear();
+  point_fields.clear();
+  cell_vector_fields.clear();
+}
+
+void
+SurfaceInterpolator3D::info()
+{
+  std::cout << "n_points:" << points.size() << " "
+            << "n_triangles:" << triangles.size() << "\n";
+
+  for (const auto &it : cell_fields)
+    std::cout << "CellData " << it.first << " " << it.second.size() << "\n";
+
+  for (const auto &it : point_fields)
+    std::cout << "PointData " << it.first << " " << it.second.size() << "\n";
+}
+
+void
+SurfaceInterpolator3D::preprocess()
+{
   const unsigned int n_triangles = triangles.size();
 
   auto &area   = cell_fields["area"];
+  auto &center = cell_vector_fields["center"];
   auto &normal = cell_vector_fields["normal"];
 
-  normal.resize(n_triangles);
   area.resize(n_triangles);
+  center.resize(n_triangles);
+  normal.resize(n_triangles);
 
   for (unsigned int i = 0; i < n_triangles; ++i)
     {
@@ -299,7 +477,8 @@ Interpolator3D::preprocess()
       const auto  norm  = a_x_b.norm();
 
       area[i]   = 0.5 * norm;
-      normal[i] = Point<dim>(a_x_b / norm);
+      center[i] = (points[v[0]] + points[v[1]] + points[v[2]]) / 3;
+      normal[i] = norm > 0 ? Point<dim>(a_x_b / norm) : Point<dim>();
     }
 }
 

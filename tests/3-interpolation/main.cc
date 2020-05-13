@@ -6,11 +6,13 @@
 #include <deal.II/fe/fe_q.h>
 
 #include <deal.II/grid/grid_generator.h>
+#include <deal.II/grid/manifold_lib.h>
 #include <deal.II/grid/tria.h>
 
 #include <deal.II/numerics/data_out.h>
 
 #include "../../include/temperature_solver.h"
+#include "../../include/utilities.h"
 
 using namespace dealii;
 
@@ -33,12 +35,15 @@ private:
   void
   output_results() const;
 
+  CylindricalManifold<dim> manifold;
+
   TemperatureSolver<dim> solver;
 };
 
 template <int dim>
 Problem<dim>::Problem(unsigned int order)
-  : solver(order)
+  : manifold(2)
+  , solver(order)
 {}
 
 template <int dim>
@@ -47,23 +52,23 @@ Problem<dim>::run()
 {
   make_grid();
   initialize();
-
-  while (true)
-    {
-      const bool keep_going = solver.solve();
-      solver.output_results();
-
-      if (!keep_going)
-        break;
-    };
+  // do not calculate
+  solver.output_results();
 }
 
 template <int dim>
 void
 Problem<dim>::make_grid()
 {
-  GridGenerator::hyper_cube(solver.mesh(), 0, 1, true);
+  Assert(dim == 3, ExcNotImplemented());
 
+  Triangulation<dim - 1> base;
+  GridGenerator::hyper_ball(base, Point<dim - 1>(), 0.1);
+
+  GridGenerator::extrude_triangulation(base, 5, 0.5, solver.mesh());
+
+  solver.mesh().set_all_manifold_ids(0);
+  solver.mesh().set_manifold(0, manifold);
   solver.mesh().refine_global(3);
 
   std::cout << "Number of active cells: " << solver.mesh().n_active_cells()
@@ -74,47 +79,30 @@ template <int dim>
 void
 Problem<dim>::initialize()
 {
-  const double T0 = 1685;
+  const double T0 = 300;
   solver.initialize(T0);
 
-  const double                          l0 = 22;
-  const Polynomials::Polynomial<double> lambda(
-    {l0 * 4.495, -l0 * 7.222 / T0, l0 * 3.728 / T0 / T0});
+  const Polynomials::Polynomial<double> lambda(std::vector<double>({1.0}));
   solver.initialize(lambda);
-
-  solver.set_bc1(0, T0);
 
   std::vector<Point<dim>> points;
   std::vector<bool>       boundary_dofs;
-  const unsigned int      boundary_id = 1;
+  const unsigned int      boundary_id = 0;
   solver.get_boundary_points(boundary_id, points, boundary_dofs);
   Vector<double> q(points.size());
-  for (unsigned int i = 0; i < q.size(); ++i)
-    {
-      if (boundary_dofs[i])
-        q[i] = 1e4;
-    }
-  const double                  emissivity0 = 0.46;
-  std::function<double(double)> emissivity  = [=](double T) {
-    const double t = T / T0;
-    return emissivity0 * (t < 0.593 ? 1.39 : 1.96 - 0.96 * t);
-  };
-  std::function<double(double)> emissivity_deriv = [=](double T) {
-    const double t = T / T0;
-    return emissivity0 * (t < 0.593 ? 0 : -0.96 / T0);
-  };
-  solver.set_bc_rad_mixed(boundary_id, q, emissivity, emissivity_deriv);
+
+  SurfaceInterpolator3D surf;
+  surf.read_vtk("q.vtk");
+  surf.write_vtu("q.vtu");
+  surf.interpolate_cell("q", points, boundary_dofs, q);
+
+  std::function<double(double)> zero = [=](double T) { return 0; };
+  solver.set_bc_rad_mixed(boundary_id, q, zero, zero);
 }
 
 int
 main()
 {
-  Problem<1> p1d;
-  p1d.run();
-
-  Problem<2> p2d;
-  p2d.run();
-
   Problem<3> p3d;
   p3d.run();
 
