@@ -14,6 +14,59 @@
 
 using namespace dealii;
 
+// helper function
+template <int dim>
+Point<dim>
+closest_segment_point(const Point<dim> &p,
+                      const Point<dim> &segment_p0,
+                      const Point<dim> &segment_p1);
+
+// helper classe
+template <int dim>
+class Triangle
+{
+public:
+  void
+  reinit(const Point<dim> &p0, const Point<dim> &p1, const Point<dim> &p2);
+
+  void
+  reinit(const Point<dim> &p0,
+         const Point<dim> &p1,
+         const Point<dim> &p2,
+         const Point<dim> &normal,
+         const double &    area);
+
+  Point<dim>
+  center() const;
+
+  Point<dim>
+  normal() const;
+
+  double
+  area() const;
+
+  Point<dim>
+  closest_triangle_point(const Point<dim> &p) const;
+
+private:
+  void
+  calculate_normal_and_area();
+
+  double
+  area(const Point<dim> &p0, const Point<dim> &p1, const Point<dim> &p2) const;
+
+  Point<dim>
+  project_to_triangle_plane(const Point<dim> &p) const;
+
+  std::array<double, 3>
+  barycentric_coordinates(const Point<dim> &p) const;
+
+  std::array<Point<dim>, 3> m_points;
+  Point<dim>                m_normal;
+  double                    m_area;
+};
+
+
 // Class for interpolation of boundary conditions from external cell or point
 // data defined on a triangulated surface.
 class SurfaceInterpolator3D
@@ -32,14 +85,14 @@ public:
 
   // write mesh and fields to vtu file
   void
-  write_vtu(const std::string &file_name);
+  write_vtu(const std::string &file_name) const;
 
   // interpolate cell field to the specified points
   void
   interpolate_cell(const std::string &            field_name,
                    const std::vector<Point<dim>> &target_points,
                    const std::vector<bool> &      markers,
-                   Vector<double> &               target_values);
+                   Vector<double> &               target_values) const;
 
 private:
   // list of points (x,y,z)
@@ -63,13 +116,158 @@ private:
 
   // print mesh and field information
   void
-  info();
+  info() const;
 
   // compute auxiliary data (cell areas, centers, normals)
   void
   preprocess();
 };
 
+
+// IMPLEMENTATION
+
+template <int dim>
+Point<dim>
+closest_segment_point(const Point<dim> &p,
+                      const Point<dim> &segment_p0,
+                      const Point<dim> &segment_p1)
+{
+  const auto d = segment_p1 - segment_p0;
+  double     t = (d * (p - segment_p0)) / d.norm();
+  // clamp to [0,1]
+  t = std::max(0.0, std::min(1.0, t));
+
+  return segment_p0 + t * d;
+}
+
+// Triangle
+
+template <int dim>
+void
+Triangle<dim>::reinit(const Point<dim> &p0,
+                      const Point<dim> &p1,
+                      const Point<dim> &p2)
+{
+  m_points[0] = p0;
+  m_points[1] = p1;
+  m_points[2] = p2;
+
+  calculate_normal_and_area();
+}
+
+template <int dim>
+void
+Triangle<dim>::reinit(const Point<dim> &p0,
+                      const Point<dim> &p1,
+                      const Point<dim> &p2,
+                      const Point<dim> &normal,
+                      const double &    area)
+{
+  reinit(p0, p1, p2);
+  m_normal = normal;
+  m_area   = area;
+}
+
+template <int dim>
+Point<dim>
+Triangle<dim>::center() const
+{
+  return (m_points[0] + m_points[1] + m_points[2]) / 3;
+}
+
+template <int dim>
+Point<dim>
+Triangle<dim>::normal() const
+{
+  return m_normal;
+}
+
+template <int dim>
+double
+Triangle<dim>::area() const
+{
+  return m_area;
+}
+
+template <int dim>
+Point<dim>
+Triangle<dim>::closest_triangle_point(const Point<dim> &p) const
+{
+  const Point<dim> p_proj = project_to_triangle_plane(p);
+
+  const auto t3 = barycentric_coordinates(p_proj);
+
+  bool inside = true;
+
+  for (const auto &t : t3)
+    inside = inside && (t >= 0) && (t <= 1);
+
+  if (inside)
+    {
+      return p_proj;
+    }
+  else
+    {
+      Point<dim> p_closest;
+      double     d_min = -1;
+
+      for (unsigned int i = 0; i < 3; ++i)
+        {
+          const Point<dim> p_edge =
+            closest_segment_point(p_proj, m_points[i], m_points[(i + 1) % 3]);
+          const double d = p_proj.distance(p_edge);
+
+          if (d < d_min || d_min < 0)
+            {
+              d_min     = d;
+              p_closest = p_edge;
+            }
+        }
+
+      return p_closest;
+    }
+}
+
+template <int dim>
+void
+Triangle<dim>::calculate_normal_and_area()
+{
+  m_normal = Point<dim>(
+    cross_product_3d(m_points[1] - m_points[0], m_points[2] - m_points[0]));
+
+  m_area = 0.5 * m_normal.norm();
+
+  // normalize
+  if (m_area > 0)
+    m_normal /= (2 * m_area);
+}
+
+template <int dim>
+double
+Triangle<dim>::area(const Point<dim> &p0,
+                    const Point<dim> &p1,
+                    const Point<dim> &p2) const
+{
+  return 0.5 * cross_product_3d(p1 - p0, p2 - p0).norm();
+}
+
+template <int dim>
+Point<dim>
+Triangle<dim>::project_to_triangle_plane(const Point<dim> &p) const
+{
+  return Point<dim>(p - m_normal * (m_normal * (p - m_points[0])));
+}
+
+template <int dim>
+std::array<double, 3>
+Triangle<dim>::barycentric_coordinates(const Point<dim> &p) const
+{
+  return std::array<double, 3>({area(p, m_points[1], m_points[2]) / m_area,
+                                area(m_points[0], p, m_points[2]) / m_area,
+                                area(m_points[0], m_points[1], p) / m_area});
+}
+
+// SurfaceInterpolator3D
 
 void
 SurfaceInterpolator3D::read_vtk(const std::string &file_name)
@@ -306,7 +504,7 @@ SurfaceInterpolator3D::read_vtu(const std::string &file_name)
 }
 
 void
-SurfaceInterpolator3D::write_vtu(const std::string &file_name)
+SurfaceInterpolator3D::write_vtu(const std::string &file_name) const
 {
   std::ofstream f_out(file_name);
 
@@ -397,38 +595,47 @@ SurfaceInterpolator3D::interpolate_cell(
   const std::string &            field_name,
   const std::vector<Point<dim>> &target_points,
   const std::vector<bool> &      markers,
-  Vector<double> &               target_values)
+  Vector<double> &               target_values) const
 {
   const auto &it = cell_fields.find(field_name);
   if (it == cell_fields.end())
     throw std::runtime_error("Field '" + field_name + "' does not exist.");
 
-  const std::vector<double> &    f = it->second;
-  const std::vector<Point<dim>> &c = cell_vector_fields["center"];
+  const std::vector<double> &    source_field = it->second;
+  const std::vector<double> &    area = cell_fields.find("area")->second;
+  const std::vector<Point<dim>> &normal =
+    cell_vector_fields.find("normal")->second;
 
   const unsigned int n_triangles = triangles.size();
   const unsigned int n_values    = target_points.size();
   target_values.reinit(n_values);
+
+  Triangle<dim> triangle;
 
   for (unsigned int i = 0; i < n_values; ++i)
     {
       if (!markers[i])
         continue;
 
-      // for now, find the closest triangle midpoint
       unsigned int j_min = 0;
-      double       d_min = c[j_min].distance(target_points[i]);
+      double       d_min = -1;
       for (unsigned int j = 1; j < n_triangles; ++j)
         {
-          double d = c[j].distance(target_points[i]);
-          if (d < d_min)
+          const auto &v = triangles[j];
+          triangle.reinit(
+            points[v[0]], points[v[1]], points[v[2]], normal[j], area[j]);
+
+          Point<dim> p_tri = triangle.closest_triangle_point(target_points[i]);
+
+          double d = p_tri.distance(target_points[i]);
+          if (d < d_min || d_min < 0)
             {
               d_min = d;
               j_min = j;
             }
         }
 
-      target_values[i] = f[j_min];
+      target_values[i] = source_field[j_min];
     }
 }
 
@@ -443,7 +650,7 @@ SurfaceInterpolator3D::clear()
 }
 
 void
-SurfaceInterpolator3D::info()
+SurfaceInterpolator3D::info() const
 {
   std::cout << "n_points:" << points.size() << " "
             << "n_triangles:" << triangles.size() << "\n";
@@ -468,17 +675,16 @@ SurfaceInterpolator3D::preprocess()
   center.resize(n_triangles);
   normal.resize(n_triangles);
 
+  Triangle<dim> triangle;
+
   for (unsigned int i = 0; i < n_triangles; ++i)
     {
-      const auto &v     = triangles[i];
-      const auto  a     = points[v[1]] - points[v[0]];
-      const auto  b     = points[v[2]] - points[v[0]];
-      const auto  a_x_b = cross_product_3d(a, b);
-      const auto  norm  = a_x_b.norm();
+      const auto &v = triangles[i];
+      triangle.reinit(points[v[0]], points[v[1]], points[v[2]]);
 
-      area[i]   = 0.5 * norm;
-      center[i] = (points[v[0]] + points[v[1]] + points[v[2]]) / 3;
-      normal[i] = norm > 0 ? Point<dim>(a_x_b / norm) : Point<dim>();
+      center[i] = triangle.center();
+      normal[i] = triangle.normal();
+      area[i]   = triangle.area();
     }
 }
 
