@@ -34,7 +34,9 @@ public:
          const Point<dim> &p1,
          const Point<dim> &p2,
          const Point<dim> &normal,
-         const double &    area);
+         const Point<dim> &center,
+         const double &    area,
+         const double &    longest_side);
 
   Point<dim>
   center() const;
@@ -44,6 +46,9 @@ public:
 
   double
   area() const;
+
+  double
+  longest_side() const;
 
   Point<dim>
   closest_triangle_point(const Point<dim> &p) const;
@@ -63,7 +68,9 @@ private:
 
   std::array<Point<dim>, 3> m_points;
   Point<dim>                m_normal;
+  Point<dim>                m_center;
   double                    m_area;
+  double                    m_longest_side;
 };
 
 
@@ -75,6 +82,12 @@ private:
   constexpr static unsigned int dim = 3; // everything is in 3D
 
 public:
+  enum FieldType
+  {
+    CellField,
+    PointField
+  };
+
   // read mesh and fields from vtk file
   void
   read_vtk(const std::string &file_name);
@@ -89,10 +102,11 @@ public:
 
   // interpolate cell field to the specified points
   void
-  interpolate_cell(const std::string &            field_name,
-                   const std::vector<Point<dim>> &target_points,
-                   const std::vector<bool> &      markers,
-                   Vector<double> &               target_values) const;
+  interpolate(const FieldType &              field_type,
+              const std::string &            field_name,
+              const std::vector<Point<dim>> &target_points,
+              const std::vector<bool> &      markers,
+              Vector<double> &               target_values) const;
 
 private:
   // list of points (x,y,z)
@@ -109,6 +123,13 @@ private:
 
   // vector fields defined on cells
   std::map<std::string, std::vector<Point<dim>>> cell_vector_fields;
+
+  // get field, if exists
+  const std::vector<double> &
+  field(const FieldType &field_type, const std::string &field_name) const;
+  const std::vector<Point<dim>> &
+  vector_field(const FieldType &  field_type,
+               const std::string &field_name) const;
 
   // clear all data
   void
@@ -153,6 +174,11 @@ Triangle<dim>::reinit(const Point<dim> &p0,
   m_points[2] = p2;
 
   calculate_normal_and_area();
+
+  m_center = (p0 + p1 + p2) / 3;
+
+  m_longest_side =
+    std::max(std::max((p1 - p0).norm(), (p2 - p0).norm()), (p1 - p2).norm());
 }
 
 template <int dim>
@@ -161,18 +187,25 @@ Triangle<dim>::reinit(const Point<dim> &p0,
                       const Point<dim> &p1,
                       const Point<dim> &p2,
                       const Point<dim> &normal,
-                      const double &    area)
+                      const Point<dim> &center,
+                      const double &    area,
+                      const double &    longest_side)
 {
-  reinit(p0, p1, p2);
-  m_normal = normal;
-  m_area   = area;
+  m_points[0] = p0;
+  m_points[1] = p1;
+  m_points[2] = p2;
+
+  m_normal       = normal;
+  m_center       = center;
+  m_area         = area;
+  m_longest_side = longest_side;
 }
 
 template <int dim>
 Point<dim>
 Triangle<dim>::center() const
 {
-  return (m_points[0] + m_points[1] + m_points[2]) / 3;
+  return m_center;
 }
 
 template <int dim>
@@ -187,6 +220,13 @@ double
 Triangle<dim>::area() const
 {
   return m_area;
+}
+
+template <int dim>
+double
+Triangle<dim>::longest_side() const
+{
+  return m_longest_side;
 }
 
 template <int dim>
@@ -209,17 +249,17 @@ Triangle<dim>::closest_triangle_point(const Point<dim> &p) const
   else
     {
       Point<dim> p_closest;
-      double     d_min = -1;
+      double     d2_min = -1;
 
       for (unsigned int i = 0; i < 3; ++i)
         {
           const Point<dim> p_edge =
             closest_segment_point(p_proj, m_points[i], m_points[(i + 1) % 3]);
-          const double d = p_proj.distance(p_edge);
+          const double d2 = (p_proj - p_edge).norm_square();
 
-          if (d < d_min || d_min < 0)
+          if (d2 < d2_min || d2_min < 0)
             {
-              d_min     = d;
+              d2_min    = d2;
               p_closest = p_edge;
             }
         }
@@ -591,20 +631,19 @@ SurfaceInterpolator3D::write_vtu(const std::string &file_name) const
 }
 
 void
-SurfaceInterpolator3D::interpolate_cell(
-  const std::string &            field_name,
-  const std::vector<Point<dim>> &target_points,
-  const std::vector<bool> &      markers,
-  Vector<double> &               target_values) const
+SurfaceInterpolator3D::interpolate(const FieldType &              field_type,
+                                   const std::string &            field_name,
+                                   const std::vector<Point<dim>> &target_points,
+                                   const std::vector<bool> &      markers,
+                                   Vector<double> &target_values) const
 {
-  const auto &it = cell_fields.find(field_name);
-  if (it == cell_fields.end())
-    throw std::runtime_error("Field '" + field_name + "' does not exist.");
+  AssertThrow(field_type == CellField, ExcNotImplemented());
 
-  const std::vector<double> &    source_field = it->second;
-  const std::vector<double> &    area = cell_fields.find("area")->second;
-  const std::vector<Point<dim>> &normal =
-    cell_vector_fields.find("normal")->second;
+  const std::vector<double> &source_field = field(field_type, field_name);
+  const std::vector<double> &area         = field(CellField, "area");
+  const std::vector<double> &longest_side = field(CellField, "longest_side");
+  const std::vector<Point<dim>> &normal   = vector_field(CellField, "normal");
+  const std::vector<Point<dim>> &center   = vector_field(CellField, "center");
 
   const unsigned int n_triangles = triangles.size();
   const unsigned int n_values    = target_points.size();
@@ -617,26 +656,63 @@ SurfaceInterpolator3D::interpolate_cell(
       if (!markers[i])
         continue;
 
-      unsigned int j_min = 0;
-      double       d_min = -1;
+      unsigned int j_min  = 0;
+      double       d2_min = -1;
       for (unsigned int j = 1; j < n_triangles; ++j)
         {
           const auto &v = triangles[j];
-          triangle.reinit(
-            points[v[0]], points[v[1]], points[v[2]], normal[j], area[j]);
+          triangle.reinit(points[v[0]],
+                          points[v[1]],
+                          points[v[2]],
+                          normal[j],
+                          center[j],
+                          area[j],
+                          longest_side[j]);
+
+          if ((target_points[i] - triangle.center()).norm() >
+              3 * triangle.longest_side())
+            continue;
 
           Point<dim> p_tri = triangle.closest_triangle_point(target_points[i]);
 
-          double d = p_tri.distance(target_points[i]);
-          if (d < d_min || d_min < 0)
+          double d2 = (p_tri - target_points[i]).norm_square();
+          if (d2 < d2_min || d2_min < 0)
             {
-              d_min = d;
-              j_min = j;
+              d2_min = d2;
+              j_min  = j;
             }
         }
 
       target_values[i] = source_field[j_min];
     }
+}
+
+const std::vector<double> &
+SurfaceInterpolator3D::field(const FieldType &  field_type,
+                             const std::string &field_name) const
+{
+  const auto &fields = field_type == CellField ? cell_fields : point_fields;
+  const auto &it     = fields.find(field_name);
+
+  if (it == fields.end())
+    throw std::runtime_error("Field '" + field_name + "' does not exist.");
+
+  return it->second;
+}
+
+const std::vector<Point<SurfaceInterpolator3D::dim>> &
+SurfaceInterpolator3D::vector_field(const FieldType &  field_type,
+                                    const std::string &field_name) const
+{
+  AssertThrow(field_type == CellField, ExcNotImplemented());
+
+  const auto &fields = cell_vector_fields;
+  const auto &it     = fields.find(field_name);
+
+  if (it == fields.end())
+    throw std::runtime_error("Field '" + field_name + "' does not exist.");
+
+  return it->second;
 }
 
 void
@@ -667,11 +743,13 @@ SurfaceInterpolator3D::preprocess()
 {
   const unsigned int n_triangles = triangles.size();
 
-  auto &area   = cell_fields["area"];
-  auto &center = cell_vector_fields["center"];
-  auto &normal = cell_vector_fields["normal"];
+  auto &area         = cell_fields["area"];
+  auto &longest_side = cell_fields["longest_side"];
+  auto &center       = cell_vector_fields["center"];
+  auto &normal       = cell_vector_fields["normal"];
 
   area.resize(n_triangles);
+  longest_side.resize(n_triangles);
   center.resize(n_triangles);
   normal.resize(n_triangles);
 
@@ -682,9 +760,10 @@ SurfaceInterpolator3D::preprocess()
       const auto &v = triangles[i];
       triangle.reinit(points[v[0]], points[v[1]], points[v[2]]);
 
-      center[i] = triangle.center();
-      normal[i] = triangle.normal();
-      area[i]   = triangle.area();
+      center[i]       = triangle.center();
+      normal[i]       = triangle.normal();
+      area[i]         = triangle.area();
+      longest_side[i] = triangle.longest_side();
     }
 }
 
