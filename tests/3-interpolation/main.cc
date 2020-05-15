@@ -95,7 +95,7 @@ Problem<dim>::initialize()
   surf.read_vtk("q.vtk");
   surf.write_vtu("q.vtu");
   surf.interpolate(
-    SurfaceInterpolator3D::CellField, "q", points, boundary_dofs, q);
+    SurfaceInterpolator3D::PointField, "q", points, boundary_dofs, q);
 
   std::function<double(double)> zero = [=](double T) { return 0; };
   solver.set_bc_rad_mixed(boundary_id, q, zero, zero);
@@ -104,7 +104,7 @@ Problem<dim>::initialize()
 int
 main()
 {
-  Problem<3> p3d(1);
+  Problem<3> p3d(2);
   p3d.run();
 
   return 0;
