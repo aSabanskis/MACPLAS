@@ -12,6 +12,7 @@
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_values.h>
 
+#include <deal.II/grid/grid_out.h>
 #include <deal.II/grid/tria.h>
 
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
@@ -77,6 +78,9 @@ public:
 
   void
   output_results() const;
+
+  void
+  output_mesh() const;
 
 private:
   void
@@ -339,6 +343,22 @@ TemperatureSolver<dim>::output_results() const
 
   std::ofstream output(file_name);
   data_out.write_vtk(output);
+}
+
+template <int dim>
+void
+TemperatureSolver<dim>::output_mesh() const
+{
+  std::stringstream ss;
+  ss << "mesh-" << dim << "d.msh";
+  const std::string file_name = ss.str();
+  std::cout << "Saving to " << file_name << "\n";
+
+  std::ofstream output(file_name);
+
+  GridOut grid_out;
+  grid_out.set_flags(GridOutFlags::Msh(true));
+  grid_out.write_msh(triangulation, output);
 }
 
 template <int dim>
