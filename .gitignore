@@ -4,10 +4,6 @@
 *.o
 *.obj
 
-# Precompiled Headers
-*.gch
-*.pch
-
 # Compiled Dynamic libraries
 *.so
 *.dylib
@@ -31,10 +27,14 @@ CMakeCache.txt
 *cmake*
 [Mm]akefile
 *project
+*.json
+*.bak
 log
 
 # Data files
 *.vt[uk]
+*.msh
+*.pvsm
 
 # Parameter files
 *.prm

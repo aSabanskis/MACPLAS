@@ -93,6 +93,14 @@ Problem<dim>::initialize()
 
   SurfaceInterpolator3D surf;
   surf.read_vtk("q.vtk");
+  surf.convert(SurfaceInterpolator3D::CellField,
+               "q",
+               SurfaceInterpolator3D::PointField,
+               "q_from_cell");
+  surf.convert(SurfaceInterpolator3D::PointField,
+               "q",
+               SurfaceInterpolator3D::CellField,
+               "q_from_point");
   surf.write_vtu("q.vtu");
   surf.interpolate(
     SurfaceInterpolator3D::PointField, "q", points, boundary_dofs, q);

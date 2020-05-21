@@ -5,6 +5,8 @@
 #include <deal.II/base/tensor.h>
 #include <deal.II/base/utilities.h>
 
+#include <deal.II/lac/vector.h>
+
 #include <array>
 #include <fstream>
 #include <iomanip>
@@ -101,6 +103,14 @@ public:
               const std::vector<bool> &      markers,
               Vector<double> &               target_values) const;
 
+  // convert between cell and point fields
+  // If target_name is not specified it is set to source_name.
+  void
+  convert(const FieldType &  source_type,
+          const std::string &source_name,
+          const FieldType &  target_type,
+          const std::string &target_name = "");
+
 private:
   // list of points (x,y,z)
   std::vector<Point<dim>> points;
@@ -121,12 +131,20 @@ private:
   std::vector<Triangle<dim>> triangle_cache;
 
 
-  // get field, if exists
+  // get field
   const std::vector<double> &
   field(const FieldType &field_type, const std::string &field_name) const;
+  std::vector<double> &
+  field(const FieldType &field_type, const std::string &field_name);
   const std::vector<Point<dim>> &
   vector_field(const FieldType &  field_type,
                const std::string &field_name) const;
+
+  // convert field
+  void
+  cell_to_point(const std::string &source_name, const std::string &target_name);
+  void
+  point_to_cell(const std::string &source_name, const std::string &target_name);
 
   // clear all data
   void
@@ -673,6 +691,30 @@ SurfaceInterpolator3D::interpolate(const FieldType &              field_type,
     }
 }
 
+void
+SurfaceInterpolator3D::convert(const FieldType &  source_type,
+                               const std::string &source_name,
+                               const FieldType &  target_type,
+                               const std::string &target_name)
+{
+  const std::string target_name_updated =
+    target_name.empty() ? source_name : target_name;
+
+  if (source_type == CellField && target_type == PointField)
+    {
+      cell_to_point(source_name, target_name_updated);
+    }
+  else if (source_type == PointField && target_type == CellField)
+    {
+      point_to_cell(source_name, target_name_updated);
+    }
+  else
+    {
+      throw std::runtime_error(
+        "Unsupported combination of source and target field types.");
+    }
+}
+
 const std::vector<double> &
 SurfaceInterpolator3D::field(const FieldType &  field_type,
                              const std::string &field_name) const
@@ -684,6 +726,14 @@ SurfaceInterpolator3D::field(const FieldType &  field_type,
     throw std::runtime_error("Field '" + field_name + "' does not exist.");
 
   return it->second;
+}
+
+std::vector<double> &
+SurfaceInterpolator3D::field(const FieldType &  field_type,
+                             const std::string &field_name)
+{
+  return field_type == CellField ? cell_fields[field_name] :
+                                   point_fields[field_name];
 }
 
 const std::vector<Point<SurfaceInterpolator3D::dim>> &
@@ -699,6 +749,70 @@ SurfaceInterpolator3D::vector_field(const FieldType &  field_type,
     throw std::runtime_error("Field '" + field_name + "' does not exist.");
 
   return it->second;
+}
+
+void
+SurfaceInterpolator3D::cell_to_point(const std::string &source_name,
+                                     const std::string &target_name)
+{
+  const unsigned int n_points    = points.size();
+  const unsigned int n_triangles = triangles.size();
+
+  const std::vector<double> &source_field = field(CellField, source_name);
+
+  std::vector<double> &target_field = field(PointField, target_name);
+  target_field.resize(n_points);
+  std::fill(target_field.begin(), target_field.end(), 0);
+
+  std::vector<int> count(n_points, 0);
+
+  for (unsigned int i = 0; i < n_triangles; ++i)
+    {
+      const auto &v = triangles[i];
+      for (const auto &id : v)
+        {
+          target_field[id] += source_field[i];
+          count[id]++;
+        }
+    }
+
+  for (unsigned int i = 0; i < n_points; ++i)
+    {
+      if (count[i] > 0)
+        target_field[i] /= count[i];
+    }
+}
+
+void
+SurfaceInterpolator3D::point_to_cell(const std::string &source_name,
+                                     const std::string &target_name)
+{
+  const unsigned int n_points    = points.size();
+  const unsigned int n_triangles = triangles.size();
+
+  const std::vector<double> &source_field = field(PointField, source_name);
+
+  std::vector<double> &target_field = field(CellField, target_name);
+  target_field.resize(n_triangles);
+  std::fill(target_field.begin(), target_field.end(), 0);
+
+  std::vector<int> count(n_triangles, 0);
+
+  for (unsigned int i = 0; i < n_triangles; ++i)
+    {
+      const auto &v = triangles[i];
+      for (const auto &id : v)
+        {
+          target_field[i] += source_field[id];
+          count[i]++;
+        }
+    }
+
+  for (unsigned int i = 0; i < n_triangles; ++i)
+    {
+      if (count[i] > 0)
+        target_field[i] /= count[i];
+    }
 }
 
 void
