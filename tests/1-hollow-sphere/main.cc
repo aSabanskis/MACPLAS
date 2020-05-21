@@ -11,6 +11,8 @@
 
 #include <fstream>
 
+#include "../../include/stress_solver.h"
+
 using namespace dealii;
 
 template <int dim>
@@ -43,6 +45,8 @@ private:
   DoFHandler<dim>    dh_temp;
 
   Vector<double> temperature;
+
+  StressSolver<dim> solver;
 };
 
 template <int dim>
@@ -55,6 +59,7 @@ Problem<dim>::Problem(unsigned int order)
   , manifold(SphericalManifold<dim>(center))
   , fe_temp(order)
   , dh_temp(triangulation)
+  , solver(order)
 {}
 
 template <int dim>
@@ -129,9 +134,6 @@ Problem<dim>::output_results() const
 int
 main()
 {
-  Problem<2> p2d;
-  p2d.run();
-
   Problem<3> p3d;
   p3d.run();
 
