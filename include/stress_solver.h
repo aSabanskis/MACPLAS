@@ -6,10 +6,14 @@
 #include <deal.II/dofs/dof_handler.h>
 
 #include <deal.II/fe/fe_q.h>
+#include <deal.II/fe/fe_system.h>
 
 #include <deal.II/grid/grid_out.h>
 #include <deal.II/grid/tria.h>
 
+#include <deal.II/lac/block_sparse_matrix.h>
+#include <deal.II/lac/block_sparsity_pattern.h>
+#include <deal.II/lac/block_vector.h>
 #include <deal.II/lac/vector.h>
 
 using namespace dealii;
@@ -19,6 +23,9 @@ class StressSolver
 {
 public:
   StressSolver(unsigned int order = 2);
+
+  void
+  solve();
 
   const Triangulation<dim> &
   get_mesh() const;
@@ -43,11 +50,28 @@ public:
   output_mesh() const;
 
 private:
-  Triangulation<dim> triangulation;
-  FE_Q<dim>          fe_temp;
-  DoFHandler<dim>    dh_temp;
+  void
+  prepare_for_solve();
 
-  Vector<double> temperature;
+  void
+  assemble_system();
+
+  void
+  solve_system();
+
+  Triangulation<dim> triangulation;
+
+  FE_Q<dim>       fe_temp;
+  DoFHandler<dim> dh_temp;
+  Vector<double>  temperature;
+
+  FESystem<dim>       fe;
+  DoFHandler<dim>     dh;
+  BlockVector<double> displacement;
+
+  BlockSparsityPattern      sparsity_pattern;
+  BlockSparseMatrix<double> system_matrix;
+  BlockVector<double>       system_rhs;
 
   // Parameters
   ParameterHandler prm;
@@ -64,6 +88,8 @@ template <int dim>
 StressSolver<dim>::StressSolver(unsigned int order)
   : fe_temp(order)
   , dh_temp(triangulation)
+  , fe(FE_Q<dim>(order), dim)
+  , dh(triangulation)
 {
   AssertThrow(dim == 3, ExcNotImplemented());
 
@@ -101,6 +127,15 @@ StressSolver<dim>::StressSolver(unsigned int order)
 }
 
 template <int dim>
+void
+StressSolver<dim>::solve()
+{
+  prepare_for_solve();
+  assemble_system();
+  solve_system();
+}
+
+template <int dim>
 const Triangulation<dim> &
 StressSolver<dim>::get_mesh() const
 {
@@ -133,10 +168,14 @@ void
 StressSolver<dim>::initialize()
 {
   dh_temp.distribute_dofs(fe_temp);
-  const unsigned int n_dofs = dh_temp.n_dofs();
-  std::cout << "Number of temperature degrees of freedom: " << n_dofs << "\n";
+  dh.distribute_dofs(fe);
 
-  temperature.reinit(n_dofs);
+  const unsigned int n_dofs_temp = dh_temp.n_dofs();
+  std::cout << "Number of degrees of freedom for temperature: " << n_dofs_temp
+            << "\n";
+
+  temperature.reinit(n_dofs_temp);
+  displacement.reinit(dim, n_dofs_temp);
 }
 
 template <int dim>
@@ -156,7 +195,13 @@ StressSolver<dim>::output_results() const
   data_out.attach_dof_handler(dh_temp);
   data_out.add_data_vector(temperature, "T");
 
-  data_out.build_patches();
+  for (unsigned int i = 0; i < displacement.n_blocks(); ++i)
+    {
+      const std::string name = "displacement_" + std::to_string(i);
+      data_out.add_data_vector(displacement.block(i), name);
+    }
+
+  data_out.build_patches(fe.degree);
 
   const std::string file_name = "result-" + std::to_string(dim) + "d.vtk";
   std::cout << "Saving to " << file_name << "\n";
@@ -180,5 +225,42 @@ StressSolver<dim>::output_mesh() const
   grid_out.set_flags(GridOutFlags::Msh(true));
   grid_out.write_msh(triangulation, output);
 }
+
+template <int dim>
+void
+StressSolver<dim>::prepare_for_solve()
+{
+  const unsigned int n_dofs_temp = dh_temp.n_dofs();
+
+  system_rhs.reinit(dim, n_dofs_temp);
+
+  BlockDynamicSparsityPattern dsp(dim, dim);
+  for (unsigned int i = 0; i < dim; ++i)
+    {
+      for (unsigned int j = 0; j < dim; ++j)
+        {
+          dsp.block(i, j).reinit(n_dofs_temp, n_dofs_temp);
+        }
+    }
+  dsp.collect_sizes();
+
+  DoFTools::make_sparsity_pattern(dh, dsp);
+
+  sparsity_pattern.copy_from(dsp);
+  system_matrix.reinit(sparsity_pattern);
+}
+
+template <int dim>
+void
+StressSolver<dim>::assemble_system()
+{
+  system_matrix = 0;
+  system_rhs    = 0;
+}
+
+template <int dim>
+void
+StressSolver<dim>::solve_system()
+{}
 
 #endif
