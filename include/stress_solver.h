@@ -21,9 +21,9 @@ public:
   StressSolver(unsigned int order = 2);
 
   const Triangulation<dim> &
-  mesh() const;
+  get_mesh() const;
   Triangulation<dim> &
-  mesh();
+  get_mesh();
 
   const Vector<double> &
   get_temperature() const;
@@ -102,14 +102,14 @@ StressSolver<dim>::StressSolver(unsigned int order)
 
 template <int dim>
 const Triangulation<dim> &
-StressSolver<dim>::mesh() const
+StressSolver<dim>::get_mesh() const
 {
   return triangulation;
 }
 
 template <int dim>
 Triangulation<dim> &
-StressSolver<dim>::mesh()
+StressSolver<dim>::get_mesh()
 {
   return triangulation;
 }

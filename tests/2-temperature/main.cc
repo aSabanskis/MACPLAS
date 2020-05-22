@@ -30,9 +30,6 @@ private:
   void
   initialize();
 
-  void
-  output_results() const;
-
   TemperatureSolver<dim> solver;
 };
 
@@ -62,11 +59,12 @@ template <int dim>
 void
 Problem<dim>::make_grid()
 {
-  GridGenerator::hyper_cube(solver.mesh(), 0, 1, true);
+  Triangulation<dim> &triangulation = solver.get_mesh();
+  GridGenerator::hyper_cube(triangulation, 0, 1, true);
 
-  solver.mesh().refine_global(3);
+  triangulation.refine_global(3);
 
-  std::cout << "Number of active cells: " << solver.mesh().n_active_cells()
+  std::cout << "Number of active cells: " << triangulation.n_active_cells()
             << "\n";
 }
 

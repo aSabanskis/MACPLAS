@@ -49,9 +49,9 @@ public:
   solve();
 
   const Triangulation<dim> &
-  mesh() const;
+  get_mesh() const;
   Triangulation<dim> &
-  mesh();
+  get_mesh();
 
   void
   initialize(const Vector<double> &t);
@@ -65,7 +65,7 @@ public:
   void
   get_boundary_points(unsigned int             id,
                       std::vector<Point<dim>> &points,
-                      std::vector<bool> &      boundary_dofs);
+                      std::vector<bool> &      boundary_dofs) const;
 
   void
   set_bc1(unsigned int id, double val);
@@ -207,14 +207,14 @@ TemperatureSolver<dim>::solve()
 
 template <int dim>
 const Triangulation<dim> &
-TemperatureSolver<dim>::mesh() const
+TemperatureSolver<dim>::get_mesh() const
 {
   return triangulation;
 }
 
 template <int dim>
 Triangulation<dim> &
-TemperatureSolver<dim>::mesh()
+TemperatureSolver<dim>::get_mesh()
 {
   return triangulation;
 }
@@ -253,9 +253,10 @@ TemperatureSolver<dim>::initialize(const Polynomials::Polynomial<double> &l)
 
 template <int dim>
 void
-TemperatureSolver<dim>::get_boundary_points(unsigned int             id,
-                                            std::vector<Point<dim>> &points,
-                                            std::vector<bool> &boundary_dofs)
+TemperatureSolver<dim>::get_boundary_points(
+  unsigned int             id,
+  std::vector<Point<dim>> &points,
+  std::vector<bool> &      boundary_dofs) const
 {
   const unsigned int n_dofs = dh.n_dofs();
   points.resize(n_dofs);

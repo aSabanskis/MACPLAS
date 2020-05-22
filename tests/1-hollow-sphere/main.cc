@@ -68,7 +68,7 @@ Problem<dim>::make_grid()
   Assert(r_a > 0, ExcMessage("r_a must be positive"));
   Assert(r_b > r_a, ExcMessage("r_b must be larger than r_b"));
 
-  Triangulation<dim> &triangulation = solver.mesh();
+  Triangulation<dim> &triangulation = solver.get_mesh();
   GridGenerator::hyper_shell(triangulation, Point<dim>(), r_a, r_b, 0, true);
 
   triangulation.set_all_manifold_ids(0);

@@ -32,9 +32,6 @@ private:
   void
   initialize();
 
-  void
-  output_results() const;
-
   CylindricalManifold<dim> manifold;
 
   TemperatureSolver<dim> solver;
@@ -65,13 +62,14 @@ Problem<dim>::make_grid()
   Triangulation<dim - 1> base;
   GridGenerator::hyper_ball(base, Point<dim - 1>(), 0.1);
 
-  GridGenerator::extrude_triangulation(base, 5, 0.5, solver.mesh());
+  Triangulation<dim> &triangulation = solver.get_mesh();
+  GridGenerator::extrude_triangulation(base, 5, 0.5, triangulation);
 
-  solver.mesh().set_all_manifold_ids(0);
-  solver.mesh().set_manifold(0, manifold);
-  solver.mesh().refine_global(3);
+  triangulation.set_all_manifold_ids(0);
+  triangulation.set_manifold(0, manifold);
+  triangulation.refine_global(3);
 
-  std::cout << "Number of active cells: " << solver.mesh().n_active_cells()
+  std::cout << "Number of active cells: " << triangulation.n_active_cells()
             << "\n";
 }
 
