@@ -25,6 +25,20 @@ public:
   Triangulation<dim> &
   mesh();
 
+  const Vector<double> &
+  get_temperature() const;
+  Vector<double> &
+  get_temperature();
+
+  void
+  initialize();
+
+  void
+  get_support_points(std::vector<Point<dim>> &points) const;
+
+  void
+  output_results() const;
+
   void
   output_mesh() const;
 
@@ -98,6 +112,57 @@ Triangulation<dim> &
 StressSolver<dim>::mesh()
 {
   return triangulation;
+}
+
+template <int dim>
+const Vector<double> &
+StressSolver<dim>::get_temperature() const
+{
+  return temperature;
+}
+
+template <int dim>
+Vector<double> &
+StressSolver<dim>::get_temperature()
+{
+  return temperature;
+}
+
+template <int dim>
+void
+StressSolver<dim>::initialize()
+{
+  dh_temp.distribute_dofs(fe_temp);
+  const unsigned int n_dofs = dh_temp.n_dofs();
+  std::cout << "Number of temperature degrees of freedom: " << n_dofs << "\n";
+
+  temperature.reinit(n_dofs);
+}
+
+template <int dim>
+void
+StressSolver<dim>::get_support_points(std::vector<Point<dim>> &points) const
+{
+  points.resize(dh_temp.n_dofs());
+  DoFTools::map_dofs_to_support_points(MappingQ1<dim>(), dh_temp, points);
+}
+
+template <int dim>
+void
+StressSolver<dim>::output_results() const
+{
+  DataOut<dim> data_out;
+
+  data_out.attach_dof_handler(dh_temp);
+  data_out.add_data_vector(temperature, "T");
+
+  data_out.build_patches();
+
+  const std::string file_name = "result-" + std::to_string(dim) + "d.vtk";
+  std::cout << "Saving to " << file_name << "\n";
+
+  std::ofstream output(file_name);
+  data_out.write_vtk(output);
 }
 
 template <int dim>
