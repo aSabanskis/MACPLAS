@@ -19,7 +19,7 @@ template <int dim>
 class Problem
 {
 public:
-  Problem(unsigned int order = 2);
+  Problem(unsigned int order = 1);
 
   void
   run();
@@ -58,6 +58,7 @@ Problem<dim>::run()
   make_grid();
   initialize();
 
+  solver.solve();
   solver.output_results();
 }
 

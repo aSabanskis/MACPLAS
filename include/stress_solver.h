@@ -4,9 +4,11 @@
 #include <deal.II/base/parameter_handler.h>
 
 #include <deal.II/dofs/dof_handler.h>
+#include <deal.II/dofs/dof_renumbering.h>
 
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_system.h>
+#include <deal.II/fe/fe_tools.h>
 
 #include <deal.II/grid/grid_out.h>
 #include <deal.II/grid/tria.h>
@@ -14,7 +16,10 @@
 #include <deal.II/lac/block_sparse_matrix.h>
 #include <deal.II/lac/block_sparsity_pattern.h>
 #include <deal.II/lac/block_vector.h>
+#include <deal.II/lac/sparse_direct.h>
 #include <deal.II/lac/vector.h>
+
+#include <deal.II/numerics/matrix_tools.h>
 
 using namespace dealii;
 
@@ -51,6 +56,9 @@ public:
 
 private:
   void
+  initialize_parameters();
+
+  void
   prepare_for_solve();
 
   void
@@ -58,6 +66,25 @@ private:
 
   void
   solve_system();
+
+  void
+  calculate_stress();
+
+  // Number of distinct elements of the stress tensor
+  // 3D: 6, 2D (axisymmetric): 4
+  static const unsigned int n_components = 2 * dim;
+
+  SymmetricTensor<2, StressSolver<dim>::n_components>
+  get_stiffness_tensor() const;
+
+  Tensor<1, StressSolver<dim>::n_components>
+  get_strain(const FEValues<dim> &fe_values,
+             const unsigned int & shape_func,
+             const unsigned int & q) const;
+  Tensor<1, StressSolver<dim>::n_components>
+  get_strain(const double &T) const;
+  Tensor<1, StressSolver<dim>::n_components>
+  get_strain(const std::vector<Tensor<1, dim>> &grad_displacement) const;
 
   Triangulation<dim> triangulation;
 
@@ -68,6 +95,7 @@ private:
   FESystem<dim>       fe;
   DoFHandler<dim>     dh;
   BlockVector<double> displacement;
+  BlockVector<double> stress;
 
   BlockSparsityPattern      sparsity_pattern;
   BlockSparseMatrix<double> system_matrix;
@@ -82,6 +110,10 @@ private:
   double m_alpha;
   // Poisson's ratio, -
   double m_nu;
+  // Reference temperature, K
+  double m_T_ref;
+  // Second-order elastic constants (stiffnesses), Pa
+  double m_C_11, m_C_12, m_C_44;
 };
 
 template <int dim>
@@ -109,6 +141,11 @@ StressSolver<dim>::StressSolver(unsigned int order)
                     Patterns::Double(0, 0.5),
                     "Poisson's ratio (dimensionless)");
 
+  prm.declare_entry("Reference temperature",
+                    "1685",
+                    Patterns::Double(),
+                    "Reference temperature in K");
+
   try
     {
       prm.parse_input("stress.prm");
@@ -121,9 +158,24 @@ StressSolver<dim>::StressSolver(unsigned int order)
       prm.print_parameters(of, ParameterHandler::Text);
     }
 
+  initialize_parameters();
+}
+
+template <int dim>
+void
+StressSolver<dim>::initialize_parameters()
+{
   m_E     = prm.get_double("Young's modulus");
   m_alpha = prm.get_double("Thermal expansion coefficient");
   m_nu    = prm.get_double("Poisson's ratio");
+  m_T_ref = prm.get_double("Reference temperature");
+
+  m_C_11 = m_E * (1 - m_nu) / ((1 + m_nu) * (1 - 2 * m_nu));
+  m_C_12 = m_E * m_nu / ((1 + m_nu) * (1 - 2 * m_nu));
+  m_C_44 = m_E / (2 * (1 + m_nu));
+
+  std::cout << "C_11=" << m_C_11 << " C_12=" << m_C_12 << " C_44=" << m_C_44
+            << "\n";
 }
 
 template <int dim>
@@ -133,6 +185,7 @@ StressSolver<dim>::solve()
   prepare_for_solve();
   assemble_system();
   solve_system();
+  calculate_stress();
 }
 
 template <int dim>
@@ -201,6 +254,12 @@ StressSolver<dim>::output_results() const
       data_out.add_data_vector(displacement.block(i), name);
     }
 
+  for (unsigned int i = 0; i < stress.n_blocks(); ++i)
+    {
+      const std::string name = "stress_" + std::to_string(i);
+      data_out.add_data_vector(stress.block(i), name);
+    }
+
   data_out.build_patches(fe.degree);
 
   const std::string file_name = "result-" + std::to_string(dim) + "d.vtk";
@@ -244,6 +303,7 @@ StressSolver<dim>::prepare_for_solve()
     }
   dsp.collect_sizes();
 
+  DoFRenumbering::component_wise(dh);
   DoFTools::make_sparsity_pattern(dh, dsp);
 
   sparsity_pattern.copy_from(dsp);
@@ -254,13 +314,257 @@ template <int dim>
 void
 StressSolver<dim>::assemble_system()
 {
+  AssertThrow(dim == 3, ExcNotImplemented());
+
+  const QGauss<dim> quadrature(fe.degree + 1);
+
   system_matrix = 0;
   system_rhs    = 0;
+
+  FEValues<dim> fe_values_temp(fe_temp, quadrature, update_values);
+  FEValues<dim> fe_values(fe, quadrature, update_gradients | update_JxW_values);
+
+  const unsigned int dofs_per_cell = fe.dofs_per_cell;
+  const unsigned int n_q_points    = quadrature.size();
+
+  FullMatrix<double> cell_matrix(dofs_per_cell, dofs_per_cell);
+  Vector<double>     cell_rhs(dofs_per_cell);
+
+  std::vector<double> T_q(n_q_points);
+
+  std::vector<types::global_dof_index> local_dof_indices(dofs_per_cell);
+
+  const SymmetricTensor<2, n_components> stiffness = get_stiffness_tensor();
+
+  typename DoFHandler<dim>::active_cell_iterator cell_temp =
+                                                   dh_temp.begin_active(),
+                                                 endc_temp = dh_temp.end(),
+                                                 cell      = dh.begin_active(),
+                                                 endc      = dh.end();
+  for (; cell != endc; ++cell_temp, ++cell)
+    {
+      cell_matrix = 0;
+      cell_rhs    = 0;
+
+      fe_values_temp.reinit(cell_temp);
+      fe_values.reinit(cell);
+
+      fe_values_temp.get_function_values(temperature, T_q);
+
+      for (unsigned int q = 0; q < n_q_points; ++q)
+        {
+          const Tensor<1, n_components> epsilon_T = get_strain(T_q[q]);
+
+          for (unsigned int i = 0; i < dofs_per_cell; ++i)
+            {
+              const Tensor<1, n_components> strain_i =
+                get_strain(fe_values, i, q);
+
+              const Tensor<1, n_components> strain_i_stiffness =
+                strain_i * stiffness;
+
+              for (unsigned int j = 0; j < dofs_per_cell; ++j)
+                {
+                  const Tensor<1, n_components> strain_j =
+                    get_strain(fe_values, j, q);
+
+                  cell_matrix(i, j) +=
+                    (strain_i_stiffness * strain_j) * fe_values.JxW(q);
+                }
+              cell_rhs(i) +=
+                (strain_i_stiffness * epsilon_T) * fe_values.JxW(q);
+            }
+        }
+
+      cell->get_dof_indices(local_dof_indices);
+      for (unsigned int i = 0; i < dofs_per_cell; ++i)
+        {
+          for (unsigned int j = 0; j < dofs_per_cell; ++j)
+            system_matrix.add(local_dof_indices[i],
+                              local_dof_indices[j],
+                              cell_matrix(i, j));
+
+          system_rhs(local_dof_indices[i]) += cell_rhs(i);
+        }
+    }
 }
 
 template <int dim>
 void
 StressSolver<dim>::solve_system()
-{}
+{
+  SparseDirectUMFPACK A;
+  A.initialize(system_matrix);
+  A.vmult(displacement, system_rhs);
+}
+
+template <int dim>
+void
+StressSolver<dim>::calculate_stress()
+{
+  AssertThrow(dim == 3, ExcNotImplemented());
+
+  const QGauss<dim> quadrature(fe.degree + 1);
+
+  FEValues<dim> fe_values_temp(fe_temp, quadrature, update_values);
+  FEValues<dim> fe_values(fe, quadrature, update_gradients);
+
+  const unsigned int n_dofs_temp        = dh_temp.n_dofs();
+  const unsigned int dofs_per_cell_temp = fe_temp.dofs_per_cell;
+  const unsigned int n_q_points         = quadrature.size();
+
+  stress.reinit(n_components, n_dofs_temp);
+  std::vector<unsigned int> count(n_dofs_temp, 0);
+
+  FullMatrix<double> qpoint_to_dof_matrix(dofs_per_cell_temp, n_q_points);
+  FETools::compute_projection_from_quadrature_points_matrix(
+    fe_temp, quadrature, quadrature, qpoint_to_dof_matrix);
+
+  std::vector<double> T_q(n_q_points);
+
+  std::vector<std::vector<Tensor<1, dim>>> grad_displacement_q(
+    n_q_points, std::vector<Tensor<1, dim>>(dim));
+
+  std::vector<Vector<double>> stress_q(n_components,
+                                       Vector<double>(n_q_points));
+
+  std::vector<Vector<double>> stress_cell(n_components,
+                                          Vector<double>(dofs_per_cell_temp));
+
+  std::vector<types::global_dof_index> local_dof_indices(dofs_per_cell_temp);
+
+  const SymmetricTensor<2, n_components> stiffness = get_stiffness_tensor();
+
+  typename DoFHandler<dim>::active_cell_iterator cell_temp =
+                                                   dh_temp.begin_active(),
+                                                 endc_temp = dh_temp.end(),
+                                                 cell      = dh.begin_active(),
+                                                 endc      = dh.end();
+  for (; cell != endc; ++cell_temp, ++cell)
+    {
+      fe_values_temp.reinit(cell_temp);
+      fe_values.reinit(cell);
+
+      fe_values_temp.get_function_values(temperature, T_q);
+
+      fe_values.get_function_gradients(displacement, grad_displacement_q);
+
+      for (unsigned int q = 0; q < n_q_points; ++q)
+        {
+          const Tensor<1, n_components> epsilon_T = get_strain(T_q[q]);
+          const Tensor<1, n_components> epsilon_e =
+            get_strain(grad_displacement_q[q]);
+
+          const Tensor<1, n_components> s = stiffness * (epsilon_e - epsilon_T);
+
+          for (unsigned int k = 0; k < n_components; ++k)
+            {
+              stress_q[k][q] = s[k];
+            }
+        }
+
+      for (unsigned int k = 0; k < n_components; ++k)
+        {
+          qpoint_to_dof_matrix.vmult(stress_cell[k], stress_q[k]);
+        }
+
+      cell_temp->get_dof_indices(local_dof_indices);
+
+      for (unsigned int i = 0; i < dofs_per_cell_temp; ++i)
+        {
+          count[local_dof_indices[i]] += 1;
+
+          for (unsigned int k = 0; k < n_components; ++k)
+            {
+              stress.block(k)[local_dof_indices[i]] += stress_cell[k][i];
+            }
+        }
+    }
+
+  for (unsigned int k = 0; k < n_components; ++k)
+    {
+      for (unsigned int i = 0; i < dofs_per_cell_temp; ++i)
+        {
+          AssertThrow(count[i] > 0,
+                      ExcMessage("count[" + std::to_string(i) +
+                                 "]=" + std::to_string(count[i]) +
+                                 ", positive value expected"));
+
+          stress.block(k)[i] /= count[i];
+        }
+    }
+}
+
+template <int dim>
+SymmetricTensor<2, StressSolver<dim>::n_components>
+StressSolver<dim>::get_stiffness_tensor() const
+{
+  AssertThrow(dim == 3, ExcNotImplemented());
+
+  SymmetricTensor<2, n_components> tmp;
+  tmp[0][0] = tmp[1][1] = tmp[2][2] = m_C_11;
+  tmp[3][3] = tmp[4][4] = tmp[5][5] = m_C_44;
+  tmp[2][1] = tmp[2][0] = tmp[1][0] = m_C_12;
+
+  return tmp;
+}
+
+template <int dim>
+Tensor<1, StressSolver<dim>::n_components>
+StressSolver<dim>::get_strain(const FEValues<dim> &fe_values,
+                              const unsigned int & shape_func,
+                              const unsigned int & q) const
+{
+  AssertThrow(dim == 3, ExcNotImplemented());
+
+  Tensor<1, n_components> tmp;
+
+  tmp[0] = fe_values.shape_grad_component(shape_func, q, 0)[0];
+  tmp[1] = fe_values.shape_grad_component(shape_func, q, 1)[1];
+  tmp[2] = fe_values.shape_grad_component(shape_func, q, 2)[2];
+
+  tmp[3] = fe_values.shape_grad_component(shape_func, q, 2)[1] +
+           fe_values.shape_grad_component(shape_func, q, 1)[2];
+
+  tmp[4] = fe_values.shape_grad_component(shape_func, q, 2)[0] +
+           fe_values.shape_grad_component(shape_func, q, 0)[2];
+
+  tmp[5] = fe_values.shape_grad_component(shape_func, q, 1)[0] +
+           fe_values.shape_grad_component(shape_func, q, 0)[1];
+
+  return tmp;
+}
+
+template <int dim>
+Tensor<1, StressSolver<dim>::n_components>
+StressSolver<dim>::get_strain(const double &T) const
+{
+  AssertThrow(dim == 3, ExcNotImplemented());
+
+  Tensor<1, n_components> tmp;
+  tmp[0] = tmp[1] = tmp[2] = m_alpha * (T - m_T_ref);
+  tmp[3] = tmp[4] = tmp[5] = 0;
+
+  return tmp;
+}
+
+template <int dim>
+Tensor<1, StressSolver<dim>::n_components>
+StressSolver<dim>::get_strain(
+  const std::vector<Tensor<1, dim>> &grad_displacement) const
+{
+  AssertThrow(dim == 3, ExcNotImplemented());
+  Tensor<1, n_components> tmp;
+
+  tmp[0] = grad_displacement[0][0];
+  tmp[1] = grad_displacement[1][1];
+  tmp[2] = grad_displacement[2][2];
+
+  tmp[3] = grad_displacement[2][1] + grad_displacement[1][2];
+  tmp[4] = grad_displacement[2][0] + grad_displacement[0][2];
+  tmp[5] = grad_displacement[1][0] + grad_displacement[0][1];
+
+  return tmp;
+}
 
 #endif
