@@ -21,6 +21,8 @@
 
 #include <deal.II/numerics/matrix_tools.h>
 
+#include "utilities.h"
+
 using namespace dealii;
 
 template <int dim>
@@ -96,6 +98,8 @@ private:
   DoFHandler<dim>     dh;
   BlockVector<double> displacement;
   BlockVector<double> stress;
+  Vector<double>      stress_hydrostatic;
+  Vector<double>      stress_von_Mises;
 
   BlockSparsityPattern      sparsity_pattern;
   BlockSparseMatrix<double> system_matrix;
@@ -260,6 +264,9 @@ StressSolver<dim>::output_results() const
       data_out.add_data_vector(stress.block(i), name);
     }
 
+  data_out.add_data_vector(stress_hydrostatic, "stress_hydrostatic");
+  data_out.add_data_vector(stress_von_Mises, "stress_von_Mises");
+
   data_out.build_patches(fe.degree);
 
   const std::string file_name = "result-" + std::to_string(dim) + "d.vtk";
@@ -414,6 +421,9 @@ StressSolver<dim>::calculate_stress()
   const unsigned int n_q_points         = quadrature.size();
 
   stress.reinit(n_components, n_dofs_temp);
+  stress_hydrostatic.reinit(n_dofs_temp);
+  stress_von_Mises.reinit(n_dofs_temp);
+
   std::vector<unsigned int> count(n_dofs_temp, 0);
 
   FullMatrix<double> qpoint_to_dof_matrix(dofs_per_cell_temp, n_q_points);
@@ -492,6 +502,21 @@ StressSolver<dim>::calculate_stress()
 
           stress.block(k)[i] /= count[i];
         }
+    }
+
+  for (unsigned int i = 0; i < n_dofs_temp; ++i)
+    {
+      stress_hydrostatic[i] =
+        (stress.block(0)[i] + stress.block(1)[i] + stress.block(2)[i]) / 3;
+
+      stress_von_Mises[i] =
+        sqr(stress.block(0)[i] - stress.block(1)[i]) +
+        sqr(stress.block(1)[i] - stress.block(2)[i]) +
+        sqr(stress.block(2)[i] - stress.block(0)[i]) +
+        6 * (sqr(stress.block(3)[i]) + sqr(stress.block(4)[i]) +
+             sqr(stress.block(5)[i]));
+
+      stress_von_Mises[i] = std::sqrt(stress_von_Mises[i] / 2);
     }
 }
 

@@ -16,7 +16,10 @@
 
 using namespace dealii;
 
-// helper function
+// helper functions
+double
+sqr(const double x);
+
 template <int dim>
 Point<dim>
 closest_segment_point(const Point<dim> &p,
@@ -161,6 +164,12 @@ private:
 
 
 // IMPLEMENTATION
+
+double
+sqr(const double x)
+{
+  return x * x;
+}
 
 template <int dim>
 Point<dim>
