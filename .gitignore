@@ -17,7 +17,7 @@
 
 # Executables
 *.exe
-*.out
+*.out*
 *.app
 
 # Temporary files and directories
@@ -28,8 +28,9 @@ CMakeCache.txt
 [Mm]akefile
 *project
 *.json
-*.bak
+*.bak*
 log
+*.log*
 
 # Data files
 *.vt[uk]

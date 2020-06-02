@@ -29,7 +29,7 @@ template <int dim>
 class StressSolver
 {
 public:
-  StressSolver(unsigned int order = 2);
+  StressSolver(const unsigned int order = 2);
 
   void
   solve();
@@ -121,7 +121,7 @@ private:
 };
 
 template <int dim>
-StressSolver<dim>::StressSolver(unsigned int order)
+StressSolver<dim>::StressSolver(const unsigned int order)
   : fe_temp(order)
   , dh_temp(triangulation)
   , fe(FE_Q<dim>(order), dim)
@@ -493,7 +493,7 @@ StressSolver<dim>::calculate_stress()
 
   for (unsigned int k = 0; k < n_components; ++k)
     {
-      for (unsigned int i = 0; i < dofs_per_cell_temp; ++i)
+      for (unsigned int i = 0; i < n_dofs_temp; ++i)
         {
           AssertThrow(count[i] > 0,
                       ExcMessage("count[" + std::to_string(i) +

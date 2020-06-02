@@ -19,7 +19,7 @@ template <int dim>
 class Problem
 {
 public:
-  Problem(unsigned int order = 1);
+  Problem(const unsigned int order = 1);
 
   void
   run();
@@ -42,11 +42,11 @@ private:
 };
 
 template <int dim>
-Problem<dim>::Problem(unsigned int order)
+Problem<dim>::Problem(const unsigned int order)
   : r_a(0.5)
   , r_b(1.0)
   , T_a(500)
-  , T_b{1000}
+  , T_b(1000)
   , manifold(SphericalManifold<dim>(Point<dim>()))
   , solver(order)
 {}
