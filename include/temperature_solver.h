@@ -21,6 +21,7 @@
 #include <deal.II/lac/sparse_matrix.h>
 
 #include <deal.II/numerics/data_out.h>
+#include <deal.II/numerics/fe_field_function.h>
 #include <deal.II/numerics/matrix_tools.h>
 #include <deal.II/numerics/vector_tools.h>
 
@@ -54,10 +55,10 @@ public:
   get_mesh();
 
   void
-  initialize(const Vector<double> &t);
+  initialize(const Vector<double> &T);
 
   void
-  initialize(double t);
+  initialize(double T);
 
   void
   initialize(const Polynomials::Polynomial<double> &l);
@@ -77,6 +78,9 @@ public:
                    std::function<double(double)> emissivity_deriv);
 
   void
+  add_probe(const Point<dim> &p);
+
+  void
   output_results() const;
 
   void
@@ -88,6 +92,12 @@ private:
 
   void
   assemble_system();
+
+  void
+  solve_system();
+
+  void
+  output_probes() const;
 
   Triangulation<dim> triangulation;
   FE_Q<dim>          fe;
@@ -106,6 +116,9 @@ private:
   // Boundary condition data
   std::map<unsigned int, double>         bc1_data;
   std::map<unsigned int, heat_flux_data> bc_rad_mixed_data;
+
+  // Locations of probe points
+  std::vector<Point<dim>> probes;
 
   // Parameters
   ParameterHandler prm;
@@ -143,6 +156,12 @@ TemperatureSolver<dim>::TemperatureSolver(unsigned int order)
                     Patterns::Double(),
                     "Max time in seconds");
 
+  prm.declare_entry(
+    "Output precision",
+    "8",
+    Patterns::Integer(1),
+    "Precision of double variables for output of field and probe data");
+
   prm.declare_entry("Density", "1000", Patterns::Double(), "Density in kg/m^3");
 
   prm.declare_entry("Specific heat capacity",
@@ -177,10 +196,7 @@ TemperatureSolver<dim>::solve()
     {
       prepare_for_solve();
       assemble_system();
-
-      SparseDirectUMFPACK A;
-      A.initialize(system_matrix);
-      A.vmult(temperature_update, system_rhs);
+      solve_system();
 
       // Using step length 1
       temperature += temperature_update;
@@ -197,6 +213,9 @@ TemperatureSolver<dim>::solve()
       if (N >= 1 && i >= N)
         break;
     }
+
+  output_probes();
+
   if (dt > 0 && t >= prm.get_double("Max time"))
     return false;
 
@@ -221,19 +240,19 @@ TemperatureSolver<dim>::get_mesh()
 
 template <int dim>
 void
-TemperatureSolver<dim>::initialize(const Vector<double> &t)
+TemperatureSolver<dim>::initialize(const Vector<double> &T)
 {
   dh.distribute_dofs(fe);
   const unsigned int n_dofs = dh.n_dofs();
   std::cout << "Number of degrees of freedom: " << n_dofs << "\n";
 
-  AssertDimension(n_dofs, t.size());
-  temperature = t;
+  AssertDimension(n_dofs, T.size());
+  temperature = T;
 }
 
 template <int dim>
 void
-TemperatureSolver<dim>::initialize(double t)
+TemperatureSolver<dim>::initialize(double T)
 {
   dh.distribute_dofs(fe);
   const unsigned int n_dofs = dh.n_dofs();
@@ -241,7 +260,7 @@ TemperatureSolver<dim>::initialize(double t)
 
   temperature.reinit(n_dofs);
   temperature_update.reinit(n_dofs);
-  temperature.add(t);
+  temperature.add(T);
 }
 
 template <int dim>
@@ -284,6 +303,13 @@ TemperatureSolver<dim>::set_bc_rad_mixed(
   bc_rad_mixed_data[id].q_in             = q_in;
   bc_rad_mixed_data[id].emissivity       = emissivity;
   bc_rad_mixed_data[id].emissivity_deriv = emissivity_deriv;
+}
+
+template <int dim>
+void
+TemperatureSolver<dim>::add_probe(const Point<dim> &p)
+{
+  probes.push_back(p);
 }
 
 template <int dim>
@@ -343,6 +369,10 @@ TemperatureSolver<dim>::output_results() const
   std::cout << "Saving to " << file_name << "\n";
 
   std::ofstream output(file_name);
+
+  const int precision = prm.get_integer("Output precision");
+  output << std::setprecision(precision);
+
   data_out.write_vtk(output);
 }
 
@@ -360,6 +390,50 @@ TemperatureSolver<dim>::output_mesh() const
   GridOut grid_out;
   grid_out.set_flags(GridOutFlags::Msh(true));
   grid_out.write_msh(triangulation, output);
+}
+
+template <int dim>
+void
+TemperatureSolver<dim>::output_probes() const
+{
+  std::stringstream ss;
+  ss << "probes-" << dim << "d.txt";
+  const std::string file_name = ss.str();
+
+  const unsigned int N = probes.size();
+
+  const double dt = prm.get_double("Time step");
+  const double t  = dt * current_step;
+
+  if (first)
+    {
+      // write header at the first time step
+      std::ofstream output(file_name);
+
+      for (unsigned int i = 0; i < N; ++i)
+        output << "# probe " << i << ": " << probes[i] << "\n";
+
+      output << "t[s]";
+      for (unsigned int i = 0; i < N; ++i)
+        output << " T_" << i << "[K]";
+      output << "\n";
+    }
+
+  Functions::FEFieldFunction<dim> ff(dh, temperature);
+
+  std::vector<double> values(N);
+  ff.value_list(probes, values);
+
+  // header is already written, append values at the current time step
+  std::ofstream output(file_name, std::ios::app);
+
+  const int precision = prm.get_integer("Output precision");
+  output << std::setprecision(precision);
+
+  output << t;
+  for (const auto &v : values)
+    output << " " << v;
+  output << "\n";
 }
 
 template <int dim>
@@ -550,6 +624,15 @@ TemperatureSolver<dim>::assemble_system()
                                      system_matrix,
                                      temperature_update,
                                      system_rhs);
+}
+
+template <int dim>
+void
+TemperatureSolver<dim>::solve_system()
+{
+  SparseDirectUMFPACK A;
+  A.initialize(system_matrix);
+  A.vmult(temperature_update, system_rhs);
 }
 
 #endif

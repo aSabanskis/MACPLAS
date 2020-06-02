@@ -36,6 +36,8 @@ log
 *.vt[uk]
 *.msh
 *.pvsm
+*.txt
+*.dat
 
 # Parameter files
 *.prm

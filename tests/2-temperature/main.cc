@@ -66,6 +66,14 @@ Problem<dim>::make_grid()
 
   std::cout << "Number of active cells: " << triangulation.n_active_cells()
             << "\n";
+
+  const unsigned int n_probes = 6;
+  for (unsigned int i = 0; i < n_probes; ++i)
+    {
+      Point<dim> p;
+      p(0) = i / (n_probes - 1.0);
+      solver.add_probe(p);
+    }
 }
 
 template <int dim>
