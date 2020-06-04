@@ -1,14 +1,4 @@
-#include <deal.II/base/polynomial.h>
-
-#include <deal.II/dofs/dof_handler.h>
-#include <deal.II/dofs/dof_tools.h>
-
-#include <deal.II/fe/fe_q.h>
-
 #include <deal.II/grid/grid_generator.h>
-#include <deal.II/grid/tria.h>
-
-#include <deal.II/numerics/data_out.h>
 
 #include "../../include/temperature_solver.h"
 
@@ -63,9 +53,6 @@ Problem<dim>::make_grid()
   GridGenerator::hyper_cube(triangulation, 0, 1, true);
 
   triangulation.refine_global(3);
-
-  std::cout << "Number of active cells: " << triangulation.n_active_cells()
-            << "\n";
 
   const unsigned int n_probes = 6;
   for (unsigned int i = 0; i < n_probes; ++i)

@@ -2,9 +2,11 @@
 #define macplas_stress_solver_h
 
 #include <deal.II/base/parameter_handler.h>
+#include <deal.II/base/timer.h>
 
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/dofs/dof_renumbering.h>
+#include <deal.II/dofs/dof_tools.h>
 
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_system.h>
@@ -19,6 +21,7 @@
 #include <deal.II/lac/sparse_direct.h>
 #include <deal.II/lac/vector.h>
 
+#include <deal.II/numerics/data_out.h>
 #include <deal.II/numerics/matrix_tools.h>
 
 #include "utilities.h"
@@ -169,6 +172,8 @@ template <int dim>
 void
 StressSolver<dim>::initialize_parameters()
 {
+  std::cout << "Intializing parameters";
+
   m_E     = prm.get_double("Young's modulus");
   m_alpha = prm.get_double("Thermal expansion coefficient");
   m_nu    = prm.get_double("Poisson's ratio");
@@ -178,8 +183,15 @@ StressSolver<dim>::initialize_parameters()
   m_C_12 = m_E * m_nu / ((1 + m_nu) * (1 - 2 * m_nu));
   m_C_44 = m_E / (2 * (1 + m_nu));
 
-  std::cout << "C_11=" << m_C_11 << " C_12=" << m_C_12 << " C_44=" << m_C_44
-            << "\n";
+  std::cout << "  done\n";
+
+  std::cout << "E=" << m_E << "\n"
+            << "alpha=" << m_alpha << "\n"
+            << "nu=" << m_nu << "\n"
+            << "T_ref=" << m_T_ref << "\n"
+            << "C_11=" << m_C_11 << "\n"
+            << "C_12=" << m_C_12 << "\n"
+            << "C_44=" << m_C_44 << "\n";
 }
 
 template <int dim>
@@ -224,15 +236,25 @@ template <int dim>
 void
 StressSolver<dim>::initialize()
 {
+  Timer timer;
+
+  std::cout << "Initializing finite element solution";
+
   dh_temp.distribute_dofs(fe_temp);
   dh.distribute_dofs(fe);
 
   const unsigned int n_dofs_temp = dh_temp.n_dofs();
-  std::cout << "Number of degrees of freedom for temperature: " << n_dofs_temp
-            << "\n";
-
   temperature.reinit(n_dofs_temp);
   displacement.reinit(dim, n_dofs_temp);
+
+  std::cout << "  done in " << timer() << " s\n";
+
+  std::cout << "dim=" << dim << "\n"
+            << "order=" << fe.degree << "\n"
+            << "Number of active cells: " << triangulation.n_active_cells()
+            << "\n"
+            << "Number of degrees of freedom for temperature: " << n_dofs_temp
+            << "\n";
 }
 
 template <int dim>
@@ -247,6 +269,13 @@ template <int dim>
 void
 StressSolver<dim>::output_results() const
 {
+  Timer timer;
+
+  std::stringstream ss;
+  ss << "result-" << dim << "d-order" << fe.degree << ".vtk";
+  const std::string file_name = ss.str();
+  std::cout << "Saving to '" << file_name << "'";
+
   DataOut<dim> data_out;
 
   data_out.attach_dof_handler(dh_temp);
@@ -269,27 +298,30 @@ StressSolver<dim>::output_results() const
 
   data_out.build_patches(fe.degree);
 
-  const std::string file_name = "result-" + std::to_string(dim) + "d.vtk";
-  std::cout << "Saving to " << file_name << "\n";
-
   std::ofstream output(file_name);
   data_out.write_vtk(output);
+
+  std::cout << "  done in " << timer() << " s\n";
 }
 
 template <int dim>
 void
 StressSolver<dim>::output_mesh() const
 {
+  Timer timer;
+
   std::stringstream ss;
-  ss << "mesh-" << dim << "d.msh";
+  ss << "mesh-" << dim << "d-order" << fe.degree << ".msh";
   const std::string file_name = ss.str();
-  std::cout << "Saving to " << file_name << "\n";
+  std::cout << "Saving to '" << file_name << "'";
 
   std::ofstream output(file_name);
 
   GridOut grid_out;
   grid_out.set_flags(GridOutFlags::Msh(true));
   grid_out.write_msh(triangulation, output);
+
+  std::cout << "  done in " << timer() << " s\n";
 }
 
 template <int dim>
@@ -322,6 +354,10 @@ void
 StressSolver<dim>::assemble_system()
 {
   AssertThrow(dim == 3, ExcNotImplemented());
+
+  Timer timer;
+
+  std::cout << "Assembling system";
 
   const QGauss<dim> quadrature(fe.degree + 1);
 
@@ -394,15 +430,23 @@ StressSolver<dim>::assemble_system()
           system_rhs(local_dof_indices[i]) += cell_rhs(i);
         }
     }
+
+  std::cout << "  done in " << timer() << " s\n";
 }
 
 template <int dim>
 void
 StressSolver<dim>::solve_system()
 {
+  Timer timer;
+
+  std::cout << "Solving system";
+
   SparseDirectUMFPACK A;
   A.initialize(system_matrix);
   A.vmult(displacement, system_rhs);
+
+  std::cout << "  done in " << timer() << " s\n";
 }
 
 template <int dim>
@@ -410,6 +454,10 @@ void
 StressSolver<dim>::calculate_stress()
 {
   AssertThrow(dim == 3, ExcNotImplemented());
+
+  Timer timer;
+
+  std::cout << "Postprocessing results";
 
   const QGauss<dim> quadrature(fe.degree + 1);
 
@@ -518,6 +566,8 @@ StressSolver<dim>::calculate_stress()
 
       stress_von_Mises[i] = std::sqrt(stress_von_Mises[i] / 2);
     }
+
+  std::cout << "  done in " << timer() << " s\n";
 }
 
 template <int dim>

@@ -5,6 +5,7 @@
 #include <deal.II/base/parameter_handler.h>
 #include <deal.II/base/polynomial.h>
 #include <deal.II/base/quadrature_lib.h>
+#include <deal.II/base/timer.h>
 
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/dofs/dof_tools.h>
@@ -244,10 +245,16 @@ TemperatureSolver<dim>::initialize(const Vector<double> &T)
 {
   dh.distribute_dofs(fe);
   const unsigned int n_dofs = dh.n_dofs();
-  std::cout << "Number of degrees of freedom: " << n_dofs << "\n";
 
   AssertDimension(n_dofs, T.size());
   temperature = T;
+
+  std::cout << "dim=" << dim << "\n"
+            << "order=" << fe.degree << "\n"
+            << "Number of active cells: " << triangulation.n_active_cells()
+            << "\n"
+            << "Number of degrees of freedom for temperature: " << n_dofs
+            << "\n";
 }
 
 template <int dim>
@@ -256,11 +263,17 @@ TemperatureSolver<dim>::initialize(double T)
 {
   dh.distribute_dofs(fe);
   const unsigned int n_dofs = dh.n_dofs();
-  std::cout << "Number of degrees of freedom: " << n_dofs << "\n";
 
   temperature.reinit(n_dofs);
   temperature_update.reinit(n_dofs);
   temperature.add(T);
+
+  std::cout << "dim=" << dim << "\n"
+            << "order=" << fe.degree << "\n"
+            << "Number of active cells: " << triangulation.n_active_cells()
+            << "\n"
+            << "Number of degrees of freedom for temperature: " << n_dofs
+            << "\n";
 }
 
 template <int dim>
@@ -316,6 +329,16 @@ template <int dim>
 void
 TemperatureSolver<dim>::output_results() const
 {
+  Timer timer;
+
+  const double dt = prm.get_double("Time step");
+  const double t  = dt * current_step;
+
+  std::stringstream ss;
+  ss << "result-" << dim << "d-order" << fe.degree << "-t" << t << ".vtk";
+  const std::string file_name = ss.str();
+  std::cout << "Saving to '" << file_name << "'";
+
   DataOut<dim> data_out;
 
   data_out.attach_dof_handler(dh);
@@ -360,45 +383,47 @@ TemperatureSolver<dim>::output_results() const
 
   data_out.build_patches(fe.degree);
 
-  const double dt = prm.get_double("Time step");
-  const double t  = dt * current_step;
-
-  std::stringstream ss;
-  ss << "result-" << dim << "d-t=" << t << "s.vtk";
-  const std::string file_name = ss.str();
-  std::cout << "Saving to " << file_name << "\n";
-
   std::ofstream output(file_name);
 
   const int precision = prm.get_integer("Output precision");
   output << std::setprecision(precision);
 
   data_out.write_vtk(output);
+
+  std::cout << "  done in " << timer() << " s\n";
 }
 
 template <int dim>
 void
 TemperatureSolver<dim>::output_mesh() const
 {
+  Timer timer;
+
   std::stringstream ss;
-  ss << "mesh-" << dim << "d.msh";
+  ss << "mesh-" << dim << "d-order" << fe.degree << ".msh";
   const std::string file_name = ss.str();
-  std::cout << "Saving to " << file_name << "\n";
+  std::cout << "Saving to '" << file_name << "'";
 
   std::ofstream output(file_name);
 
   GridOut grid_out;
   grid_out.set_flags(GridOutFlags::Msh(true));
   grid_out.write_msh(triangulation, output);
+
+  std::cout << "  done in " << timer() << " s\n";
 }
 
 template <int dim>
 void
 TemperatureSolver<dim>::output_probes() const
 {
+  Timer timer;
+
   std::stringstream ss;
   ss << "probes-" << dim << "d.txt";
   const std::string file_name = ss.str();
+
+  std::cout << "Saving values at probe points to '" << file_name << "'";
 
   const unsigned int N = probes.size();
 
@@ -434,6 +459,8 @@ TemperatureSolver<dim>::output_probes() const
   for (const auto &v : values)
     output << " " << v;
   output << "\n";
+
+  std::cout << "  done in " << timer() << " s\n";
 }
 
 template <int dim>
@@ -470,6 +497,10 @@ template <int dim>
 void
 TemperatureSolver<dim>::assemble_system()
 {
+  Timer timer;
+
+  std::cout << "Assembling system";
+
   const double dt     = prm.get_double("Time step");
   const double inv_dt = dt == 0 ? 0 : 1 / dt;
 
@@ -624,15 +655,23 @@ TemperatureSolver<dim>::assemble_system()
                                      system_matrix,
                                      temperature_update,
                                      system_rhs);
+
+  std::cout << "  done in " << timer() << " s\n";
 }
 
 template <int dim>
 void
 TemperatureSolver<dim>::solve_system()
 {
+  Timer timer;
+
+  std::cout << "Solving system";
+
   SparseDirectUMFPACK A;
   A.initialize(system_matrix);
   A.vmult(temperature_update, system_rhs);
+
+  std::cout << "  done in " << timer() << " s\n";
 }
 
 #endif

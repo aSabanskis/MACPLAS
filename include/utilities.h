@@ -3,6 +3,7 @@
 
 #include <deal.II/base/point.h>
 #include <deal.II/base/tensor.h>
+#include <deal.II/base/timer.h>
 #include <deal.II/base/utilities.h>
 
 #include <deal.II/lac/vector.h>
@@ -317,6 +318,8 @@ Triangle<dim>::barycentric_coordinates(const Point<dim> &p) const
 void
 SurfaceInterpolator3D::read_vtk(const std::string &file_name)
 {
+  Timer timer;
+
   clear();
 
   std::ifstream file(file_name);
@@ -326,6 +329,9 @@ SurfaceInterpolator3D::read_vtk(const std::string &file_name)
       std::cout << "Could not open '" << file_name << "'\n";
       return;
     }
+  else
+    std::cout << "Reading '" << file_name << "'";
+
 
   std::string s, data_type, data_name;
 
@@ -371,8 +377,6 @@ SurfaceInterpolator3D::read_vtk(const std::string &file_name)
               unsigned int N =
                 data_type == "CELL_DATA" ? triangles.size() : points.size();
 
-              std::cout << data_type << " " << data_name << " " << N << "\n";
-
               std::vector<double> &f = data_type == "CELL_DATA" ?
                                          cell_fields[data_name] :
                                          point_fields[data_name];
@@ -394,9 +398,6 @@ SurfaceInterpolator3D::read_vtk(const std::string &file_name)
                   unsigned int N =
                     data_type == "CELL_DATA" ? triangles.size() : points.size();
 
-                  std::cout << data_type << " " << data_name << " " << N
-                            << "\n";
-
                   std::vector<double> &f = data_type == "CELL_DATA" ?
                                              cell_fields[data_name] :
                                              point_fields[data_name];
@@ -409,6 +410,8 @@ SurfaceInterpolator3D::read_vtk(const std::string &file_name)
         }
     }
 
+  std::cout << "  done in " << timer() << " s\n";
+
   info();
   preprocess();
 }
@@ -416,6 +419,8 @@ SurfaceInterpolator3D::read_vtk(const std::string &file_name)
 void
 SurfaceInterpolator3D::read_vtu(const std::string &file_name)
 {
+  Timer timer;
+
   clear();
 
   std::ifstream file(file_name);
@@ -425,6 +430,8 @@ SurfaceInterpolator3D::read_vtu(const std::string &file_name)
       std::cout << "Could not open '" << file_name << "'\n";
       return;
     }
+  else
+    std::cout << "Reading '" << file_name << "'";
 
   std::string s, data_type, data_name;
 
@@ -463,8 +470,6 @@ SurfaceInterpolator3D::read_vtu(const std::string &file_name)
       // <DataArray ...> has been reached, now read the data
       if (data_start && s.back() == '>')
         {
-          std::cout << data_type << " " << data_name << "\n";
-
           std::vector<std::string> data;
 
           while (file >> s)
@@ -544,6 +549,8 @@ SurfaceInterpolator3D::read_vtu(const std::string &file_name)
         }
     }
 
+  std::cout << "  done in " << timer() << " s\n";
+
   info();
   preprocess();
 }
@@ -551,6 +558,10 @@ SurfaceInterpolator3D::read_vtu(const std::string &file_name)
 void
 SurfaceInterpolator3D::write_vtu(const std::string &file_name) const
 {
+  Timer timer;
+
+  std::cout << "Saving to '" << file_name << "'";
+
   std::ofstream f_out(file_name);
 
   const unsigned int n_points    = points.size();
@@ -633,6 +644,8 @@ SurfaceInterpolator3D::write_vtu(const std::string &file_name) const
   f_out << "</Piece>\n"
            "</UnstructuredGrid>\n"
            "</VTKFile>\n";
+
+  std::cout << "  done in " << timer() << " s\n";
 }
 
 void
@@ -644,6 +657,10 @@ SurfaceInterpolator3D::interpolate(const FieldType &              field_type,
 {
   AssertThrow(field_type == CellField || field_type == PointField,
               ExcNotImplemented());
+
+  Timer timer;
+
+  std::cout << "Interpolating field '" << field_name << "'";
 
   const std::vector<double> &source_field = field(field_type, field_name);
 
@@ -698,6 +715,8 @@ SurfaceInterpolator3D::interpolate(const FieldType &              field_type,
             break;
         }
     }
+
+  std::cout << "  done in " << timer() << " s\n";
 }
 
 void
@@ -764,6 +783,10 @@ void
 SurfaceInterpolator3D::cell_to_point(const std::string &source_name,
                                      const std::string &target_name)
 {
+  Timer timer;
+
+  std::cout << "Convering field '" << source_name << "' from cell to point";
+
   const unsigned int n_points    = points.size();
   const unsigned int n_triangles = triangles.size();
 
@@ -790,12 +813,18 @@ SurfaceInterpolator3D::cell_to_point(const std::string &source_name,
       if (count[i] > 0)
         target_field[i] /= count[i];
     }
+
+  std::cout << "  done in " << timer() << " s\n";
 }
 
 void
 SurfaceInterpolator3D::point_to_cell(const std::string &source_name,
                                      const std::string &target_name)
 {
+  Timer timer;
+
+  std::cout << "Convering field '" << source_name << "' from point to cell";
+
   const unsigned int n_points    = points.size();
   const unsigned int n_triangles = triangles.size();
 
@@ -822,6 +851,8 @@ SurfaceInterpolator3D::point_to_cell(const std::string &source_name,
       if (count[i] > 0)
         target_field[i] /= count[i];
     }
+
+  std::cout << "  done in " << timer() << " s\n";
 }
 
 void
@@ -851,6 +882,10 @@ SurfaceInterpolator3D::info() const
 void
 SurfaceInterpolator3D::preprocess()
 {
+  Timer timer;
+
+  std::cout << "Preprocessing data";
+
   const unsigned int n_triangles = triangles.size();
 
   auto &area         = cell_fields["area"];
@@ -876,6 +911,8 @@ SurfaceInterpolator3D::preprocess()
       area[i]         = triangle.area();
       longest_side[i] = triangle.longest_side();
     }
+
+  std::cout << "  done in " << timer() << " s\n";
 }
 
 #endif

@@ -1,15 +1,5 @@
-#include <deal.II/base/polynomial.h>
-
-#include <deal.II/dofs/dof_handler.h>
-#include <deal.II/dofs/dof_tools.h>
-
-#include <deal.II/fe/fe_q.h>
-
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/manifold_lib.h>
-#include <deal.II/grid/tria.h>
-
-#include <deal.II/numerics/data_out.h>
 
 #include "../../include/temperature_solver.h"
 #include "../../include/utilities.h"
@@ -68,9 +58,6 @@ Problem<dim>::make_grid()
   triangulation.set_all_manifold_ids(0);
   triangulation.set_manifold(0, manifold);
   triangulation.refine_global(3);
-
-  std::cout << "Number of active cells: " << triangulation.n_active_cells()
-            << "\n";
 }
 
 template <int dim>
