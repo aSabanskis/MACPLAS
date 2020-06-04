@@ -42,3 +42,5 @@ log
 # Parameter files
 *.prm
 
+# Allow some ignored files
+!CMakeLists.txt
