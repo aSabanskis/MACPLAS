@@ -18,6 +18,21 @@ private:
   void
   initialize_parameters();
 
+  // effective stress
+  double
+  tau_eff(const double N_m, const double J_2) const;
+
+  // dN_m/dt
+  double
+  derivative_N_m(const double N_m, const double J_2, const double T) const;
+
+  // de^creep_ij/dt
+  double
+  derivative_strain(const double N_m,
+                    const double J_2,
+                    const double T,
+                    const double S) const;
+
   // Parameters
   ParameterHandler prm;
 
@@ -35,6 +50,9 @@ private:
   double m_l;
   // Material constant p, -
   double m_p;
+
+  // Boltzmann constant, eV/K
+  static constexpr double m_k_B = 8.617e-5;
 };
 
 template <int dim>
@@ -113,7 +131,40 @@ DislocationSolver<dim>::initialize_parameters()
             << "K=" << m_K << "\n"
             << "k_0=" << m_k_0 << "\n"
             << "l=" << m_l << "\n"
-            << "p=" << m_p << "\n";
+            << "p=" << m_p << "\n"
+            << "k_B=" << m_k_B << "\n";
+}
+
+template <int dim>
+double
+DislocationSolver<dim>::tau_eff(const double N_m, const double J_2) const
+{
+  return std::max(std::sqrt(J_2) - m_D * std::sqrt(N_m), 0.0);
+}
+
+template <int dim>
+double
+DislocationSolver<dim>::derivative_N_m(const double N_m,
+                                       const double J_2,
+                                       const double T) const
+{
+  const double tau = tau_eff(N_m, J_2);
+
+  return m_K * m_k_0 * std::pow(tau, m_p + m_l) * std::exp(-m_Q / (m_k_B * T)) *
+         N_m;
+}
+
+template <int dim>
+double
+DislocationSolver<dim>::derivative_strain(const double N_m,
+                                          const double J_2,
+                                          const double T,
+                                          const double S) const
+{
+  const double tau = tau_eff(N_m, J_2);
+
+  return m_b * m_k_0 * N_m * std::pow(tau, m_p) * std::exp(-m_Q / (m_k_B * T)) *
+         S / (2 * std::sqrt(J_2));
 }
 
 #endif
