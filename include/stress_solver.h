@@ -101,8 +101,14 @@ private:
   DoFHandler<dim>     dh;
   BlockVector<double> displacement;
   BlockVector<double> stress;
-  Vector<double>      stress_hydrostatic;
-  Vector<double>      stress_von_Mises;
+  BlockVector<double> stress_deviator;
+
+  // mean (hydrostatic) stress
+  Vector<double> stress_hydrostatic;
+  // von Mises stress
+  Vector<double> stress_von_Mises;
+  // second invariant of deviatoric stress
+  Vector<double> stress_J_2;
 
   BlockSparsityPattern      sparsity_pattern;
   BlockSparseMatrix<double> system_matrix;
@@ -152,6 +158,11 @@ StressSolver<dim>::StressSolver(const unsigned int order)
                     "1685",
                     Patterns::Double(),
                     "Reference temperature in K");
+
+  prm.declare_entry("Output precision",
+                    "8",
+                    Patterns::Integer(1),
+                    "Precision of double variables for output of field data");
 
   try
     {
@@ -292,13 +303,23 @@ StressSolver<dim>::output_results() const
       const std::string name = "stress_" + std::to_string(i);
       data_out.add_data_vector(stress.block(i), name);
     }
+  for (unsigned int i = 0; i < stress_deviator.n_blocks(); ++i)
+    {
+      const std::string name = "stress_deviator_" + std::to_string(i);
+      data_out.add_data_vector(stress_deviator.block(i), name);
+    }
 
   data_out.add_data_vector(stress_hydrostatic, "stress_hydrostatic");
   data_out.add_data_vector(stress_von_Mises, "stress_von_Mises");
+  data_out.add_data_vector(stress_J_2, "stress_J_2");
 
   data_out.build_patches(fe.degree);
 
   std::ofstream output(file_name);
+
+  const int precision = prm.get_integer("Output precision");
+  output << std::setprecision(precision);
+
   data_out.write_vtk(output);
 
   std::cout << "  done in " << timer() << " s\n";
@@ -471,6 +492,7 @@ StressSolver<dim>::calculate_stress()
   stress.reinit(n_components, n_dofs_temp);
   stress_hydrostatic.reinit(n_dofs_temp);
   stress_von_Mises.reinit(n_dofs_temp);
+  stress_J_2.reinit(n_dofs_temp);
 
   std::vector<unsigned int> count(n_dofs_temp, 0);
 
@@ -565,7 +587,14 @@ StressSolver<dim>::calculate_stress()
              sqr(stress.block(5)[i]));
 
       stress_von_Mises[i] = std::sqrt(stress_von_Mises[i] / 2);
+
+      stress_J_2[i] = sqr(stress_von_Mises[i]) / 3;
     }
+
+  stress_deviator = stress;
+  stress_deviator.block(0) -= stress_hydrostatic;
+  stress_deviator.block(1) -= stress_hydrostatic;
+  stress_deviator.block(2) -= stress_hydrostatic;
 
   std::cout << "  done in " << timer() << " s\n";
 }
