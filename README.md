@@ -1,7 +1,7 @@
 # MACPLAS
 MAcroscopic Crystal PLAsticity Simulator
 
-Uses deal.II C++ finite element library to model dislocation density dynamics during single crystal growth.
+Uses [deal.II](https://www.dealii.org/) C++ finite element library to model thermal stresses and dislocation density dynamics during single crystal growth.
 
 # License
 
