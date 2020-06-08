@@ -28,105 +28,121 @@
 
 using namespace dealii;
 
+/// Class for calculation of the thermal stresses for a given temperature field
 template <int dim>
 class StressSolver
 {
 public:
+  /// Constructor
+
+  /// Initializes the solver parameters from \c stress.prm.
+  /// If it doesn't exist, the default parameter values are written to
+  /// \c stress-default.prm.
   StressSolver(const unsigned int order = 2);
 
+  /// Calculate the stresses
   void
   solve();
 
+  /// Get mesh
   const Triangulation<dim> &
   get_mesh() const;
+  /// Get mesh
   Triangulation<dim> &
   get_mesh();
 
+  /// Get temperature
   const Vector<double> &
   get_temperature() const;
+  /// Get temperature
   Vector<double> &
   get_temperature();
 
+  /// Initialize fields
   void
   initialize();
 
+  /// Get coordinates of DOFs
   void
   get_support_points(std::vector<Point<dim>> &points) const;
 
+  /// Save results to disk
   void
   output_results() const;
 
+  /// Save mesh to disk
   void
   output_mesh() const;
 
 private:
+  /// Initialize physical parameters
   void
   initialize_parameters();
 
+  /// Initialize data before calculation
   void
   prepare_for_solve();
 
+  /// Assemble the system matrix and right-hand-side vector
   void
   assemble_system();
 
+  /// Solve the system of linear equations
   void
   solve_system();
 
+  /// Calculate the stresses from the displacement field
   void
   calculate_stress();
 
-  // Number of distinct elements of the stress tensor
-  // 3D: 6, 2D (axisymmetric): 4
+  /// Number of distinct elements of the stress tensor (3D: 6, 2D: 4)
   static const unsigned int n_components = 2 * dim;
 
+  /// Get stiffness tensor
   SymmetricTensor<2, StressSolver<dim>::n_components>
   get_stiffness_tensor() const;
 
+  /// Get strain from FEValues
   Tensor<1, StressSolver<dim>::n_components>
   get_strain(const FEValues<dim> &fe_values,
              const unsigned int & shape_func,
              const unsigned int & q) const;
+  /// Get strain from temperature
   Tensor<1, StressSolver<dim>::n_components>
   get_strain(const double &T) const;
+  /// Get strain from displacement
   Tensor<1, StressSolver<dim>::n_components>
   get_strain(const std::vector<Tensor<1, dim>> &grad_displacement) const;
 
-  Triangulation<dim> triangulation;
+  Triangulation<dim> triangulation; ///< Mesh
 
-  FE_Q<dim>       fe_temp;
-  DoFHandler<dim> dh_temp;
-  Vector<double>  temperature;
+  FE_Q<dim>       fe_temp;     ///< Finite element for temperature
+  DoFHandler<dim> dh_temp;     ///< Degrees of freedom for temperature
+  Vector<double>  temperature; ///< Temperature
 
-  FESystem<dim>       fe;
-  DoFHandler<dim>     dh;
-  BlockVector<double> displacement;
-  BlockVector<double> stress;
-  BlockVector<double> stress_deviator;
+  FESystem<dim>       fe;              ///< Finite element for displacement
+  DoFHandler<dim>     dh;              ///< Degrees of freedom for displacement
+  BlockVector<double> displacement;    ///< Displacement
+  BlockVector<double> stress;          ///< Stress
+  BlockVector<double> stress_deviator; ///< Stress deviator
 
-  // mean (hydrostatic) stress
-  Vector<double> stress_hydrostatic;
-  // von Mises stress
-  Vector<double> stress_von_Mises;
-  // second invariant of deviatoric stress
-  Vector<double> stress_J_2;
+  Vector<double> stress_hydrostatic; ///< Mean (hydrostatic) stress
+  Vector<double> stress_von_Mises;   ///< von Mises stress
+  Vector<double> stress_J_2;         ///< Second invariant of deviatoric stress
 
-  BlockSparsityPattern      sparsity_pattern;
-  BlockSparseMatrix<double> system_matrix;
-  BlockVector<double>       system_rhs;
+  BlockSparsityPattern      sparsity_pattern; ///< Sparsity pattern
+  BlockSparseMatrix<double> system_matrix;    ///< System matrix
+  BlockVector<double>       system_rhs;       ///< Right-hand-side vector
 
-  // Parameters
-  ParameterHandler prm;
+  ParameterHandler prm; ///< Parameter handler
 
-  // Young's modulus, Pa
-  double m_E;
-  // Thermal expansion coefficient, 1/K
-  double m_alpha;
-  // Poisson's ratio, -
-  double m_nu;
-  // Reference temperature, K
-  double m_T_ref;
-  // Second-order elastic constants (stiffnesses), Pa
-  double m_C_11, m_C_12, m_C_44;
+  double m_E;     ///< Young's modulus, Pa
+  double m_alpha; ///< Thermal expansion coefficient, K<sup>-1</sup>
+  double m_nu;    ///< Poisson's ratio, -
+  double m_T_ref; ///< Reference temperature, K
+  double m_C_11; ///< Second-order elastic constant (stiffness) \f$C_{11}\f$, Pa
+  double m_C_12; ///< Second-order elastic constant (stiffness) \f$C_{12}\f$, Pa
+  double m_C_44; ///< Second-order elastic constant (stiffness) \f$C_{44}\f$, Pa
 };
 
 template <int dim>

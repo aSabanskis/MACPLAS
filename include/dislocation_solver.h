@@ -8,50 +8,51 @@
 
 using namespace dealii;
 
+/// Class for calculation of the time-dependent dislocation density
 template <int dim>
 class DislocationSolver
 {
 public:
+  /// Constructor
   DislocationSolver();
 
 private:
+  /// Initialize the solver parameters from \c dislocation.prm.
+
+  /// If it doesn't exist, the default parameter values are written to
+  /// \c dislocation-default.prm.
   void
   initialize_parameters();
 
-  // effective stress
+  /// Calculate the effective stress \f$\tau_\mathrm{eff}\f$
   double
   tau_eff(const double N_m, const double J_2) const;
 
-  // dN_m/dt
+  /// Calculate the time derivative of dislocation density \f$\dot{N_m}\f$
   double
   derivative_N_m(const double N_m, const double J_2, const double T) const;
 
-  // de^creep_ij/dt
+  /// Calculate the creep strain rate \f$\dot{\varepsilon^c_{ij}}\f$
   double
   derivative_strain(const double N_m,
                     const double J_2,
                     const double T,
                     const double S) const;
 
-  // Parameters
-  ParameterHandler prm;
 
-  // Magnitude of Burgers vector, m
-  double m_b;
-  // Peierls potential, eV
-  double m_Q;
-  // Strain hardening factor, N/m
-  double m_D;
-  // Material constant K, m/N
-  double m_K;
-  // Material constant k_0, m^(2p+l)/N^p/s
+  ParameterHandler prm; ///< Parameter handler
+
+  double m_b; ///< Magnitude of Burgers vector \f$b\f$, m
+  double m_Q; ///< Peierls potential \f$Q\f$, eV
+  double m_D; ///< Strain hardening factor \f$D\f$, N m<sup>-1</sup>
+  double m_K; ///< Material constant \f$K\f$, m N<sup>-1</sup>
+
+  /// Material constant \f$k_0, \text{m}^{2p+l}\;\text{N}^{-p}\;\text{s}^{-1}\f$
   double m_k_0;
-  // Material constant l, -
-  double m_l;
-  // Material constant p, -
-  double m_p;
+  double m_l; ///< Material constant \f$l\f$, -
+  double m_p; ///< Material constant \f$p\f$, -
 
-  // Boltzmann constant, eV/K
+  /// Boltzmann constant \f$k_B\f$, eV/K
   static constexpr double m_k_B = 8.617e-5;
 };
 

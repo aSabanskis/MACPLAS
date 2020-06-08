@@ -30,103 +30,129 @@
 
 using namespace dealii;
 
-// Stefan–Boltzmann constant, W/m^2/K^4
+/// Stefan–Boltzmann constant, W m<sup>-2</sup> K<sup>-4</sup>
 static const double sigma_SB = 5.67e-8;
 
+/// Data structure for thermal radiation and incoming heat flux density BC
 struct heat_flux_data
 {
+  /// Incoming heat flux density, W m<sup>-2</sup>
   Vector<double> q_in;
-
+  /// Temperature-dependent emissivity, -
   std::function<double(double)> emissivity;
+  /// Emissivity temperature derivative, K<sup>-1</sup>
   std::function<double(double)> emissivity_deriv;
 };
 
+/// Class for calculation of the time-dependent temperature field
 template <int dim>
 class TemperatureSolver
 {
 public:
+  /// Constructor
+
+  /// Initializes the solver parameters from \c temperature.prm.
+  /// If it doesn't exist, the default parameter values are written to
+  /// \c temperature-default.prm.
   TemperatureSolver(unsigned int order = 2);
 
+  /// Calculate the temperature field
+
+  /// @returns \c true if the final time has been reached
   bool
   solve();
 
+  /// Get mesh
   const Triangulation<dim> &
   get_mesh() const;
+  /// Get mesh
   Triangulation<dim> &
   get_mesh();
 
+  /// Initialize temperature field
   void
   initialize(const Vector<double> &T);
 
+  /// Initialize temperature field
   void
   initialize(double T);
 
+  /// Initialize temperature-dependent thermal conductivity
   void
   initialize(const Polynomials::Polynomial<double> &l);
 
+  /// Get coordinates of boundary DOFs
   void
   get_boundary_points(unsigned int             id,
                       std::vector<Point<dim>> &points,
                       std::vector<bool> &      boundary_dofs) const;
 
+  /// Set first-type boundary condition
   void
   set_bc1(unsigned int id, double val);
 
+  /// Set thermal radiation and incoming heat flux density boundary condition
   void
   set_bc_rad_mixed(unsigned int                  id,
                    const Vector<double> &        q_in,
                    std::function<double(double)> emissivity,
                    std::function<double(double)> emissivity_deriv);
 
+  /// Add probe point
   void
   add_probe(const Point<dim> &p);
 
+  /// Save results to disk
   void
   output_results() const;
 
+  /// Save mesh to disk
   void
   output_mesh() const;
 
 private:
+  /// Initialize data before calculation
   void
   prepare_for_solve();
 
+  /// Assemble the system matrix and right-hand-side vector
   void
   assemble_system();
 
+  /// Solve the system of linear equations
   void
   solve_system();
 
+  /// Write temperature at probe points to disk
   void
   output_probes() const;
 
-  Triangulation<dim> triangulation;
-  FE_Q<dim>          fe;
-  DoFHandler<dim>    dh;
+  Triangulation<dim> triangulation; ///< Mesh
+  FE_Q<dim>          fe;            ///< Finite element
+  DoFHandler<dim>    dh;            ///< Degrees of freedom
 
-  SparsityPattern      sparsity_pattern;
-  SparseMatrix<double> system_matrix;
-  Vector<double>       system_rhs;
+  SparsityPattern      sparsity_pattern; ///< Sparsity pattern
+  SparseMatrix<double> system_matrix;    ///< System matrix
+  Vector<double>       system_rhs;       ///< Right-hand-side vector
 
-  Vector<double> temperature;
-  Vector<double> temperature_prev;
-  Vector<double> temperature_update;
+  Vector<double> temperature;        ///< Temperature
+  Vector<double> temperature_prev;   ///< Temperature at the previous time step
+  Vector<double> temperature_update; ///< Newton update for temperature
 
+  /// Thermal conductivity, W m<sup>-1</sup> K<sup>-1</sup>
   Polynomials::Polynomial<double> lambda;
 
-  // Boundary condition data
-  std::map<unsigned int, double>         bc1_data;
+  /// Data for first-type BC
+  std::map<unsigned int, double> bc1_data;
+  /// Data for thermal radiation and incoming heat flux density BC
   std::map<unsigned int, heat_flux_data> bc_rad_mixed_data;
 
-  // Locations of probe points
-  std::vector<Point<dim>> probes;
+  std::vector<Point<dim>> probes; ///< Locations of probe points
 
-  // Parameters
-  ParameterHandler prm;
+  ParameterHandler prm; ///< Parameter handler
 
-  // Time stepping
-  bool first;
-  int  current_step;
+  bool first;        ///< Time stepping: flag for the first time step
+  int  current_step; ///< Time stepping: index of the current time step
 };
 
 template <int dim>
