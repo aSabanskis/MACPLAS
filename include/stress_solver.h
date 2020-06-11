@@ -23,6 +23,7 @@
 
 #include <deal.II/numerics/data_out.h>
 #include <deal.II/numerics/matrix_tools.h>
+#include <deal.II/numerics/vector_tools.h>
 
 #include "utilities.h"
 
@@ -65,6 +66,12 @@ public:
   /// Get coordinates of DOFs
   void
   get_support_points(std::vector<Point<dim>> &points) const;
+
+  /// Set first-type boundary condition
+  void
+  set_bc1(const unsigned int id,
+          const unsigned int component,
+          const double       val);
 
   /// Save results to disk
   void
@@ -133,6 +140,9 @@ private:
   BlockSparsityPattern      sparsity_pattern; ///< Sparsity pattern
   BlockSparseMatrix<double> system_matrix;    ///< System matrix
   BlockVector<double>       system_rhs;       ///< Right-hand-side vector
+
+  /// Data for first-type BC
+  std::map<unsigned int, std::pair<unsigned int, double>> bc1_data;
 
   ParameterHandler prm; ///< Parameter handler
 
@@ -290,6 +300,18 @@ StressSolver<dim>::get_support_points(std::vector<Point<dim>> &points) const
 {
   points.resize(dh_temp.n_dofs());
   DoFTools::map_dofs_to_support_points(MappingQ1<dim>(), dh_temp, points);
+}
+
+template <int dim>
+void
+StressSolver<dim>::set_bc1(const unsigned int id,
+                           const unsigned int component,
+                           const double       val)
+{
+  AssertThrow(component < dim,
+              ExcMessage("Invalid component=" + std::to_string(component)));
+
+  bc1_data[id] = std::make_pair(component, val);
 }
 
 template <int dim>
@@ -467,6 +489,26 @@ StressSolver<dim>::assemble_system()
           system_rhs(local_dof_indices[i]) += cell_rhs(i);
         }
     }
+
+  // Apply boundary conditions for displacement
+  std::map<types::global_dof_index, double> boundary_values;
+  for (auto const &it : bc1_data)
+    {
+      std::vector<bool> mask(dim, false);
+      mask[it.second.first] = true;
+
+      VectorTools::interpolate_boundary_values( // break line
+        dh,
+        it.first,
+        ConstantFunction<dim>(it.second.second),
+        boundary_values,
+        mask);
+    }
+
+  MatrixTools::apply_boundary_values(boundary_values,
+                                     system_matrix,
+                                     displacement,
+                                     system_rhs);
 
   std::cout << "  done in " << timer() << " s\n";
 }
