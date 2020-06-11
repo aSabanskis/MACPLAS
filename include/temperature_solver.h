@@ -54,7 +54,7 @@ public:
   /// Initializes the solver parameters from \c temperature.prm.
   /// If it doesn't exist, the default parameter values are written to
   /// \c temperature-default.prm.
-  TemperatureSolver(unsigned int order = 2);
+  TemperatureSolver(const unsigned int order = 2);
 
   /// Calculate the temperature field
 
@@ -75,7 +75,7 @@ public:
 
   /// Initialize temperature field
   void
-  initialize(double T);
+  initialize(const double T);
 
   /// Initialize temperature-dependent thermal conductivity
   void
@@ -83,17 +83,17 @@ public:
 
   /// Get coordinates of boundary DOFs
   void
-  get_boundary_points(unsigned int             id,
+  get_boundary_points(const unsigned int       id,
                       std::vector<Point<dim>> &points,
                       std::vector<bool> &      boundary_dofs) const;
 
   /// Set first-type boundary condition
   void
-  set_bc1(unsigned int id, double val);
+  set_bc1(const unsigned int id, const double val);
 
   /// Set thermal radiation and incoming heat flux density boundary condition
   void
-  set_bc_rad_mixed(unsigned int                  id,
+  set_bc_rad_mixed(const unsigned int            id,
                    const Vector<double> &        q_in,
                    std::function<double(double)> emissivity,
                    std::function<double(double)> emissivity_deriv);
@@ -156,7 +156,7 @@ private:
 };
 
 template <int dim>
-TemperatureSolver<dim>::TemperatureSolver(unsigned int order)
+TemperatureSolver<dim>::TemperatureSolver(const unsigned int order)
   : fe(order)
   , dh(triangulation)
   , lambda(0)
@@ -285,7 +285,7 @@ TemperatureSolver<dim>::initialize(const Vector<double> &T)
 
 template <int dim>
 void
-TemperatureSolver<dim>::initialize(double T)
+TemperatureSolver<dim>::initialize(const double T)
 {
   dh.distribute_dofs(fe);
   const unsigned int n_dofs = dh.n_dofs();
@@ -312,7 +312,7 @@ TemperatureSolver<dim>::initialize(const Polynomials::Polynomial<double> &l)
 template <int dim>
 void
 TemperatureSolver<dim>::get_boundary_points(
-  unsigned int             id,
+  const unsigned int       id,
   std::vector<Point<dim>> &points,
   std::vector<bool> &      boundary_dofs) const
 {
@@ -326,7 +326,7 @@ TemperatureSolver<dim>::get_boundary_points(
 
 template <int dim>
 void
-TemperatureSolver<dim>::set_bc1(unsigned int id, double val)
+TemperatureSolver<dim>::set_bc1(const unsigned int id, const double val)
 {
   bc1_data[id] = val;
 }
@@ -334,7 +334,7 @@ TemperatureSolver<dim>::set_bc1(unsigned int id, double val)
 template <int dim>
 void
 TemperatureSolver<dim>::set_bc_rad_mixed(
-  unsigned int                  id,
+  const unsigned int            id,
   const Vector<double> &        q_in,
   std::function<double(double)> emissivity,
   std::function<double(double)> emissivity_deriv)
