@@ -69,6 +69,16 @@ public:
   Triangulation<dim> &
   get_mesh();
 
+  // Current time, s
+  double
+  get_time() const;
+  // Time step, s
+  double
+  get_time_step() const;
+  // Final time, s
+  double
+  get_max_time() const;
+
   /// Initialize temperature field
   void
   initialize(const Vector<double> &T);
@@ -147,15 +157,13 @@ private:
 
   ParameterHandler prm; ///< Parameter handler
 
-  bool first;        ///< Time stepping: flag for the first time step
-  int  current_step; ///< Time stepping: index of the current time step
+  int current_step; ///< Time stepping: index of the current time step
 };
 
 template <int dim>
 TemperatureSolver<dim>::TemperatureSolver(const unsigned int order)
   : fe(order)
   , dh(triangulation)
-  , first(true)
   , current_step(0)
 {
   prm.declare_entry("Max absolute change",
@@ -235,8 +243,9 @@ bool
 TemperatureSolver<dim>::solve()
 {
   current_step++;
-  const double dt = prm.get_double("Time step");
-  const double t  = dt * current_step;
+  const double dt    = get_time_step();
+  const double t     = get_time();
+  const double t_max = get_max_time();
 
   temperature_prev = temperature;
 
@@ -264,10 +273,8 @@ TemperatureSolver<dim>::solve()
 
   output_probes();
 
-  if (dt > 0 && t >= prm.get_double("Max time"))
+  if (dt > 0 && t >= t_max)
     return false;
-
-  first = false;
 
   return dt > 0;
 }
@@ -284,6 +291,27 @@ Triangulation<dim> &
 TemperatureSolver<dim>::get_mesh()
 {
   return triangulation;
+}
+
+template <int dim>
+double
+TemperatureSolver<dim>::get_time() const
+{
+  return get_time_step() * current_step;
+}
+
+template <int dim>
+double
+TemperatureSolver<dim>::get_time_step() const
+{
+  return prm.get_double("Time step");
+}
+
+template <int dim>
+double
+TemperatureSolver<dim>::get_max_time() const
+{
+  return prm.get_double("Max time");
 }
 
 template <int dim>
@@ -371,8 +399,7 @@ TemperatureSolver<dim>::output_results() const
 {
   Timer timer;
 
-  const double dt = prm.get_double("Time step");
-  const double t  = dt * current_step;
+  const double t = get_time();
 
   std::stringstream ss;
   ss << "result-" << dim << "d-order" << fe.degree << "-t" << t << ".vtk";
@@ -467,10 +494,9 @@ TemperatureSolver<dim>::output_probes() const
 
   const unsigned int N = probes.size();
 
-  const double dt = prm.get_double("Time step");
-  const double t  = dt * current_step;
+  const double t = get_time();
 
-  if (first)
+  if (current_step == 1)
     {
       // write header at the first time step
       std::ofstream output(file_name);
@@ -541,7 +567,7 @@ TemperatureSolver<dim>::assemble_system()
 
   std::cout << "Assembling system";
 
-  const double dt     = prm.get_double("Time step");
+  const double dt     = get_time_step();
   const double inv_dt = dt == 0 ? 0 : 1 / dt;
 
   const double rho = prm.get_double("Density");
