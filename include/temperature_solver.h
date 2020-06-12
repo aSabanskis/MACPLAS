@@ -77,10 +77,6 @@ public:
   void
   initialize(const double T);
 
-  /// Initialize temperature-dependent thermal conductivity
-  void
-  initialize(const Polynomials::Polynomial<double> &l);
-
   /// Get coordinates of boundary DOFs
   void
   get_boundary_points(const unsigned int       id,
@@ -159,7 +155,6 @@ template <int dim>
 TemperatureSolver<dim>::TemperatureSolver(const unsigned int order)
   : fe(order)
   , dh(triangulation)
-  , lambda(0)
   , first(true)
   , current_step(0)
 {
@@ -189,12 +184,22 @@ TemperatureSolver<dim>::TemperatureSolver(const unsigned int order)
     Patterns::Integer(1),
     "Precision of double variables for output of field and probe data");
 
-  prm.declare_entry("Density", "1000", Patterns::Double(), "Density in kg/m^3");
+  // Physical parameters from https://doi.org/10.1016/S0022-0248(03)01253-3
+  prm.declare_entry("Density",
+                    "2329",
+                    Patterns::Double(0),
+                    "Density in kg/m^3");
 
   prm.declare_entry("Specific heat capacity",
                     "1000",
-                    Patterns::Double(),
+                    Patterns::Double(0),
                     "Specific heat capacity in J/kg/K");
+
+  prm.declare_entry(
+    "Thermal conductivity",
+    "98.89, -9.41813870776526E-02, 2.88183040644504E-05",
+    Patterns::List(Patterns::Double(), 1),
+    "Comma-separated polynomial coefficients (temperature function) in W/m/K^0, W/m/K^1 etc.");
 
   try
     {
@@ -207,6 +212,22 @@ TemperatureSolver<dim>::TemperatureSolver(const unsigned int order)
       std::ofstream of("temperature-default.prm");
       prm.print_parameters(of, ParameterHandler::Text);
     }
+
+  std::cout << "rho=" << prm.get_double("Density") << "\n"
+            << "c_p=" << prm.get_double("Specific heat capacity") << "\n";
+
+  // no built-in function exists, parse manually
+  std::string              lambda_raw = prm.get("Thermal conductivity");
+  std::vector<std::string> lambda_split =
+    Utilities::split_string_list(lambda_raw);
+  std::vector<double> lambda_coefficients =
+    Utilities::string_to_double(lambda_split);
+
+  lambda = Polynomials::Polynomial<double>(lambda_coefficients);
+
+  const int precision = prm.get_integer("Output precision");
+  std::cout << "lambda=" << std::setprecision(precision);
+  lambda.print(std::cout);
 }
 
 template <int dim>
@@ -300,13 +321,6 @@ TemperatureSolver<dim>::initialize(const double T)
             << "\n"
             << "Number of degrees of freedom for temperature: " << n_dofs
             << "\n";
-}
-
-template <int dim>
-void
-TemperatureSolver<dim>::initialize(const Polynomials::Polynomial<double> &l)
-{
-  lambda = l;
 }
 
 template <int dim>

@@ -67,19 +67,16 @@ template <int dim>
 void
 Problem<dim>::initialize()
 {
-  const double T0 = 1685;
+  // Physical parameters from https://doi.org/10.1016/S0022-0248(03)01253-3
+  const double T0 = 1687;
   solver.initialize(T0);
 
-  const double                          l0 = 22;
-  const Polynomials::Polynomial<double> lambda(
-    {l0 * 4.495, -l0 * 7.222 / T0, l0 * 3.728 / T0 / T0});
-  solver.initialize(lambda);
-
-  solver.set_bc1(0, T0);
+  unsigned int boundary_id = 0;
+  solver.set_bc1(boundary_id, T0);
 
   std::vector<Point<dim>> points;
   std::vector<bool>       boundary_dofs;
-  const unsigned int      boundary_id = 1;
+  boundary_id = 1;
   solver.get_boundary_points(boundary_id, points, boundary_dofs);
   Vector<double> q(points.size());
   for (unsigned int i = 0; i < q.size(); ++i)
