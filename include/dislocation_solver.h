@@ -3,8 +3,14 @@
 
 #include <deal.II/base/parameter_handler.h>
 
+#include <deal.II/grid/tria.h>
+
+#include <deal.II/lac/vector.h>
+
 #include <fstream>
 #include <iostream>
+
+#include "stress_solver.h"
 
 using namespace dealii;
 
@@ -14,7 +20,21 @@ class DislocationSolver
 {
 public:
   /// Constructor
-  DislocationSolver();
+  DislocationSolver(const unsigned int order = 2);
+
+  /// Get mesh
+  const Triangulation<dim> &
+  get_mesh() const;
+  /// Get mesh
+  Triangulation<dim> &
+  get_mesh();
+
+  /// Get temperature
+  const Vector<double> &
+  get_temperature() const;
+  /// Get temperature
+  Vector<double> &
+  get_temperature();
 
 private:
   /// Initialize the solver parameters from \c dislocation.prm.
@@ -39,6 +59,9 @@ private:
                     const double T,
                     const double S) const;
 
+  StressSolver<dim>  stress_solver; ///< Stress solver
+  Triangulation<dim> triangulation; ///< Mesh
+  Vector<double>     temperature;   ///< Temperature
 
   ParameterHandler prm; ///< Parameter handler
 
@@ -57,7 +80,8 @@ private:
 };
 
 template <int dim>
-DislocationSolver<dim>::DislocationSolver()
+DislocationSolver<dim>::DislocationSolver(const unsigned int order)
+  : stress_solver(order)
 {
   // Physical parameters from https://doi.org/10.1016/j.jcrysgro.2016.05.027
   prm.declare_entry("Burgers vector",
@@ -108,6 +132,34 @@ DislocationSolver<dim>::DislocationSolver()
     }
 
   initialize_parameters();
+}
+
+template <int dim>
+const Triangulation<dim> &
+DislocationSolver<dim>::get_mesh() const
+{
+  return triangulation;
+}
+
+template <int dim>
+Triangulation<dim> &
+DislocationSolver<dim>::get_mesh()
+{
+  return triangulation;
+}
+
+template <int dim>
+const Vector<double> &
+DislocationSolver<dim>::get_temperature() const
+{
+  return temperature;
+}
+
+template <int dim>
+Vector<double> &
+DislocationSolver<dim>::get_temperature()
+{
+  return temperature;
 }
 
 template <int dim>
