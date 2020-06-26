@@ -65,6 +65,9 @@ public:
   /// Get stress deviator
   const BlockVector<double> &
   get_stress_deviator() const;
+  /// Get second invariant of deviatoric stress
+  const Vector<double> &
+  get_stress_J_2() const;
 
   /// Initialize fields
   void
@@ -295,6 +298,13 @@ StressSolver<dim>::get_stress_deviator() const
 }
 
 template <int dim>
+const Vector<double> &
+StressSolver<dim>::get_stress_J_2() const
+{
+  return stress_J_2;
+}
+
+template <int dim>
 void
 StressSolver<dim>::initialize()
 {
@@ -308,6 +318,8 @@ StressSolver<dim>::initialize()
   const unsigned int n_dofs_temp = dh_temp.n_dofs();
   temperature.reinit(n_dofs_temp);
   displacement.reinit(dim, n_dofs_temp);
+  stress.reinit(n_components, n_dofs_temp);
+  stress_deviator.reinit(n_components, n_dofs_temp);
 
   std::cout << "  done in " << timer() << " s\n";
 
@@ -532,7 +544,7 @@ StressSolver<dim>::assemble_system()
       VectorTools::interpolate_boundary_values( // break line
         dh,
         it.first,
-        ConstantFunction<dim>(it.second.second),
+        ConstantFunction<dim>(it.second.second, dim),
         boundary_values,
         mask);
     }

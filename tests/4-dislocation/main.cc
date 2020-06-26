@@ -8,7 +8,7 @@ template <int dim>
 class Problem
 {
 public:
-  Problem();
+  Problem(const unsigned int order = 1);
 
   void
   run();
@@ -24,7 +24,8 @@ private:
 };
 
 template <int dim>
-Problem<dim>::Problem()
+Problem<dim>::Problem(const unsigned int order)
+  : solver(order)
 {}
 
 template <int dim>
@@ -34,7 +35,7 @@ Problem<dim>::run()
   make_grid();
   initialize();
 
-  // do not calculate
+  solver.solve();
   solver.output_results();
 }
 
@@ -61,6 +62,9 @@ Problem<dim>::initialize()
       temperature[i]         = 1000;
       dislocation_density[i] = 1e3;
     }
+
+  solver.get_stress_solver().set_bc1(0, 0, 0e-4);
+  solver.get_stress_solver().set_bc1(1, 0, 1e-4);
 }
 
 int

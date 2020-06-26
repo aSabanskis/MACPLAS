@@ -22,6 +22,10 @@ public:
   /// Constructor
   DislocationSolver(const unsigned int order = 2);
 
+  /// Calculate the dislocation density and creep strain
+  void
+  solve();
+
   /// Get mesh
   const Triangulation<dim> &
   get_mesh() const;
@@ -49,6 +53,9 @@ public:
   /// Get stress deviator
   const BlockVector<double> &
   get_stress_deviator() const;
+  /// Get second invariant of deviatoric stress
+  const Vector<double> &
+  get_stress_J_2() const;
 
   /// Get degrees of freedom for temperature
   const DoFHandler<dim> &
@@ -102,7 +109,7 @@ private:
   Vector<double> dislocation_density; ///< Dislocation density, m<sup>-2</sup>
 
   /// Creep strain
-  std::vector<Tensor<1, StressSolver<dim>::n_components>> epsilon_c;
+  BlockVector<double> epsilon_c;
 
   ParameterHandler prm; ///< Parameter handler
 
@@ -182,6 +189,15 @@ DislocationSolver<dim>::DislocationSolver(const unsigned int order)
 }
 
 template <int dim>
+void
+DislocationSolver<dim>::solve()
+{
+  stress_solver.solve();
+
+  // TODO: time integration and coupling with stress
+}
+
+template <int dim>
 const Triangulation<dim> &
 DislocationSolver<dim>::get_mesh() const
 {
@@ -238,6 +254,13 @@ DislocationSolver<dim>::get_stress_deviator() const
 }
 
 template <int dim>
+const Vector<double> &
+DislocationSolver<dim>::get_stress_J_2() const
+{
+  return stress_solver.get_stress_J_2();
+}
+
+template <int dim>
 const DoFHandler<dim> &
 DislocationSolver<dim>::get_dof_handler() const
 {
@@ -260,10 +283,7 @@ DislocationSolver<dim>::initialize()
   const unsigned int n_dofs_temp = get_temperature().size();
 
   dislocation_density.reinit(n_dofs_temp);
-  epsilon_c.resize(n_dofs_temp);
-  std::fill(epsilon_c.begin(),
-            epsilon_c.end(),
-            Tensor<1, StressSolver<dim>::n_components>());
+  epsilon_c.reinit(StressSolver<dim>::n_components, n_dofs_temp);
 }
 
 template <int dim>
@@ -284,8 +304,11 @@ DislocationSolver<dim>::output_results() const
 
   data_out.attach_dof_handler(dh);
 
-  data_out.add_data_vector(get_temperature(), "T");
-  data_out.add_data_vector(get_dislocation_density(), "dislocation_density");
+  const Vector<double> &T   = get_temperature();
+  const Vector<double> &N_m = get_dislocation_density();
+
+  data_out.add_data_vector(T, "T");
+  data_out.add_data_vector(N_m, "N_m");
 
   const BlockVector<double> &stress = get_stress();
   for (unsigned int i = 0; i < stress.n_blocks(); ++i)
@@ -299,6 +322,35 @@ DislocationSolver<dim>::output_results() const
     {
       const std::string name = "stress_deviator_" + std::to_string(i);
       data_out.add_data_vector(stress_deviator.block(i), name);
+    }
+
+  const Vector<double> &stress_J_2 = get_stress_J_2();
+  data_out.add_data_vector(get_stress_J_2(), "stress_J_2");
+
+  const unsigned int n_dofs_temp = T.size();
+
+  Vector<double>      tau(n_dofs_temp);
+  Vector<double>      dot_N_m(n_dofs_temp);
+  BlockVector<double> dot_epsilon_c(StressSolver<dim>::n_components,
+                                    n_dofs_temp);
+
+  for (unsigned int i = 0; i < n_dofs_temp; ++i)
+    {
+      tau[i]     = tau_eff(N_m[i], stress_J_2[i]);
+      dot_N_m[i] = derivative_N_m(N_m[i], stress_J_2[i], T[i]);
+      for (unsigned int j = 0; j < dot_epsilon_c.n_blocks(); ++j)
+        {
+          dot_epsilon_c.block(j)[i] = derivative_strain(
+            N_m[i], stress_J_2[i], T[i], stress_deviator.block(j)[i]);
+        }
+    }
+
+  data_out.add_data_vector(tau, "tau_eff");
+  data_out.add_data_vector(dot_N_m, "dot_N_m");
+  for (unsigned int i = 0; i < dot_epsilon_c.n_blocks(); ++i)
+    {
+      const std::string name = "dot_epsilon_c_" + std::to_string(i);
+      data_out.add_data_vector(dot_epsilon_c.block(i), name);
     }
 
   data_out.build_patches(fe.degree);
