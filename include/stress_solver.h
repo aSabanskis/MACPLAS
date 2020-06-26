@@ -59,6 +59,13 @@ public:
   Vector<double> &
   get_temperature();
 
+  /// Get stress
+  const BlockVector<double> &
+  get_stress() const;
+  /// Get stress deviator
+  const BlockVector<double> &
+  get_stress_deviator() const;
+
   /// Initialize fields
   void
   initialize();
@@ -66,6 +73,10 @@ public:
   /// Get coordinates of DOFs
   void
   get_support_points(std::vector<Point<dim>> &points) const;
+
+  /// Get degrees of freedom for temperature
+  const DoFHandler<dim> &
+  get_dof_handler() const;
 
   /// Set first-type boundary condition
   void
@@ -80,6 +91,9 @@ public:
   /// Save mesh to disk
   void
   output_mesh() const;
+
+  /// Number of distinct elements of the stress tensor (3D: 6, 2D: 4)
+  static const unsigned int n_components = 2 * dim;
 
 private:
   /// Initialize physical parameters
@@ -101,9 +115,6 @@ private:
   /// Calculate the stresses from the displacement field
   void
   calculate_stress();
-
-  /// Number of distinct elements of the stress tensor (3D: 6, 2D: 4)
-  static const unsigned int n_components = 2 * dim;
 
   /// Get stiffness tensor
   SymmetricTensor<2, StressSolver<dim>::n_components>
@@ -270,6 +281,20 @@ StressSolver<dim>::get_temperature()
 }
 
 template <int dim>
+const BlockVector<double> &
+StressSolver<dim>::get_stress() const
+{
+  return stress;
+}
+
+template <int dim>
+const BlockVector<double> &
+StressSolver<dim>::get_stress_deviator() const
+{
+  return stress_deviator;
+}
+
+template <int dim>
 void
 StressSolver<dim>::initialize()
 {
@@ -312,6 +337,13 @@ StressSolver<dim>::set_bc1(const unsigned int id,
               ExcMessage("Invalid component=" + std::to_string(component)));
 
   bc1_data[id] = std::make_pair(component, val);
+}
+
+template <int dim>
+const DoFHandler<dim> &
+StressSolver<dim>::get_dof_handler() const
+{
+  return dh_temp;
 }
 
 template <int dim>
