@@ -435,6 +435,10 @@ StressSolver<dim>::prepare_for_solve()
 
   system_rhs.reinit(dim, n_dofs_temp);
 
+  // check whether already initialized
+  if (!sparsity_pattern.empty() && !system_matrix.empty())
+    return;
+
   BlockDynamicSparsityPattern dsp(dim, dim);
   for (unsigned int i = 0; i < dim; ++i)
     {

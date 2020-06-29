@@ -35,8 +35,14 @@ Problem<dim>::run()
   make_grid();
   initialize();
 
-  solver.solve();
-  solver.output_results();
+  while (true)
+    {
+      const bool keep_going = solver.solve();
+      solver.output_results();
+
+      if (!keep_going)
+        break;
+    };
 }
 
 template <int dim>
@@ -46,6 +52,14 @@ Problem<dim>::make_grid()
   Triangulation<dim> &triangulation = solver.get_mesh();
 
   GridGenerator::hyper_cube(triangulation, 0, 1, true);
+
+  const unsigned int n_probes = 3;
+  for (unsigned int i = 0; i < n_probes; ++i)
+    {
+      Point<dim> p;
+      p(0) = i / (n_probes - 1.0);
+      solver.add_probe(p);
+    }
 }
 
 template <int dim>

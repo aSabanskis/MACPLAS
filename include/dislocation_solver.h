@@ -2,10 +2,16 @@
 #define macplas_dislocation_solver_h
 
 #include <deal.II/base/parameter_handler.h>
+#include <deal.II/base/timer.h>
 
+#include <deal.II/grid/grid_out.h>
 #include <deal.II/grid/tria.h>
 
+#include <deal.II/lac/block_vector.h>
 #include <deal.II/lac/vector.h>
+
+#include <deal.II/numerics/data_out.h>
+#include <deal.II/numerics/fe_field_function.h>
 
 #include <fstream>
 #include <iostream>
@@ -23,7 +29,7 @@ public:
   DislocationSolver(const unsigned int order = 2);
 
   /// Calculate the dislocation density and creep strain
-  void
+  bool
   solve();
 
   /// Get mesh
@@ -65,9 +71,23 @@ public:
   StressSolver<dim> &
   get_stress_solver();
 
+  // Current time, s
+  double
+  get_time() const;
+  // Time step, s
+  double
+  get_time_step() const;
+  // Final time, s
+  double
+  get_max_time() const;
+
   /// Initialize fields
   void
   initialize();
+
+  /// Add probe point
+  void
+  add_probe(const Point<dim> &p);
 
   /// Save results to disk
   void
@@ -84,6 +104,10 @@ private:
   /// \c dislocation-default.prm.
   void
   initialize_parameters();
+
+  /// Write current values of fields at probe points to disk
+  void
+  output_probes() const;
 
   /// Calculate the effective stress \f$\tau_\mathrm{eff}\f$
   double
@@ -108,10 +132,13 @@ private:
 
   Vector<double> dislocation_density; ///< Dislocation density, m<sup>-2</sup>
 
-  /// Creep strain
-  BlockVector<double> epsilon_c;
+  BlockVector<double> epsilon_c; ///< Creep strain
+
+  std::vector<Point<dim>> probes; ///< Locations of probe points
 
   ParameterHandler prm; ///< Parameter handler
+
+  int current_step; ///< Time stepping: index of the current time step
 
   double m_b; ///< Magnitude of Burgers vector \f$b\f$, m
   double m_Q; ///< Peierls potential \f$Q\f$, eV
@@ -130,6 +157,7 @@ private:
 template <int dim>
 DislocationSolver<dim>::DislocationSolver(const unsigned int order)
   : stress_solver(order)
+  , current_step(0)
 {
   // Physical parameters from https://doi.org/10.1016/j.jcrysgro.2016.05.027
   prm.declare_entry("Burgers vector",
@@ -168,6 +196,16 @@ DislocationSolver<dim>::DislocationSolver(const unsigned int order)
                     "Material constant p (dimensionless)");
 
 
+  prm.declare_entry("Time step",
+                    "1",
+                    Patterns::Double(),
+                    "Time step in seconds (0 - steady-state)");
+
+  prm.declare_entry("Max time",
+                    "10",
+                    Patterns::Double(),
+                    "Max time in seconds");
+
   prm.declare_entry("Output precision",
                     "8",
                     Patterns::Integer(1),
@@ -189,12 +227,26 @@ DislocationSolver<dim>::DislocationSolver(const unsigned int order)
 }
 
 template <int dim>
-void
+bool
 DislocationSolver<dim>::solve()
 {
+  current_step++;
+  const double dt    = get_time_step();
+  const double t     = get_time();
+  const double t_max = get_max_time();
+
+  std::cout << "Time " << t << " s\n";
+
   stress_solver.solve();
 
   // TODO: time integration and coupling with stress
+
+  output_probes();
+
+  if (dt > 0 && t >= t_max)
+    return false;
+
+  return dt > 0;
 }
 
 template <int dim>
@@ -275,6 +327,27 @@ DislocationSolver<dim>::get_stress_solver()
 }
 
 template <int dim>
+double
+DislocationSolver<dim>::get_time() const
+{
+  return get_time_step() * current_step;
+}
+
+template <int dim>
+double
+DislocationSolver<dim>::get_time_step() const
+{
+  return prm.get_double("Time step");
+}
+
+template <int dim>
+double
+DislocationSolver<dim>::get_max_time() const
+{
+  return prm.get_double("Max time");
+}
+
+template <int dim>
 void
 DislocationSolver<dim>::initialize()
 {
@@ -288,15 +361,24 @@ DislocationSolver<dim>::initialize()
 
 template <int dim>
 void
+DislocationSolver<dim>::add_probe(const Point<dim> &p)
+{
+  probes.push_back(p);
+}
+
+template <int dim>
+void
 DislocationSolver<dim>::output_results() const
 {
   Timer timer;
+
+  const double t = get_time();
 
   const DoFHandler<dim> &   dh = get_dof_handler();
   const FiniteElement<dim> &fe = dh.get_fe();
 
   std::stringstream ss;
-  ss << "result-" << dim << "d-order" << fe.degree << ".vtk";
+  ss << "result-" << dim << "d-order" << fe.degree << "-t" << t << ".vtk";
   const std::string file_name = ss.str();
   std::cout << "Saving to '" << file_name << "'";
 
@@ -410,6 +492,56 @@ DislocationSolver<dim>::initialize_parameters()
             << "l=" << m_l << "\n"
             << "p=" << m_p << "\n"
             << "k_B=" << m_k_B << "\n";
+}
+
+template <int dim>
+void
+DislocationSolver<dim>::output_probes() const
+{
+  Timer timer;
+
+  std::stringstream ss;
+  ss << "probes-" << dim << "d.txt";
+  const std::string file_name = ss.str();
+
+  std::cout << "Saving values at probe points to '" << file_name << "'";
+
+  const unsigned int N = probes.size();
+
+  const double t = get_time();
+
+  if (current_step == 1)
+    {
+      // write header at the first time step
+      std::ofstream output(file_name);
+
+      for (unsigned int i = 0; i < N; ++i)
+        output << "# probe " << i << ": " << probes[i] << "\n";
+
+      output << "t[s]";
+      for (unsigned int i = 0; i < N; ++i)
+        output << " T_" << i << "[K]";
+      output << "\n";
+    }
+
+  // TODO: implement for other fields besides the temperature
+  Functions::FEFieldFunction<dim> ff(get_dof_handler(), get_temperature());
+
+  std::vector<double> values(N);
+  ff.value_list(probes, values);
+
+  // header is already written, append values at the current time step
+  std::ofstream output(file_name, std::ios::app);
+
+  const int precision = prm.get_integer("Output precision");
+  output << std::setprecision(precision);
+
+  output << t;
+  for (const auto &v : values)
+    output << " " << v;
+  output << "\n";
+
+  std::cout << "  done in " << timer() << " s\n";
 }
 
 template <int dim>
