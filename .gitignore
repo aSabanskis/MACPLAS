@@ -33,6 +33,9 @@ log
 *.log*
 html
 latex
+*.pdf
+*.gnu
+*.plt
 
 # Data files
 *.vt[uk]
@@ -40,6 +43,7 @@ latex
 *.pvsm
 *.txt
 *.dat
+*.[ct]sv
 
 # Parameter files
 *.prm
