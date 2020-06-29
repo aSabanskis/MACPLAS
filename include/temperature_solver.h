@@ -69,23 +69,26 @@ public:
   Triangulation<dim> &
   get_mesh();
 
-  // Current time, s
+  /// Get temperature
+  const Vector<double> &
+  get_temperature() const;
+  /// Get temperature
+  Vector<double> &
+  get_temperature();
+
+  /// Current time, s
   double
   get_time() const;
-  // Time step, s
+  /// Time step, s
   double
   get_time_step() const;
-  // Final time, s
+  /// Final time, s
   double
   get_max_time() const;
 
-  /// Initialize temperature field
+  /// Initialize fields
   void
-  initialize(const Vector<double> &T);
-
-  /// Initialize temperature field
-  void
-  initialize(const double T);
+  initialize();
 
   /// Get coordinates of boundary DOFs
   void
@@ -294,6 +297,20 @@ TemperatureSolver<dim>::get_mesh()
 }
 
 template <int dim>
+const Vector<double> &
+TemperatureSolver<dim>::get_temperature() const
+{
+  return temperature;
+}
+
+template <int dim>
+Vector<double> &
+TemperatureSolver<dim>::get_temperature()
+{
+  return temperature;
+}
+
+template <int dim>
 double
 TemperatureSolver<dim>::get_time() const
 {
@@ -316,32 +333,13 @@ TemperatureSolver<dim>::get_max_time() const
 
 template <int dim>
 void
-TemperatureSolver<dim>::initialize(const Vector<double> &T)
-{
-  dh.distribute_dofs(fe);
-  const unsigned int n_dofs = dh.n_dofs();
-
-  AssertDimension(n_dofs, T.size());
-  temperature = T;
-
-  std::cout << "dim=" << dim << "\n"
-            << "order=" << fe.degree << "\n"
-            << "Number of active cells: " << triangulation.n_active_cells()
-            << "\n"
-            << "Number of degrees of freedom for temperature: " << n_dofs
-            << "\n";
-}
-
-template <int dim>
-void
-TemperatureSolver<dim>::initialize(const double T)
+TemperatureSolver<dim>::initialize()
 {
   dh.distribute_dofs(fe);
   const unsigned int n_dofs = dh.n_dofs();
 
   temperature.reinit(n_dofs);
   temperature_update.reinit(n_dofs);
-  temperature.add(T);
 
   std::cout << "dim=" << dim << "\n"
             << "order=" << fe.degree << "\n"

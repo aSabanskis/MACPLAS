@@ -69,7 +69,11 @@ Problem<dim>::initialize()
 {
   // Physical parameters from https://doi.org/10.1016/S0022-0248(03)01253-3
   const double T0 = 1687;
-  solver.initialize(T0);
+
+  solver.initialize(); // sets T=0
+
+  Vector<double> &temperature = solver.get_temperature();
+  temperature.add(T0);
 
   unsigned int boundary_id = 0;
   solver.set_bc1(boundary_id, T0);
