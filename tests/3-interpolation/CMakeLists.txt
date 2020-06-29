@@ -1,4 +1,4 @@
-SET(TARGET "3-interpolation")
+SET(TARGET "macplas-test-3")
 
 FILE(GLOB TARGET_SRC  "*.cc")
 SET(TARGET_SRC ${TARGET_SRC})

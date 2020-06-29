@@ -120,6 +120,10 @@ public:
   output_mesh() const;
 
 private:
+  /// Initialize parameters. Called by the constructor
+  void
+  initialize_parameters();
+
   /// Initialize data before calculation
   void
   prepare_for_solve();
@@ -224,6 +228,16 @@ TemperatureSolver<dim>::TemperatureSolver(const unsigned int order)
       prm.print_parameters(of, ParameterHandler::Text);
     }
 
+  initialize_parameters();
+}
+
+template <int dim>
+void
+TemperatureSolver<dim>::initialize_parameters()
+{
+  std::cout << "Intializing parameters";
+
+  // some of the parameters are only fetched when needed
   std::cout << "rho=" << prm.get_double("Density") << "\n"
             << "c_p=" << prm.get_double("Specific heat capacity") << "\n";
 

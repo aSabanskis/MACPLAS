@@ -1,4 +1,4 @@
-SET(TARGET "1-hollow-sphere")
+SET(TARGET "macplas-test-1")
 
 FILE(GLOB TARGET_SRC  "*.cc")
 SET(TARGET_SRC ${TARGET_SRC})

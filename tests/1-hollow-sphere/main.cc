@@ -91,8 +91,9 @@ Problem<dim>::initialize()
   solver.get_support_points(support_points);
 
   Vector<double> &temperature = solver.get_temperature();
+  AssertDimension(temperature.size(), support_points.size());
 
-  for (unsigned int i = 0; i < support_points.size(); ++i)
+  for (unsigned int i = 0; i < temperature.size(); ++i)
     {
       temperature[i] = c1 / support_points[i].norm() + c2;
     }

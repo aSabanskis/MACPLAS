@@ -99,7 +99,7 @@ public:
   static const unsigned int n_components = 2 * dim;
 
 private:
-  /// Initialize physical parameters
+  /// Initialize parameters. Called by the constructor
   void
   initialize_parameters();
 

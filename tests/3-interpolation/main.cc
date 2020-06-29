@@ -64,11 +64,8 @@ template <int dim>
 void
 Problem<dim>::initialize()
 {
-  const double T0 = 300;
-  solver.initialize(T0);
-
-  const Polynomials::Polynomial<double> lambda(std::vector<double>({1.0}));
-  solver.initialize(lambda);
+  solver.initialize();
+  // no need to initialize the temperature field
 
   std::vector<Point<dim>> points;
   std::vector<bool>       boundary_dofs;

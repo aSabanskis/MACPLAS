@@ -26,6 +26,10 @@ class DislocationSolver
 {
 public:
   /// Constructor
+
+  /// Initialize the solver parameters from \c dislocation.prm.
+  /// If it doesn't exist, the default parameter values are written to
+  /// \c dislocation-default.prm.
   DislocationSolver(const unsigned int order = 2);
 
   /// Calculate the dislocation density and creep strain
@@ -71,13 +75,13 @@ public:
   StressSolver<dim> &
   get_stress_solver();
 
-  // Current time, s
+  /// Current time, s
   double
   get_time() const;
-  // Time step, s
+  /// Time step, s
   double
   get_time_step() const;
-  // Final time, s
+  /// Final time, s
   double
   get_max_time() const;
 
@@ -98,10 +102,7 @@ public:
   output_mesh() const;
 
 private:
-  /// Initialize the solver parameters from \c dislocation.prm.
-
-  /// If it doesn't exist, the default parameter values are written to
-  /// \c dislocation-default.prm.
+  /// Initialize parameters. Called by the constructor
   void
   initialize_parameters();
 

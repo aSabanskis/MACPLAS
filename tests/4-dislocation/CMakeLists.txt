@@ -1,4 +1,4 @@
-SET(TARGET "4-dislocation")
+SET(TARGET "macplas-test-4")
 
 FILE(GLOB TARGET_SRC  "*.cc")
 SET(TARGET_SRC ${TARGET_SRC})

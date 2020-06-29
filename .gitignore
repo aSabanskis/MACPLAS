@@ -19,6 +19,7 @@
 *.exe
 *.out*
 *.app
+macplas-test-*
 
 # Temporary files and directories
 *.dir

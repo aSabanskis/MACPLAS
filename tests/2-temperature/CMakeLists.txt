@@ -1,4 +1,4 @@
-SET(TARGET "2-temperature")
+SET(TARGET "macplas-test-2")
 
 FILE(GLOB TARGET_SRC  "*.cc")
 SET(TARGET_SRC ${TARGET_SRC})
