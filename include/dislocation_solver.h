@@ -113,10 +113,18 @@ private:
   /// Calculate the effective stress \f$\tau_\mathrm{eff}\f$
   double
   tau_eff(const double N_m, const double J_2) const;
+  /// Same as above, for vector arguments
+  Vector<double>
+  tau_eff(const Vector<double> &N_m, const Vector<double> &J_2) const;
 
   /// Calculate the time derivative of dislocation density \f$\dot{N_m}\f$
   double
   derivative_N_m(const double N_m, const double J_2, const double T) const;
+  /// Same as above, for vector arguments
+  Vector<double>
+  derivative_N_m(const Vector<double> &N_m,
+                 const Vector<double> &J_2,
+                 const Vector<double> &T) const;
 
   /// Calculate the creep strain rate \f$\dot{\varepsilon^c_{ij}}\f$
   double
@@ -124,6 +132,12 @@ private:
                     const double J_2,
                     const double T,
                     const double S) const;
+  /// Same as above, for vector arguments
+  Vector<double>
+  derivative_strain(const Vector<double> &N_m,
+                    const Vector<double> &J_2,
+                    const Vector<double> &T,
+                    const Vector<double> &S) const;
 
   /// Stress solver
 
@@ -412,20 +426,14 @@ DislocationSolver<dim>::output_results() const
 
   const unsigned int n_dofs_temp = T.size();
 
-  Vector<double>      tau(n_dofs_temp);
-  Vector<double>      dot_N_m(n_dofs_temp);
-  BlockVector<double> dot_epsilon_c(StressSolver<dim>::n_components,
-                                    n_dofs_temp);
+  Vector<double> tau     = tau_eff(N_m, stress_J_2);
+  Vector<double> dot_N_m = derivative_N_m(N_m, stress_J_2, T);
 
-  for (unsigned int i = 0; i < n_dofs_temp; ++i)
+  BlockVector<double> dot_epsilon_c(StressSolver<dim>::n_components);
+  for (unsigned int i = 0; i < dot_epsilon_c.n_blocks(); ++i)
     {
-      tau[i]     = tau_eff(N_m[i], stress_J_2[i]);
-      dot_N_m[i] = derivative_N_m(N_m[i], stress_J_2[i], T[i]);
-      for (unsigned int j = 0; j < dot_epsilon_c.n_blocks(); ++j)
-        {
-          dot_epsilon_c.block(j)[i] = derivative_strain(
-            N_m[i], stress_J_2[i], T[i], stress_deviator.block(j)[i]);
-        }
+      dot_epsilon_c.block(i) =
+        derivative_strain(N_m, stress_J_2, T, stress_deviator.block(i));
     }
 
   data_out.add_data_vector(tau, "tau_eff");
@@ -521,15 +529,34 @@ DislocationSolver<dim>::output_probes() const
 
       output << "t[s]";
       for (unsigned int i = 0; i < N; ++i)
-        output << " T_" << i << "[K]";
+        output << " T_" << i << "[K]"
+               << " N_m_" << i << "[m^-2]"
+               << " dot_N_m_" << i << "[m^-2 s^-1]"
+               << " J_2_" << i << "[Pa^2]"
+               << " tau_eff_" << i << "[Pa]";
       output << "\n";
     }
 
-  // TODO: implement for other fields besides the temperature
-  Functions::FEFieldFunction<dim> ff(get_dof_handler(), get_temperature());
+  const Vector<double> &T   = get_temperature();
+  const Vector<double> &N_m = get_dislocation_density();
+  const Vector<double> &J_2 = get_stress_J_2();
 
-  std::vector<double> values(N);
-  ff.value_list(probes, values);
+  // Process each field separately - easy to implement but potentially slow.
+  // Not all fields are currently outputted.
+  Functions::FEFieldFunction<dim> ff_T(get_dof_handler(), T);
+  Functions::FEFieldFunction<dim> ff_N_m(get_dof_handler(), N_m);
+  Functions::FEFieldFunction<dim> ff_J_2(get_dof_handler(), J_2);
+
+  std::vector<double> values_T(N), values_N_m(N), values_J_2(N);
+
+  ff_T.value_list(probes, values_T);
+  ff_N_m.value_list(probes, values_N_m);
+  ff_J_2.value_list(probes, values_J_2);
+
+  // calculate additional fields
+  Vector<double> tau     = tau_eff(N_m, J_2);
+  Vector<double> dot_N_m = derivative_N_m(N_m, J_2, T);
+  // skip dot_epsilon_c for now
 
   // header is already written, append values at the current time step
   std::ofstream output(file_name, std::ios::app);
@@ -538,8 +565,9 @@ DislocationSolver<dim>::output_probes() const
   output << std::setprecision(precision);
 
   output << t;
-  for (const auto &v : values)
-    output << " " << v;
+  for (unsigned int i = 0; i < N; ++i)
+    output << " " << T[i] << " " << N_m[i] << " " << dot_N_m[i] << " " << J_2[i]
+           << " " << tau[i];
   output << "\n";
 
   std::cout << "  done in " << timer() << " s\n";
@@ -550,6 +578,21 @@ double
 DislocationSolver<dim>::tau_eff(const double N_m, const double J_2) const
 {
   return std::max(std::sqrt(J_2) - m_D * std::sqrt(N_m), 0.0);
+}
+
+template <int dim>
+Vector<double>
+DislocationSolver<dim>::tau_eff(const Vector<double> &N_m,
+                                const Vector<double> &J_2) const
+{
+  const unsigned int N = N_m.size();
+
+  Vector<double> result(N);
+
+  for (unsigned int i = 0; i < N; ++i)
+    result[i] = tau_eff(N_m[i], J_2[i]);
+
+  return result;
 }
 
 template <int dim>
@@ -565,6 +608,22 @@ DislocationSolver<dim>::derivative_N_m(const double N_m,
 }
 
 template <int dim>
+Vector<double>
+DislocationSolver<dim>::derivative_N_m(const Vector<double> &N_m,
+                                       const Vector<double> &J_2,
+                                       const Vector<double> &T) const
+{
+  const unsigned int N = N_m.size();
+
+  Vector<double> result(N);
+
+  for (unsigned int i = 0; i < N; ++i)
+    result[i] = derivative_N_m(N_m[i], J_2[i], T[i]);
+
+  return result;
+}
+
+template <int dim>
 double
 DislocationSolver<dim>::derivative_strain(const double N_m,
                                           const double J_2,
@@ -575,6 +634,23 @@ DislocationSolver<dim>::derivative_strain(const double N_m,
 
   return m_b * m_k_0 * N_m * std::pow(tau, m_p) * std::exp(-m_Q / (m_k_B * T)) *
          S / (2 * std::sqrt(J_2));
+}
+
+template <int dim>
+Vector<double>
+DislocationSolver<dim>::derivative_strain(const Vector<double> &N_m,
+                                          const Vector<double> &J_2,
+                                          const Vector<double> &T,
+                                          const Vector<double> &S) const
+{
+  const unsigned int N = N_m.size();
+
+  Vector<double> result(N);
+
+  for (unsigned int i = 0; i < N; ++i)
+    result[i] = derivative_strain(N_m[i], J_2[i], T[i], S[i]);
+
+  return result;
 }
 
 #endif
