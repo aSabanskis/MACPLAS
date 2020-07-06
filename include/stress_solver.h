@@ -69,6 +69,13 @@ public:
   const Vector<double> &
   get_stress_J_2() const;
 
+  /// Get creep strain
+  const BlockVector<double> &
+  get_strain_c() const;
+  /// Get creep strain
+  BlockVector<double> &
+  get_strain_c();
+
   /// Initialize fields
   void
   initialize();
@@ -146,6 +153,8 @@ private:
   BlockVector<double> displacement;    ///< Displacement
   BlockVector<double> stress;          ///< Stress
   BlockVector<double> stress_deviator; ///< Stress deviator
+
+  BlockVector<double> strain_c; ///< Creep strain
 
   Vector<double> stress_hydrostatic; ///< Mean (hydrostatic) stress
   Vector<double> stress_von_Mises;   ///< von Mises stress
@@ -305,6 +314,20 @@ StressSolver<dim>::get_stress_J_2() const
 }
 
 template <int dim>
+const BlockVector<double> &
+StressSolver<dim>::get_strain_c() const
+{
+  return strain_c;
+}
+
+template <int dim>
+BlockVector<double> &
+StressSolver<dim>::get_strain_c()
+{
+  return strain_c;
+}
+
+template <int dim>
 void
 StressSolver<dim>::initialize()
 {
@@ -320,6 +343,7 @@ StressSolver<dim>::initialize()
   displacement.reinit(dim, n_dofs_temp);
   stress.reinit(n_components, n_dofs_temp);
   stress_deviator.reinit(n_components, n_dofs_temp);
+  strain_c.reinit(n_components, n_dofs_temp);
 
   std::cout << "  done in " << timer() << " s\n";
 
@@ -482,6 +506,9 @@ StressSolver<dim>::assemble_system()
 
   std::vector<double> T_q(n_q_points);
 
+  std::vector<std::vector<double>> epsilon_c_q(n_components,
+                                               std::vector<double>(n_q_points));
+
   std::vector<types::global_dof_index> local_dof_indices(dofs_per_cell);
 
   const SymmetricTensor<2, n_components> stiffness = get_stiffness_tensor();
@@ -501,9 +528,19 @@ StressSolver<dim>::assemble_system()
 
       fe_values_temp.get_function_values(temperature, T_q);
 
+      for (unsigned int i = 0; i < n_components; ++i)
+        {
+          fe_values_temp.get_function_values(strain_c.block(i), epsilon_c_q[i]);
+        }
+
       for (unsigned int q = 0; q < n_q_points; ++q)
         {
-          const Tensor<1, n_components> epsilon_T = get_strain(T_q[q]);
+          const Tensor<1, n_components> epsilon_T_q = get_strain(T_q[q]);
+
+          // sum of thermal and creep strain
+          Tensor<1, n_components> epsilon_T_c_q = epsilon_T_q;
+          for (unsigned int i = 0; i < n_components; ++i)
+            epsilon_T_c_q[i] += epsilon_c_q[i][q];
 
           for (unsigned int i = 0; i < dofs_per_cell; ++i)
             {
@@ -522,7 +559,7 @@ StressSolver<dim>::assemble_system()
                     (strain_i_stiffness * strain_j) * fe_values.JxW(q);
                 }
               cell_rhs(i) +=
-                (strain_i_stiffness * epsilon_T) * fe_values.JxW(q);
+                (strain_i_stiffness * epsilon_T_c_q) * fe_values.JxW(q);
             }
         }
 
@@ -608,6 +645,9 @@ StressSolver<dim>::calculate_stress()
 
   std::vector<double> T_q(n_q_points);
 
+  std::vector<std::vector<double>> epsilon_c_q(n_components,
+                                               std::vector<double>(n_q_points));
+
   std::vector<std::vector<Tensor<1, dim>>> grad_displacement_q(
     n_q_points, std::vector<Tensor<1, dim>>(dim));
 
@@ -635,13 +675,22 @@ StressSolver<dim>::calculate_stress()
 
       fe_values.get_function_gradients(displacement, grad_displacement_q);
 
+      for (unsigned int i = 0; i < n_components; ++i)
+        fe_values_temp.get_function_values(strain_c.block(i), epsilon_c_q[i]);
+
       for (unsigned int q = 0; q < n_q_points; ++q)
         {
-          const Tensor<1, n_components> epsilon_T = get_strain(T_q[q]);
-          const Tensor<1, n_components> epsilon_e =
+          const Tensor<1, n_components> epsilon_T_q = get_strain(T_q[q]);
+          const Tensor<1, n_components> epsilon_e_q =
             get_strain(grad_displacement_q[q]);
 
-          const Tensor<1, n_components> s = stiffness * (epsilon_e - epsilon_T);
+          // sum of thermal and creep strain
+          Tensor<1, n_components> epsilon_T_c_q = epsilon_T_q;
+          for (unsigned int i = 0; i < n_components; ++i)
+            epsilon_T_c_q[i] += epsilon_c_q[i][q];
+
+          const Tensor<1, n_components> s =
+            stiffness * (epsilon_e_q - epsilon_T_c_q);
 
           for (unsigned int k = 0; k < n_components; ++k)
             {

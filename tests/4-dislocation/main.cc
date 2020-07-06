@@ -51,15 +51,10 @@ Problem<dim>::make_grid()
 {
   Triangulation<dim> &triangulation = solver.get_mesh();
 
-  GridGenerator::hyper_cube(triangulation, 0, 1, true);
+  GridGenerator::hyper_cube(triangulation, 0, 0.02, true);
 
-  const unsigned int n_probes = 3;
-  for (unsigned int i = 0; i < n_probes; ++i)
-    {
-      Point<dim> p;
-      p(0) = i / (n_probes - 1.0);
-      solver.add_probe(p);
-    }
+  // a single probe point at the origin
+  solver.add_probe(Point<dim>());
 }
 
 template <int dim>
@@ -77,8 +72,8 @@ Problem<dim>::initialize()
       dislocation_density[i] = 1e3;
     }
 
-  solver.get_stress_solver().set_bc1(0, 0, 0e-4);
-  solver.get_stress_solver().set_bc1(1, 0, 1e-4);
+  solver.get_stress_solver().set_bc1(0, 0, 0.0);
+  solver.get_stress_solver().set_bc1(1, 0, 1e-7);
 }
 
 int

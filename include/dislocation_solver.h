@@ -67,6 +67,13 @@ public:
   const Vector<double> &
   get_stress_J_2() const;
 
+  /// Get creep strain
+  const BlockVector<double> &
+  get_strain_c() const;
+  /// Get creep strain
+  BlockVector<double> &
+  get_strain_c();
+
   /// Get degrees of freedom for temperature
   const DoFHandler<dim> &
   get_dof_handler() const;
@@ -139,6 +146,10 @@ private:
                     const Vector<double> &T,
                     const Vector<double> &S) const;
 
+  /// Time integration using explicit scheme
+  void
+  integrate_Euler();
+
   /// Stress solver
 
   /// To avoid redundancy, mesh, finite element, degree handler and temperature
@@ -147,11 +158,11 @@ private:
 
   Vector<double> dislocation_density; ///< Dislocation density, m<sup>-2</sup>
 
-  BlockVector<double> epsilon_c; ///< Creep strain
-
   std::vector<Point<dim>> probes; ///< Locations of probe points
 
   ParameterHandler prm; ///< Parameter handler
+
+  std::string time_scheme; ///< Time integration scheme
 
   int current_step; ///< Time stepping: index of the current time step
 
@@ -221,6 +232,12 @@ DislocationSolver<dim>::DislocationSolver(const unsigned int order)
                     Patterns::Double(),
                     "Max time in seconds");
 
+  prm.declare_entry("Time scheme",
+                    "Euler",
+                    Patterns::Anything(),
+                    "Time integration scheme");
+
+
   prm.declare_entry("Output precision",
                     "8",
                     Patterns::Integer(1),
@@ -252,9 +269,14 @@ DislocationSolver<dim>::solve()
 
   std::cout << "Time " << t << " s\n";
 
-  stress_solver.solve();
+  // first time step: calculate stresses
+  if (current_step == 1)
+    stress_solver.solve();
 
-  // TODO: time integration and coupling with stress
+  if (time_scheme == "Euler")
+    integrate_Euler();
+  else
+    AssertThrow(false, ExcNotImplemented());
 
   output_probes();
 
@@ -328,6 +350,20 @@ DislocationSolver<dim>::get_stress_J_2() const
 }
 
 template <int dim>
+const BlockVector<double> &
+DislocationSolver<dim>::get_strain_c() const
+{
+  return stress_solver.get_strain_c();
+}
+
+template <int dim>
+BlockVector<double> &
+DislocationSolver<dim>::get_strain_c()
+{
+  return stress_solver.get_strain_c();
+}
+
+template <int dim>
 const DoFHandler<dim> &
 DislocationSolver<dim>::get_dof_handler() const
 {
@@ -371,7 +407,6 @@ DislocationSolver<dim>::initialize()
   const unsigned int n_dofs_temp = get_temperature().size();
 
   dislocation_density.reinit(n_dofs_temp);
-  epsilon_c.reinit(StressSolver<dim>::n_components, n_dofs_temp);
 }
 
 template <int dim>
@@ -491,6 +526,8 @@ DislocationSolver<dim>::initialize_parameters()
   m_l   = prm.get_double("Material constant l");
   m_p   = prm.get_double("Material constant p");
 
+  time_scheme = prm.get("Time scheme");
+
   std::cout << "  done\n";
 
   std::cout << "b=" << m_b << "\n"
@@ -500,7 +537,8 @@ DislocationSolver<dim>::initialize_parameters()
             << "k_0=" << m_k_0 << "\n"
             << "l=" << m_l << "\n"
             << "p=" << m_p << "\n"
-            << "k_B=" << m_k_B << "\n";
+            << "k_B=" << m_k_B << "\n"
+            << "time_scheme=" << time_scheme << "\n";
 }
 
 template <int dim>
@@ -527,11 +565,13 @@ DislocationSolver<dim>::output_probes() const
       for (unsigned int i = 0; i < N; ++i)
         output << "# probe " << i << ": " << probes[i] << "\n";
 
+      // Write column titles, avoiding spaces in the units.
+      // In future, consider using tabs as separators.
       output << "t[s]";
       for (unsigned int i = 0; i < N; ++i)
         output << " T_" << i << "[K]"
                << " N_m_" << i << "[m^-2]"
-               << " dot_N_m_" << i << "[m^-2 s^-1]"
+               << " dot_N_m_" << i << "[m^-2s^-1]"
                << " J_2_" << i << "[Pa^2]"
                << " tau_eff_" << i << "[Pa]";
       output << "\n";
@@ -651,6 +691,42 @@ DislocationSolver<dim>::derivative_strain(const Vector<double> &N_m,
     result[i] = derivative_strain(N_m[i], J_2[i], T[i], S[i]);
 
   return result;
+}
+
+template <int dim>
+void
+DislocationSolver<dim>::integrate_Euler()
+{
+  // Implementation of explicit time integration. In future, consider using
+  // deal.II functionality (TimeStepping::RungeKutta)
+
+  Vector<double> &     N_m       = get_dislocation_density();
+  BlockVector<double> &epsilon_c = get_strain_c();
+
+  const Vector<double> &     T   = get_temperature();
+  const Vector<double> &     J_2 = get_stress_J_2();
+  const BlockVector<double> &S   = get_stress_deviator();
+
+  const unsigned int N  = N_m.size();
+  const double       dt = get_time_step();
+
+  for (unsigned int i = 0; i < N; ++i)
+    {
+      // calculate all changes
+      const double d_N_m = derivative_N_m(N_m[i], J_2[i], T[i]) * dt;
+
+      Vector<double> d_epsilon_c(epsilon_c.n_blocks());
+      for (unsigned int j = 0; j < epsilon_c.n_blocks(); ++j)
+        d_epsilon_c[j] =
+          derivative_strain(N_m[i], J_2[i], T[i], S.block(j)[i]) * dt;
+
+      // update all variables
+      N_m[i] += d_N_m;
+      for (unsigned int j = 0; j < epsilon_c.n_blocks(); ++j)
+        epsilon_c.block(j)[i] += d_epsilon_c[j];
+    }
+
+  stress_solver.solve();
 }
 
 #endif
