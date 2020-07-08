@@ -117,10 +117,17 @@ private:
   void
   output_probes() const;
 
+  /// Evaluate values of source field at probe points
+  std::vector<double>
+  get_field_at_probes(const Vector<double> &source) const;
+
   /// Calculate the effective stress \f$\tau_\mathrm{eff}\f$
   double
   tau_eff(const double N_m, const double J_2) const;
   /// Same as above, for vector arguments
+  std::vector<double>
+  tau_eff(const std::vector<double> &N_m, const std::vector<double> &J_2) const;
+  /// Same as above, for Vector arguments
   Vector<double>
   tau_eff(const Vector<double> &N_m, const Vector<double> &J_2) const;
 
@@ -128,6 +135,11 @@ private:
   double
   derivative_N_m(const double N_m, const double J_2, const double T) const;
   /// Same as above, for vector arguments
+  std::vector<double>
+  derivative_N_m(const std::vector<double> &N_m,
+                 const std::vector<double> &J_2,
+                 const std::vector<double> &T) const;
+  /// Same as above, for Vector arguments
   Vector<double>
   derivative_N_m(const Vector<double> &N_m,
                  const Vector<double> &J_2,
@@ -140,11 +152,33 @@ private:
                     const double T,
                     const double S) const;
   /// Same as above, for vector arguments
+  std::vector<double>
+  derivative_strain(const std::vector<double> &N_m,
+                    const std::vector<double> &J_2,
+                    const std::vector<double> &T,
+                    const std::vector<double> &S) const;
+  /// Same as above, for Vector arguments
   Vector<double>
   derivative_strain(const Vector<double> &N_m,
                     const Vector<double> &J_2,
                     const Vector<double> &T,
                     const Vector<double> &S) const;
+
+  /// Calculate the dislocation velocity \f$v\f$
+  double
+  dislocation_velocity(const double N_m,
+                       const double J_2,
+                       const double T) const;
+  /// Same as above, for vector arguments
+  std::vector<double>
+  dislocation_velocity(const std::vector<double> &N_m,
+                       const std::vector<double> &J_2,
+                       const std::vector<double> &T) const;
+  /// Same as above, for Vector arguments
+  Vector<double>
+  dislocation_velocity(const Vector<double> &N_m,
+                       const Vector<double> &J_2,
+                       const Vector<double> &T) const;
 
   /// Time integration using explicit scheme
   void
@@ -461,8 +495,9 @@ DislocationSolver<dim>::output_results() const
 
   const unsigned int n_dofs_temp = T.size();
 
-  Vector<double> tau     = tau_eff(N_m, stress_J_2);
-  Vector<double> dot_N_m = derivative_N_m(N_m, stress_J_2, T);
+  const Vector<double> tau     = tau_eff(N_m, stress_J_2);
+  const Vector<double> dot_N_m = derivative_N_m(N_m, stress_J_2, T);
+  const Vector<double> v       = dislocation_velocity(N_m, stress_J_2, T);
 
   BlockVector<double> dot_epsilon_c(StressSolver<dim>::n_components);
   for (unsigned int i = 0; i < dot_epsilon_c.n_blocks(); ++i)
@@ -473,6 +508,7 @@ DislocationSolver<dim>::output_results() const
 
   data_out.add_data_vector(tau, "tau_eff");
   data_out.add_data_vector(dot_N_m, "dot_N_m");
+  data_out.add_data_vector(v, "v");
   for (unsigned int i = 0; i < dot_epsilon_c.n_blocks(); ++i)
     {
       const std::string name = "dot_epsilon_c_" + std::to_string(i);
@@ -557,6 +593,8 @@ DislocationSolver<dim>::output_probes() const
 
   const double t = get_time();
 
+  const BlockVector<double> &s = get_stress();
+
   if (current_step == 1)
     {
       // write header at the first time step
@@ -569,11 +607,16 @@ DislocationSolver<dim>::output_probes() const
       // In future, consider using tabs as separators.
       output << "t[s]";
       for (unsigned int i = 0; i < N; ++i)
-        output << " T_" << i << "[K]"
-               << " N_m_" << i << "[m^-2]"
-               << " dot_N_m_" << i << "[m^-2s^-1]"
-               << " J_2_" << i << "[Pa^2]"
-               << " tau_eff_" << i << "[Pa]";
+        {
+          output << " T_" << i << "[K]"
+                 << " N_m_" << i << "[m^-2]"
+                 << " dot_N_m_" << i << "[m^-2s^-1]"
+                 << " v_" << i << "[ms^-1]";
+          for (unsigned int j = 0; j < s.n_blocks(); ++j)
+            output << " s_" << j << "_" << i << "[Pa]";
+          output << " tau_eff_" << i << "[Pa]"
+                 << " J_2_" << i << "[Pa^2]";
+        }
       output << "\n";
     }
 
@@ -583,19 +626,20 @@ DislocationSolver<dim>::output_probes() const
 
   // Process each field separately - easy to implement but potentially slow.
   // Not all fields are currently outputted.
-  Functions::FEFieldFunction<dim> ff_T(get_dof_handler(), T);
-  Functions::FEFieldFunction<dim> ff_N_m(get_dof_handler(), N_m);
-  Functions::FEFieldFunction<dim> ff_J_2(get_dof_handler(), J_2);
+  const std::vector<double> values_T   = get_field_at_probes(T);
+  const std::vector<double> values_N_m = get_field_at_probes(N_m);
+  const std::vector<double> values_J_2 = get_field_at_probes(J_2);
 
-  std::vector<double> values_T(N), values_N_m(N), values_J_2(N);
-
-  ff_T.value_list(probes, values_T);
-  ff_N_m.value_list(probes, values_N_m);
-  ff_J_2.value_list(probes, values_J_2);
+  std::vector<std::vector<double>> values_s(s.n_blocks());
+  for (unsigned int i = 0; i < s.n_blocks(); ++i)
+    values_s[i] = get_field_at_probes(s.block(i));
 
   // calculate additional fields
-  Vector<double> tau     = tau_eff(N_m, J_2);
-  Vector<double> dot_N_m = derivative_N_m(N_m, J_2, T);
+  const std::vector<double> values_tau = tau_eff(values_N_m, values_J_2);
+  const std::vector<double> values_dot_N_m =
+    derivative_N_m(values_N_m, values_J_2, values_T);
+  const std::vector<double> values_v =
+    dislocation_velocity(values_N_m, values_J_2, values_T);
   // skip dot_epsilon_c for now
 
   // header is already written, append values at the current time step
@@ -606,11 +650,28 @@ DislocationSolver<dim>::output_probes() const
 
   output << t;
   for (unsigned int i = 0; i < N; ++i)
-    output << " " << T[i] << " " << N_m[i] << " " << dot_N_m[i] << " " << J_2[i]
-           << " " << tau[i];
+    {
+      output << " " << values_T[i] << " " << values_N_m[i] << " "
+             << values_dot_N_m[i] << " " << values_v[i];
+      for (unsigned int j = 0; j < s.n_blocks(); ++j)
+        output << " " << values_s[j][i];
+      output << " " << values_tau[i] << " " << values_J_2[i];
+    }
   output << "\n";
 
   std::cout << "  done in " << timer() << " s\n";
+}
+
+template <int dim>
+std::vector<double>
+DislocationSolver<dim>::get_field_at_probes(const Vector<double> &source) const
+{
+  Functions::FEFieldFunction<dim> ff(get_dof_handler(), source);
+
+  std::vector<double> values(probes.size());
+  ff.value_list(probes, values);
+
+  return values;
 }
 
 template <int dim>
@@ -618,6 +679,21 @@ double
 DislocationSolver<dim>::tau_eff(const double N_m, const double J_2) const
 {
   return std::max(std::sqrt(J_2) - m_D * std::sqrt(N_m), 0.0);
+}
+
+template <int dim>
+std::vector<double>
+DislocationSolver<dim>::tau_eff(const std::vector<double> &N_m,
+                                const std::vector<double> &J_2) const
+{
+  const unsigned int N = N_m.size();
+
+  std::vector<double> result(N);
+
+  for (unsigned int i = 0; i < N; ++i)
+    result[i] = tau_eff(N_m[i], J_2[i]);
+
+  return result;
 }
 
 template <int dim>
@@ -645,6 +721,22 @@ DislocationSolver<dim>::derivative_N_m(const double N_m,
 
   return m_K * m_k_0 * std::pow(tau, m_p + m_l) * std::exp(-m_Q / (m_k_B * T)) *
          N_m;
+}
+
+template <int dim>
+std::vector<double>
+DislocationSolver<dim>::derivative_N_m(const std::vector<double> &N_m,
+                                       const std::vector<double> &J_2,
+                                       const std::vector<double> &T) const
+{
+  const unsigned int N = N_m.size();
+
+  std::vector<double> result(N);
+
+  for (unsigned int i = 0; i < N; ++i)
+    result[i] = derivative_N_m(N_m[i], J_2[i], T[i]);
+
+  return result;
 }
 
 template <int dim>
@@ -677,6 +769,23 @@ DislocationSolver<dim>::derivative_strain(const double N_m,
 }
 
 template <int dim>
+std::vector<double>
+DislocationSolver<dim>::derivative_strain(const std::vector<double> &N_m,
+                                          const std::vector<double> &J_2,
+                                          const std::vector<double> &T,
+                                          const std::vector<double> &S) const
+{
+  const unsigned int N = N_m.size();
+
+  std::vector<double> result(N);
+
+  for (unsigned int i = 0; i < N; ++i)
+    result[i] = derivative_strain(N_m[i], J_2[i], T[i], S[i]);
+
+  return result;
+}
+
+template <int dim>
 Vector<double>
 DislocationSolver<dim>::derivative_strain(const Vector<double> &N_m,
                                           const Vector<double> &J_2,
@@ -689,6 +798,49 @@ DislocationSolver<dim>::derivative_strain(const Vector<double> &N_m,
 
   for (unsigned int i = 0; i < N; ++i)
     result[i] = derivative_strain(N_m[i], J_2[i], T[i], S[i]);
+
+  return result;
+}
+
+template <int dim>
+double
+DislocationSolver<dim>::dislocation_velocity(const double N_m,
+                                             const double J_2,
+                                             const double T) const
+{
+  const double tau = tau_eff(N_m, J_2);
+
+  return m_k_0 * std::pow(tau, m_p) * std::exp(-m_Q / (m_k_B * T));
+}
+
+template <int dim>
+std::vector<double>
+DislocationSolver<dim>::dislocation_velocity(const std::vector<double> &N_m,
+                                             const std::vector<double> &J_2,
+                                             const std::vector<double> &T) const
+{
+  const unsigned int N = N_m.size();
+
+  std::vector<double> result(N);
+
+  for (unsigned int i = 0; i < N; ++i)
+    result[i] = dislocation_velocity(N_m[i], J_2[i], T[i]);
+
+  return result;
+}
+
+template <int dim>
+Vector<double>
+DislocationSolver<dim>::dislocation_velocity(const Vector<double> &N_m,
+                                             const Vector<double> &J_2,
+                                             const Vector<double> &T) const
+{
+  const unsigned int N = N_m.size();
+
+  Vector<double> result(N);
+
+  for (unsigned int i = 0; i < N; ++i)
+    result[i] = dislocation_velocity(N_m[i], J_2[i], T[i]);
 
   return result;
 }
