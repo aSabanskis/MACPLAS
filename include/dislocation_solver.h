@@ -145,6 +145,10 @@ private:
                  const Vector<double> &J_2,
                  const Vector<double> &T) const;
 
+  /// Calculate the partial derivative \f$\partial \dot{N_m} / \partial N_m\f$
+  double
+  derivative2_N_m_N_m(const double N_m, const double J_2, const double T) const;
+
   /// Calculate the creep strain rate \f$\dot{\varepsilon^c_{ij}}\f$
   double
   derivative_strain(const double N_m,
@@ -183,6 +187,10 @@ private:
   /// Time integration using explicit scheme
   void
   integrate_Euler();
+
+  /// Time integration using analytical expression for linearized N_m
+  void
+  integrate_linearized_N_m();
 
   /// Stress solver
 
@@ -309,6 +317,8 @@ DislocationSolver<dim>::solve()
 
   if (time_scheme == "Euler")
     integrate_Euler();
+  if (time_scheme == "Linearized N_m")
+    integrate_linearized_N_m();
   else
     AssertThrow(false, ExcNotImplemented());
 
@@ -757,6 +767,20 @@ DislocationSolver<dim>::derivative_N_m(const Vector<double> &N_m,
 
 template <int dim>
 double
+DislocationSolver<dim>::derivative2_N_m_N_m(const double N_m,
+                                            const double J_2,
+                                            const double T) const
+{
+  const double tau = tau_eff(N_m, J_2);
+
+  return m_K * m_k_0 * std::exp(-m_Q / (m_k_B * T)) *
+         (std::pow(tau, m_p + m_l) - (m_p + m_l) *
+                                       std::pow(tau, m_p + m_l - 1) *
+                                       std::sqrt(N_m) * m_D / 2);
+}
+
+template <int dim>
+double
 DislocationSolver<dim>::derivative_strain(const double N_m,
                                           const double J_2,
                                           const double T,
@@ -874,6 +898,44 @@ DislocationSolver<dim>::integrate_Euler()
 
       // update all variables
       N_m[i] += d_N_m;
+      for (unsigned int j = 0; j < epsilon_c.n_blocks(); ++j)
+        epsilon_c.block(j)[i] += d_epsilon_c[j];
+    }
+
+  stress_solver.solve();
+}
+
+template <int dim>
+void
+DislocationSolver<dim>::integrate_linearized_N_m()
+{
+  Vector<double> &     N_m       = get_dislocation_density();
+  BlockVector<double> &epsilon_c = get_strain_c();
+
+  const Vector<double> &     T   = get_temperature();
+  const Vector<double> &     J_2 = get_stress_J_2();
+  const BlockVector<double> &S   = get_stress_deviator();
+
+  const unsigned int N  = N_m.size();
+  const double       dt = get_time_step();
+
+  for (unsigned int i = 0; i < N; ++i)
+    {
+      // linearize dot_N_m = a + b * N_m
+      const double a = derivative_N_m(N_m[i], J_2[i], T[i]);
+      const double b = derivative2_N_m_N_m(N_m[i], J_2[i], T[i]);
+
+      // integrate analytically, assuming constant stresses
+      const double d_N_m = a / b * (std::exp(b * dt) - 1);
+
+      // update N_m
+      N_m[i] += d_N_m;
+
+      Vector<double> d_epsilon_c(epsilon_c.n_blocks());
+      for (unsigned int j = 0; j < epsilon_c.n_blocks(); ++j)
+        d_epsilon_c[j] =
+          derivative_strain(N_m[i], J_2[i], T[i], S.block(j)[i]) * dt;
+
       for (unsigned int j = 0; j < epsilon_c.n_blocks(); ++j)
         epsilon_c.block(j)[i] += d_epsilon_c[j];
     }
