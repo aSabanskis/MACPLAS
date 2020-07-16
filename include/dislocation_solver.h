@@ -317,7 +317,7 @@ DislocationSolver<dim>::solve()
 
   if (time_scheme == "Euler")
     integrate_Euler();
-  if (time_scheme == "Linearized N_m")
+  else if (time_scheme == "Linearized N_m")
     integrate_linearized_N_m();
   else
     AssertThrow(false, ExcNotImplemented());
@@ -603,7 +603,8 @@ DislocationSolver<dim>::output_probes() const
 
   const double t = get_time();
 
-  const BlockVector<double> &s = get_stress();
+  const BlockVector<double> &s   = get_stress();
+  const BlockVector<double> &e_c = get_strain_c();
 
   if (current_step == 1)
     {
@@ -622,8 +623,16 @@ DislocationSolver<dim>::output_probes() const
                  << " N_m_" << i << "[m^-2]"
                  << " dot_N_m_" << i << "[m^-2s^-1]"
                  << " v_" << i << "[ms^-1]";
+
           for (unsigned int j = 0; j < s.n_blocks(); ++j)
-            output << " s_" << j << "_" << i << "[Pa]";
+            output << " stress_" << j << "_" << i << "[Pa]";
+
+          for (unsigned int j = 0; j < e_c.n_blocks(); ++j)
+            output << " strain_c_" << j << "_" << i << "[-]";
+
+          for (unsigned int j = 0; j < e_c.n_blocks(); ++j)
+            output << " dot_strain_c_" << j << "_" << i << "[s^-1]";
+
           output << " tau_eff_" << i << "[Pa]"
                  << " J_2_" << i << "[Pa^2]";
         }
@@ -635,7 +644,6 @@ DislocationSolver<dim>::output_probes() const
   const Vector<double> &J_2 = get_stress_J_2();
 
   // Process each field separately - easy to implement but potentially slow.
-  // Not all fields are currently outputted.
   const std::vector<double> values_T   = get_field_at_probes(T);
   const std::vector<double> values_N_m = get_field_at_probes(N_m);
   const std::vector<double> values_J_2 = get_field_at_probes(J_2);
@@ -644,13 +652,23 @@ DislocationSolver<dim>::output_probes() const
   for (unsigned int i = 0; i < s.n_blocks(); ++i)
     values_s[i] = get_field_at_probes(s.block(i));
 
+  std::vector<std::vector<double>> values_e_c(e_c.n_blocks());
+  for (unsigned int i = 0; i < e_c.n_blocks(); ++i)
+    values_e_c[i] = get_field_at_probes(e_c.block(i));
+
   // calculate additional fields
   const std::vector<double> values_tau = tau_eff(values_N_m, values_J_2);
+
   const std::vector<double> values_dot_N_m =
     derivative_N_m(values_N_m, values_J_2, values_T);
+
   const std::vector<double> values_v =
     dislocation_velocity(values_N_m, values_J_2, values_T);
-  // skip dot_epsilon_c for now
+
+  std::vector<std::vector<double>> values_dot_e_c(e_c.n_blocks());
+  for (unsigned int i = 0; i < e_c.n_blocks(); ++i)
+    values_dot_e_c[i] =
+      derivative_strain(values_N_m, values_J_2, values_T, values_s[i]);
 
   // header is already written, append values at the current time step
   std::ofstream output(file_name, std::ios::app);
@@ -663,8 +681,16 @@ DislocationSolver<dim>::output_probes() const
     {
       output << " " << values_T[i] << " " << values_N_m[i] << " "
              << values_dot_N_m[i] << " " << values_v[i];
+
       for (unsigned int j = 0; j < s.n_blocks(); ++j)
         output << " " << values_s[j][i];
+
+      for (unsigned int j = 0; j < e_c.n_blocks(); ++j)
+        output << " " << values_e_c[j][i];
+
+      for (unsigned int j = 0; j < e_c.n_blocks(); ++j)
+        output << " " << values_dot_e_c[j][i];
+
       output << " " << values_tau[i] << " " << values_J_2[i];
     }
   output << "\n";
@@ -931,13 +957,10 @@ DislocationSolver<dim>::integrate_linearized_N_m()
       // update N_m
       N_m[i] += d_N_m;
 
-      Vector<double> d_epsilon_c(epsilon_c.n_blocks());
+      // update strains
       for (unsigned int j = 0; j < epsilon_c.n_blocks(); ++j)
-        d_epsilon_c[j] =
+        epsilon_c.block(j)[i] +=
           derivative_strain(N_m[i], J_2[i], T[i], S.block(j)[i]) * dt;
-
-      for (unsigned int j = 0; j < epsilon_c.n_blocks(); ++j)
-        epsilon_c.block(j)[i] += d_epsilon_c[j];
     }
 
   stress_solver.solve();

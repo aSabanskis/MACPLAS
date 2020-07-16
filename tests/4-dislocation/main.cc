@@ -1,3 +1,5 @@
+#include <deal.II/base/parameter_handler.h>
+
 #include <deal.II/grid/grid_generator.h>
 
 #include "../../include/dislocation_solver.h"
@@ -16,6 +18,8 @@ public:
 private:
   DislocationSolver<dim> solver;
 
+  ParameterHandler prm;
+
   void
   make_grid();
 
@@ -26,7 +30,34 @@ private:
 template <int dim>
 Problem<dim>::Problem(const unsigned int order)
   : solver(order)
-{}
+{
+  prm.declare_entry("Initial temperature",
+                    "1000",
+                    Patterns::Double(),
+                    "Initial temperature in K");
+
+  prm.declare_entry("Initial dislocation density",
+                    "1e3",
+                    Patterns::Double(),
+                    "Initial dislocation density in m^-2");
+
+  prm.declare_entry("Displacement",
+                    "1e-7",
+                    Patterns::Double(),
+                    "Displacement in m");
+
+  try
+    {
+      prm.parse_input("problem.prm");
+    }
+  catch (std::exception &e)
+    {
+      std::cout << e.what() << "\n";
+
+      std::ofstream of("problem-default.prm");
+      prm.print_parameters(of, ParameterHandler::Text);
+    }
+}
 
 template <int dim>
 void
@@ -66,14 +97,14 @@ Problem<dim>::initialize()
   Vector<double> &temperature         = solver.get_temperature();
   Vector<double> &dislocation_density = solver.get_dislocation_density();
 
-  for (unsigned int i = 0; i < temperature.size(); ++i)
-    {
-      temperature[i]         = 1000;
-      dislocation_density[i] = 1e3;
-    }
+  temperature = 0;
+  temperature.add(prm.get_double("Initial temperature"));
+
+  dislocation_density = 0;
+  dislocation_density.add(prm.get_double("Initial dislocation density"));
 
   solver.get_stress_solver().set_bc1(0, 0, 0.0);
-  solver.get_stress_solver().set_bc1(1, 0, 1e-7);
+  solver.get_stress_solver().set_bc1(1, 0, prm.get_double("Displacement"));
 }
 
 int
