@@ -184,9 +184,13 @@ private:
                        const Vector<double> &J_2,
                        const Vector<double> &T) const;
 
-  /// Time integration using explicit scheme
+  /// Time integration using the forward Euler method (explicit)
   void
   integrate_Euler();
+
+  /// Time integration using the midpoint method (explicit), also known as RK2
+  void
+  integrate_midpoint();
 
   /// Time integration using analytical expression for linearized N_m
   void
@@ -317,6 +321,8 @@ DislocationSolver<dim>::solve()
 
   if (time_scheme == "Euler")
     integrate_Euler();
+  else if (time_scheme == "Midpoint" || time_scheme == "RK2")
+    integrate_midpoint();
   else if (time_scheme == "Linearized N_m")
     integrate_linearized_N_m();
   else
@@ -914,18 +920,62 @@ DislocationSolver<dim>::integrate_Euler()
 
   for (unsigned int i = 0; i < N; ++i)
     {
-      // calculate all changes
-      const double d_N_m = derivative_N_m(N_m[i], J_2[i], T[i]) * dt;
-
-      Vector<double> d_epsilon_c(epsilon_c.n_blocks());
+      // update strains
       for (unsigned int j = 0; j < epsilon_c.n_blocks(); ++j)
-        d_epsilon_c[j] =
+        epsilon_c.block(j)[i] +=
           derivative_strain(N_m[i], J_2[i], T[i], S.block(j)[i]) * dt;
 
-      // update all variables
-      N_m[i] += d_N_m;
+      // update N_m
+      N_m[i] += derivative_N_m(N_m[i], J_2[i], T[i]) * dt;
+    }
+
+  stress_solver.solve();
+}
+
+template <int dim>
+void
+DislocationSolver<dim>::integrate_midpoint()
+{
+  Vector<double> &     N_m       = get_dislocation_density();
+  BlockVector<double> &epsilon_c = get_strain_c();
+
+  const Vector<double> &     T   = get_temperature();
+  const Vector<double> &     J_2 = get_stress_J_2();
+  const BlockVector<double> &S   = get_stress_deviator();
+
+  const unsigned int N  = N_m.size();
+  const double       dt = get_time_step();
+
+  // save values at the beginning of time step
+  Vector<double>      N_m_0       = N_m;
+  BlockVector<double> epsilon_c_0 = epsilon_c;
+
+  // first, take a half step
+  for (unsigned int i = 0; i < N; ++i)
+    {
+      // update strains
       for (unsigned int j = 0; j < epsilon_c.n_blocks(); ++j)
-        epsilon_c.block(j)[i] += d_epsilon_c[j];
+        epsilon_c.block(j)[i] +=
+          derivative_strain(N_m[i], J_2[i], T[i], S.block(j)[i]) * dt / 2;
+
+      // update N_m
+      N_m[i] += derivative_N_m(N_m[i], J_2[i], T[i]) * dt / 2;
+    }
+
+  // recalculate stresses
+  stress_solver.solve();
+
+  // now, take a full step with derivatives evaluated at the midpoint
+  for (unsigned int i = 0; i < N; ++i)
+    {
+      // update strains
+      for (unsigned int j = 0; j < epsilon_c.n_blocks(); ++j)
+        epsilon_c.block(j)[i] =
+          epsilon_c_0.block(j)[i] +
+          derivative_strain(N_m[i], J_2[i], T[i], S.block(j)[i]) * dt;
+
+      // update N_m
+      N_m[i] = N_m_0[i] + derivative_N_m(N_m[i], J_2[i], T[i]) * dt;
     }
 
   stress_solver.solve();
