@@ -69,7 +69,7 @@ Problem<dim>::run()
   while (true)
     {
       const bool keep_going = solver.solve();
-      solver.output_results();
+      //solver.output_results();
 
       if (!keep_going)
         break;

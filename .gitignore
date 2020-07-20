@@ -37,6 +37,7 @@ latex
 *.pdf
 *.gnu
 *.plt
+*.sh
 
 # Data files
 *.vt[uk]
@@ -45,6 +46,9 @@ latex
 *.txt
 *.dat
 *.[ct]sv
+*.zip
+*.png
+*.mp4
 
 # Parameter files
 *.prm
