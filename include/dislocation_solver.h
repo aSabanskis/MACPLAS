@@ -313,6 +313,13 @@ template <int dim>
 bool
 DislocationSolver<dim>::solve()
 {
+  // first time step: calculate stresses
+  if (current_step == 0)
+    {
+      stress_solver.solve();
+      output_probes();
+    }
+
   current_step++;
   const double dt    = get_time_step();
   const double t     = get_time();
@@ -320,9 +327,6 @@ DislocationSolver<dim>::solve()
 
   std::cout << "Time " << t << " s\n";
 
-  // first time step: calculate stresses
-  if (current_step == 1)
-    stress_solver.solve();
 
   if (time_scheme == "Euler")
     integrate_Euler();
@@ -620,7 +624,7 @@ DislocationSolver<dim>::output_probes() const
   const BlockVector<double> &s   = get_stress();
   const BlockVector<double> &e_c = get_strain_c();
 
-  if (current_step == 1)
+  if (current_step == 0)
     {
       // write header at the first time step
       std::ofstream output(file_name);

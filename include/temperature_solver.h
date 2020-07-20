@@ -259,6 +259,9 @@ template <int dim>
 bool
 TemperatureSolver<dim>::solve()
 {
+  if (current_step == 0)
+    output_probes();
+
   current_step++;
   const double dt    = get_time_step();
   const double t     = get_time();
@@ -508,7 +511,7 @@ TemperatureSolver<dim>::output_probes() const
 
   const double t = get_time();
 
-  if (current_step == 1)
+  if (current_step == 0)
     {
       // write header at the first time step
       std::ofstream output(file_name);
