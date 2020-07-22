@@ -91,7 +91,7 @@ private:
 };
 
 
-/// Class for interpolation of surface fields from external data.
+/// Class for interpolation of 3D surface fields from external data.
 
 /// Used for interpolation of boundary conditions between different meshes.
 /// The source cell or point data are defined on a triangulated surface.
@@ -120,7 +120,7 @@ public:
   void
   write_vtu(const std::string &file_name) const;
 
-  /// Interpolate cell field to the specified points
+  /// Interpolate field to the specified points
   void
   interpolate(const FieldType &              field_type,
               const std::string &            field_name,
@@ -204,7 +204,7 @@ closest_segment_point(const Point<dim> &p,
                       const Point<dim> &segment_p1)
 {
   const auto d = segment_p1 - segment_p0;
-  double     t = (d * (p - segment_p0)) / d.norm();
+  double     t = d * (p - segment_p0) / d.norm_square();
   // clamp to [0,1]
   t = std::max(0.0, std::min(1.0, t));
 
@@ -697,15 +697,13 @@ SurfaceInterpolator3D::interpolate(const FieldType &              field_type,
 
   for (unsigned int i = 0; i < n_values; ++i)
     {
-      target_values[i] = 0;
-
       if (!markers[i])
         continue;
 
       Point<dim>   p_found;
       unsigned int j_found = 0;
       double       d2_min  = -1;
-      for (unsigned int j = 1; j < n_triangles; ++j)
+      for (unsigned int j = 0; j < n_triangles; ++j)
         {
           const Triangle<dim> &triangle = triangle_cache[j];
 
