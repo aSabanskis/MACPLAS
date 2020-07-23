@@ -3,6 +3,7 @@
 
 #include <deal.II/base/parameter_handler.h>
 #include <deal.II/base/timer.h>
+#include <deal.II/base/utilities.h>
 
 #include <deal.II/grid/grid_out.h>
 #include <deal.II/grid/tria.h>
@@ -201,6 +202,10 @@ private:
   void
   integrate_linearized_N_m_midpoint();
 
+  /// Time integration using the backward Euler method (implicit)
+  void
+  integrate_implicit();
+
   /// Stress solver
 
   /// To avoid redundancy, mesh, finite element, degree handler and temperature
@@ -337,6 +342,8 @@ DislocationSolver<dim>::solve()
   else if (time_scheme == "Linearized N_m midpoint" ||
            time_scheme == "Linearized N_m RK2")
     integrate_linearized_N_m_midpoint();
+  else if (Utilities::match_at_string_start(time_scheme, "Implicit"))
+    integrate_implicit();
   else
     AssertThrow(false, ExcNotImplemented());
 
@@ -1083,6 +1090,52 @@ DislocationSolver<dim>::integrate_linearized_N_m_midpoint()
     }
 
   stress_solver.solve();
+}
+
+template <int dim>
+void
+DislocationSolver<dim>::integrate_implicit()
+{
+  Vector<double> &     N_m       = get_dislocation_density();
+  BlockVector<double> &epsilon_c = get_strain_c();
+
+  const Vector<double> &     T   = get_temperature();
+  const Vector<double> &     J_2 = get_stress_J_2();
+  const BlockVector<double> &S   = get_stress_deviator();
+
+  const unsigned int N  = N_m.size();
+  const double       dt = get_time_step();
+
+  // save values at the beginning of time step
+  Vector<double>      N_m_0       = N_m;
+  BlockVector<double> epsilon_c_0 = epsilon_c;
+
+  // get number of fixed-point iterations
+  const std::vector<std::string> tmp =
+    Utilities::split_string_list(time_scheme, ' ');
+  const unsigned int n_iterations = tmp.size() > 1 ? std::stoul(tmp.back()) : 1;
+
+  for (unsigned int k = 0; k <= n_iterations; ++k)
+    {
+      // k=0: initial approximation (forward Euler)
+
+      std::cout << "Fixed point iteration " << k << " of " << n_iterations
+                << "\n";
+
+      for (unsigned int i = 0; i < N; ++i)
+        {
+          // update strains
+          for (unsigned int j = 0; j < epsilon_c.n_blocks(); ++j)
+            epsilon_c.block(j)[i] =
+              epsilon_c_0.block(j)[i] +
+              derivative_strain(N_m[i], J_2[i], T[i], S.block(j)[i]) * dt;
+
+          // update N_m
+          N_m[i] = N_m_0[i] + derivative_N_m(N_m[i], J_2[i], T[i]) * dt;
+        }
+
+      stress_solver.solve();
+    }
 }
 
 #endif
