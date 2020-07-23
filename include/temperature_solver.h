@@ -2,10 +2,12 @@
 #define macplas_temperature_solver_h
 
 #include <deal.II/base/function.h>
+#include <deal.II/base/multithread_info.h>
 #include <deal.II/base/parameter_handler.h>
 #include <deal.II/base/polynomial.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/timer.h>
+#include <deal.II/base/work_stream.h>
 
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/dofs/dof_tools.h>
@@ -132,6 +134,36 @@ private:
   void
   assemble_system();
 
+
+  // Structure that holds scratch data
+  struct AssemblyScratchData
+  {
+    AssemblyScratchData(const Quadrature<dim>     quadrature,
+                        const Quadrature<dim - 1> face_quadrature,
+                        const FiniteElement<dim> &fe);
+    AssemblyScratchData(const AssemblyScratchData &scratch_data);
+
+    FEValues<dim>     fe_values;
+    FEFaceValues<dim> fe_face_values;
+  };
+  // Structure that holds local contributions
+  struct AssemblyCopyData
+  {
+    FullMatrix<double>                   cell_matrix;
+    Vector<double>                       cell_rhs;
+    std::vector<types::global_dof_index> local_dof_indices;
+  };
+  // Local assembly function
+  void
+  local_assemble_system(
+    const typename DoFHandler<dim>::active_cell_iterator &cell,
+    AssemblyScratchData &                                 scratch_data,
+    AssemblyCopyData &                                    copy_data);
+  // Copy local contributions to global
+  void
+  copy_local_to_global(const AssemblyCopyData &copy_data);
+
+
   /// Solve the system of linear equations
   void
   solve_system();
@@ -193,6 +225,12 @@ TemperatureSolver<dim>::TemperatureSolver(const unsigned int order)
                     Patterns::Double(),
                     "Max time in seconds");
 
+
+  prm.declare_entry("Number of threads",
+                    "0",
+                    Patterns::Integer(),
+                    "Maximum number of threads to be used (0 - default)");
+
   prm.declare_entry(
     "Output precision",
     "8",
@@ -237,10 +275,6 @@ TemperatureSolver<dim>::initialize_parameters()
 {
   std::cout << "Intializing parameters";
 
-  // some of the parameters are only fetched when needed
-  std::cout << "rho=" << prm.get_double("Density") << "\n"
-            << "c_p=" << prm.get_double("Specific heat capacity") << "\n";
-
   // no built-in function exists, parse manually
   std::string              lambda_raw = prm.get("Thermal conductivity");
   std::vector<std::string> lambda_split =
@@ -250,9 +284,22 @@ TemperatureSolver<dim>::initialize_parameters()
 
   lambda = Polynomials::Polynomial<double>(lambda_coefficients);
 
+  const auto n_threads = prm.get_integer("Number of threads");
+  MultithreadInfo::set_thread_limit(n_threads > 0 ? n_threads :
+                                                    MultithreadInfo::n_cores());
+
+  std::cout << "  done\n";
+
+  // some of the parameters are only fetched when needed
+  std::cout << "rho=" << prm.get_double("Density") << "\n"
+            << "c_p=" << prm.get_double("Specific heat capacity") << "\n";
+
   const int precision = prm.get_integer("Output precision");
   std::cout << "lambda=" << std::setprecision(precision);
   lambda.print(std::cout);
+
+  std::cout << "n_cores=" << MultithreadInfo::n_cores() << "\n"
+            << "n_threads=" << MultithreadInfo::n_threads() << "\n";
 }
 
 template <int dim>
@@ -575,6 +622,30 @@ TemperatureSolver<dim>::prepare_for_solve()
 }
 
 template <int dim>
+TemperatureSolver<dim>::AssemblyScratchData::AssemblyScratchData(
+  const Quadrature<dim>     quadrature,
+  const Quadrature<dim - 1> face_quadrature,
+  const FiniteElement<dim> &fe)
+  : fe_values(fe,
+              quadrature,
+              update_values | update_gradients | update_quadrature_points |
+                update_JxW_values)
+  , fe_face_values(fe, face_quadrature, update_values | update_JxW_values)
+{}
+
+template <int dim>
+TemperatureSolver<dim>::AssemblyScratchData::AssemblyScratchData(
+  const AssemblyScratchData &scratch_data)
+  : fe_values(scratch_data.fe_values.get_fe(),
+              scratch_data.fe_values.get_quadrature(),
+              update_values | update_gradients | update_quadrature_points |
+                update_JxW_values)
+  , fe_face_values(scratch_data.fe_face_values.get_fe(),
+                   scratch_data.fe_face_values.get_quadrature(),
+                   update_values | update_JxW_values)
+{}
+
+template <int dim>
 void
 TemperatureSolver<dim>::assemble_system()
 {
@@ -582,145 +653,19 @@ TemperatureSolver<dim>::assemble_system()
 
   std::cout << "Assembling system";
 
-  const double dt     = get_time_step();
-  const double inv_dt = dt == 0 ? 0 : 1 / dt;
-
-  const double rho = prm.get_double("Density");
-  const double c_p = prm.get_double("Specific heat capacity");
-
-  const QGauss<dim>     quadrature(fe.degree + 1 + lambda.degree() / 2);
-  const QGauss<dim - 1> face_quadrature(fe.degree + 1 + lambda.degree() / 2);
+  const QGauss<dim> &    quadrature(fe.degree + 1 + lambda.degree() / 2);
+  const QGauss<dim - 1> &face_quadrature(fe.degree + 1 + lambda.degree() / 2);
 
   system_matrix = 0;
   system_rhs    = 0;
 
-  FEValues<dim> fe_values(fe,
-                          quadrature,
-                          update_values | update_gradients |
-                            update_quadrature_points | update_JxW_values);
-
-  FEFaceValues<dim> fe_face_values(fe,
-                                   face_quadrature,
-                                   update_values | update_JxW_values);
-
-  const unsigned int dofs_per_cell   = fe.dofs_per_cell;
-  const unsigned int n_q_points      = quadrature.size();
-  const unsigned int n_face_q_points = face_quadrature.size();
-
-
-  FullMatrix<double> cell_matrix(dofs_per_cell, dofs_per_cell);
-  Vector<double>     cell_rhs(dofs_per_cell);
-
-  std::vector<double>         lambda_data(2);
-  std::vector<double>         T_q(n_q_points);
-  std::vector<double>         T_prev_q(n_q_points);
-  std::vector<Tensor<1, dim>> grad_T_q(n_q_points);
-  std::vector<double>         T_face_q(n_face_q_points);
-  std::vector<double>         heat_flux_in_face_q(n_face_q_points);
-
-  std::vector<types::global_dof_index> local_dof_indices(dofs_per_cell);
-
-  typename DoFHandler<dim>::active_cell_iterator cell = dh.begin_active(),
-                                                 endc = dh.end();
-  for (; cell != endc; ++cell)
-    {
-      cell_matrix = 0;
-      cell_rhs    = 0;
-
-      fe_values.reinit(cell);
-
-      fe_values.get_function_values(temperature, T_q);
-      fe_values.get_function_values(temperature_prev, T_prev_q);
-      fe_values.get_function_gradients(temperature, grad_T_q);
-
-      for (unsigned int q = 0; q < n_q_points; ++q)
-        {
-          lambda.value(T_q[q], lambda_data);
-          const double lambda_q      = lambda_data[0];
-          const double grad_lambda_q = lambda_data[1];
-
-          for (unsigned int i = 0; i < dofs_per_cell; ++i)
-            {
-              const double &        phi_i      = fe_values.shape_value(i, q);
-              const Tensor<1, dim> &grad_phi_i = fe_values.shape_grad(i, q);
-
-              for (unsigned int j = 0; j < dofs_per_cell; ++j)
-                {
-                  const double &        phi_j = fe_values.shape_value(j, q);
-                  const Tensor<1, dim> &grad_phi_j = fe_values.shape_grad(j, q);
-
-                  // Newthon's method
-                  cell_matrix(i, j) += ((lambda_q * grad_phi_j +
-                                         grad_lambda_q * phi_j * grad_T_q[q]) *
-                                          grad_phi_i +
-                                        inv_dt * rho * c_p * phi_j * phi_i) *
-                                       fe_values.JxW(q);
-                }
-
-              cell_rhs(i) -=
-                (lambda_q * grad_T_q[q] * grad_phi_i +
-                 inv_dt * rho * c_p * (T_q[q] - T_prev_q[q]) * phi_i) *
-                fe_values.JxW(q);
-            }
-        }
-
-      for (unsigned int face_number = 0;
-           face_number < GeometryInfo<dim>::faces_per_cell;
-           ++face_number)
-        {
-          if (!cell->face(face_number)->at_boundary())
-            continue;
-
-          auto it =
-            bc_rad_mixed_data.find(cell->face(face_number)->boundary_id());
-          if (it == bc_rad_mixed_data.end())
-            continue;
-
-          fe_face_values.reinit(cell, face_number);
-
-          fe_face_values.get_function_values(temperature, T_face_q);
-          fe_face_values.get_function_values(it->second.q_in,
-                                             heat_flux_in_face_q);
-
-          for (unsigned int q = 0; q < n_face_q_points; ++q)
-            {
-              const double net_heat_flux =
-                sigma_SB * it->second.emissivity(T_face_q[q]) *
-                  std::pow(T_face_q[q], 4) -
-                heat_flux_in_face_q[q];
-
-              for (unsigned int i = 0; i < dofs_per_cell; ++i)
-                {
-                  for (unsigned int j = 0; j < dofs_per_cell; ++j)
-                    {
-                      cell_matrix(i, j) +=
-                        sigma_SB *
-                        (it->second.emissivity(T_face_q[q]) * 4.0 *
-                           std::pow(T_face_q[q], 3) +
-                         it->second.emissivity_deriv(T_face_q[q]) *
-                           std::pow(T_face_q[q], 4)) *
-                        fe_face_values.shape_value(i, q) *
-                        fe_face_values.shape_value(j, q) *
-                        fe_face_values.JxW(q);
-                    }
-                  cell_rhs(i) -= net_heat_flux *
-                                 fe_face_values.shape_value(i, q) *
-                                 fe_face_values.JxW(q);
-                }
-            }
-        }
-
-      cell->get_dof_indices(local_dof_indices);
-      for (unsigned int i = 0; i < dofs_per_cell; ++i)
-        {
-          for (unsigned int j = 0; j < dofs_per_cell; ++j)
-            system_matrix.add(local_dof_indices[i],
-                              local_dof_indices[j],
-                              cell_matrix(i, j));
-
-          system_rhs(local_dof_indices[i]) += cell_rhs(i);
-        }
-    }
+  WorkStream::run(dh.begin_active(),
+                  dh.end(),
+                  *this,
+                  &TemperatureSolver::local_assemble_system,
+                  &TemperatureSolver::copy_local_to_global,
+                  AssemblyScratchData(quadrature, face_quadrature, fe),
+                  AssemblyCopyData());
 
   // Apply boundary conditions for Newton update
   std::map<types::global_dof_index, double> boundary_values;
@@ -738,6 +683,146 @@ TemperatureSolver<dim>::assemble_system()
                                      system_rhs);
 
   std::cout << "  done in " << timer() << " s\n";
+}
+
+template <int dim>
+void
+TemperatureSolver<dim>::local_assemble_system(
+  const typename DoFHandler<dim>::active_cell_iterator &cell,
+  AssemblyScratchData &                                 scratch_data,
+  AssemblyCopyData &                                    copy_data)
+{
+  const double dt     = get_time_step();
+  const double inv_dt = dt == 0 ? 0 : 1 / dt;
+
+  const double rho = prm.get_double("Density");
+  const double c_p = prm.get_double("Specific heat capacity");
+
+  FEValues<dim> &            fe_values       = scratch_data.fe_values;
+  FEFaceValues<dim> &        fe_face_values  = scratch_data.fe_face_values;
+  const Quadrature<dim> &    quadrature      = fe_values.get_quadrature();
+  const Quadrature<dim - 1> &face_quadrature = fe_face_values.get_quadrature();
+
+  const unsigned int dofs_per_cell   = fe.dofs_per_cell;
+  const unsigned int n_q_points      = quadrature.size();
+  const unsigned int n_face_q_points = face_quadrature.size();
+
+
+  FullMatrix<double> &cell_matrix = copy_data.cell_matrix;
+  Vector<double> &    cell_rhs    = copy_data.cell_rhs;
+
+  cell_matrix.reinit(dofs_per_cell, dofs_per_cell);
+  cell_rhs.reinit(dofs_per_cell);
+
+  std::vector<double>         lambda_data(2);
+  std::vector<double>         T_q(n_q_points);
+  std::vector<double>         T_prev_q(n_q_points);
+  std::vector<Tensor<1, dim>> grad_T_q(n_q_points);
+  std::vector<double>         T_face_q(n_face_q_points);
+  std::vector<double>         heat_flux_in_face_q(n_face_q_points);
+
+  std::vector<types::global_dof_index> &local_dof_indices =
+    copy_data.local_dof_indices;
+
+  local_dof_indices.resize(dofs_per_cell);
+
+
+  cell_matrix = 0;
+  cell_rhs    = 0;
+
+  fe_values.reinit(cell);
+
+  fe_values.get_function_values(temperature, T_q);
+  fe_values.get_function_values(temperature_prev, T_prev_q);
+  fe_values.get_function_gradients(temperature, grad_T_q);
+
+  for (unsigned int q = 0; q < n_q_points; ++q)
+    {
+      lambda.value(T_q[q], lambda_data);
+      const double lambda_q      = lambda_data[0];
+      const double grad_lambda_q = lambda_data[1];
+
+      for (unsigned int i = 0; i < dofs_per_cell; ++i)
+        {
+          const double &        phi_i      = fe_values.shape_value(i, q);
+          const Tensor<1, dim> &grad_phi_i = fe_values.shape_grad(i, q);
+
+          for (unsigned int j = 0; j < dofs_per_cell; ++j)
+            {
+              const double &        phi_j      = fe_values.shape_value(j, q);
+              const Tensor<1, dim> &grad_phi_j = fe_values.shape_grad(j, q);
+
+              // Newthon's method
+              cell_matrix(i, j) +=
+                ((lambda_q * grad_phi_j + grad_lambda_q * phi_j * grad_T_q[q]) *
+                   grad_phi_i +
+                 inv_dt * rho * c_p * phi_j * phi_i) *
+                fe_values.JxW(q);
+            }
+
+          cell_rhs(i) -= (lambda_q * grad_T_q[q] * grad_phi_i +
+                          inv_dt * rho * c_p * (T_q[q] - T_prev_q[q]) * phi_i) *
+                         fe_values.JxW(q);
+        }
+    }
+
+  for (unsigned int face_number = 0;
+       face_number < GeometryInfo<dim>::faces_per_cell;
+       ++face_number)
+    {
+      if (!cell->face(face_number)->at_boundary())
+        continue;
+
+      auto it = bc_rad_mixed_data.find(cell->face(face_number)->boundary_id());
+      if (it == bc_rad_mixed_data.end())
+        continue;
+
+      fe_face_values.reinit(cell, face_number);
+
+      fe_face_values.get_function_values(temperature, T_face_q);
+      fe_face_values.get_function_values(it->second.q_in, heat_flux_in_face_q);
+
+      for (unsigned int q = 0; q < n_face_q_points; ++q)
+        {
+          const double net_heat_flux = sigma_SB *
+                                         it->second.emissivity(T_face_q[q]) *
+                                         std::pow(T_face_q[q], 4) -
+                                       heat_flux_in_face_q[q];
+
+          for (unsigned int i = 0; i < dofs_per_cell; ++i)
+            {
+              for (unsigned int j = 0; j < dofs_per_cell; ++j)
+                {
+                  cell_matrix(i, j) +=
+                    sigma_SB *
+                    (it->second.emissivity(T_face_q[q]) * 4.0 *
+                       std::pow(T_face_q[q], 3) +
+                     it->second.emissivity_deriv(T_face_q[q]) *
+                       std::pow(T_face_q[q], 4)) *
+                    fe_face_values.shape_value(i, q) *
+                    fe_face_values.shape_value(j, q) * fe_face_values.JxW(q);
+                }
+              cell_rhs(i) -= net_heat_flux * fe_face_values.shape_value(i, q) *
+                             fe_face_values.JxW(q);
+            }
+        }
+    }
+
+  cell->get_dof_indices(local_dof_indices);
+}
+
+template <int dim>
+void
+TemperatureSolver<dim>::copy_local_to_global(const AssemblyCopyData &copy_data)
+{
+  for (unsigned int i = 0; i < copy_data.local_dof_indices.size(); ++i)
+    {
+      for (unsigned int j = 0; j < copy_data.local_dof_indices.size(); ++j)
+        system_matrix.add(copy_data.local_dof_indices[i],
+                          copy_data.local_dof_indices[j],
+                          copy_data.cell_matrix(i, j));
+      system_rhs(copy_data.local_dof_indices[i]) += copy_data.cell_rhs(i);
+    }
 }
 
 template <int dim>
