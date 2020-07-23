@@ -30,6 +30,13 @@ closest_segment_point(const Point<dim> &p,
                       const Point<dim> &segment_p0,
                       const Point<dim> &segment_p1);
 
+/// Get barycentric coordinates of point \f$p\f$ of a line segment
+template <int dim>
+std::array<double, 2>
+barycentric_coordinates(const Point<dim> &p,
+                        const Point<dim> &segment_p0,
+                        const Point<dim> &segment_p1);
+
 // helper classes
 
 /// Class for storing and quering geometrical information of a single triangle
@@ -188,6 +195,53 @@ private:
   preprocess();
 };
 
+/// Class for interpolation of 2D surface fields from external data.
+
+/// Used for interpolation of boundary conditions between different meshes.
+/// The source point data are defined on a polyline.
+class SurfaceInterpolator2D
+{
+private:
+  constexpr static unsigned int dim = 2; ///< Only 2D meshes are supported
+
+public:
+  /// Read mesh and fields from plain text file
+  void
+  read_txt(const std::string &file_name);
+
+  /// Interpolate field to the specified points
+  void
+  interpolate(const std::string &            field_name,
+              const std::vector<Point<dim>> &target_points,
+              const std::vector<bool> &      markers,
+              Vector<double> &               target_values) const;
+  /// Same as above, for target points in 3D
+  void
+  interpolate(const std::string &                field_name,
+              const std::vector<Point<dim + 1>> &target_points,
+              const std::vector<bool> &          markers,
+              Vector<double> &                   target_values) const;
+
+private:
+  /// Points \c (x,y)
+  std::vector<Point<dim>> points;
+
+  /// Fields defined on points
+  std::map<std::string, std::vector<double>> fields;
+
+  /// Get field
+  const std::vector<double> &
+  field(const std::string &field_name) const;
+
+  /// Clear all data
+  void
+  clear();
+
+  /// Print mesh and field information
+  void
+  info() const;
+};
+
 
 // IMPLEMENTATION
 
@@ -209,6 +263,19 @@ closest_segment_point(const Point<dim> &p,
   t = std::max(0.0, std::min(1.0, t));
 
   return segment_p0 + t * d;
+}
+
+template <int dim>
+std::array<double, 2>
+barycentric_coordinates(const Point<dim> &p,
+                        const Point<dim> &segment_p0,
+                        const Point<dim> &segment_p1)
+{
+  const auto   d = segment_p1 - segment_p0;
+  const double t = d * (p - segment_p0) / d.norm_square();
+
+  // t=0 corresponds to the first point segment_p0
+  return std::array<double, 2>({1.0 - t, t});
 }
 
 // Triangle
@@ -936,6 +1003,167 @@ SurfaceInterpolator3D::preprocess()
     }
 
   std::cout << "  done in " << timer() << " s\n";
+}
+
+// SurfaceInterpolator2D
+
+void
+SurfaceInterpolator2D::read_txt(const std::string &file_name)
+{
+  Timer timer;
+
+  clear();
+
+  std::ifstream file(file_name);
+
+  if (!file.is_open())
+    {
+      std::cout << "Could not open '" << file_name << "'\n";
+      return;
+    }
+  else
+    std::cout << "Reading '" << file_name << "'";
+
+
+  std::vector<std::string>         field_names;
+  std::vector<std::vector<double>> field_values;
+
+  std::string line;
+  while (std::getline(file, line))
+    {
+      if (line.empty())
+        continue;
+
+      std::stringstream ss(line);
+
+      if (field_names.empty())
+        {
+          std::string name;
+          ss >> name >> name; // First 2 columns are x and y;
+          while (ss >> name)  // then - field names
+            field_names.push_back(name);
+
+          field_values.resize(field_names.size());
+        }
+      else
+        {
+          Point<dim> p;
+          ss >> p[0] >> p[1];
+
+          points.push_back(p);
+
+          double val;
+          for (unsigned int i = 0; i < field_names.size(); ++i)
+            {
+              ss >> val;
+              field_values[i].push_back(val);
+            }
+        }
+    }
+
+  for (unsigned int i = 0; i < field_names.size(); ++i)
+    fields[field_names[i]] = field_values[i];
+
+  std::cout << "  done in " << timer() << " s\n";
+
+  info();
+}
+
+void
+SurfaceInterpolator2D::interpolate(const std::string &            field_name,
+                                   const std::vector<Point<dim>> &target_points,
+                                   const std::vector<bool> &      markers,
+                                   Vector<double> &target_values) const
+{
+  Timer timer;
+
+  std::cout << "Interpolating field '" << field_name << "'";
+
+  const std::vector<double> &source_field = field(field_name);
+
+  const unsigned int n_points = points.size();
+  const unsigned int n_values = target_points.size();
+  target_values.reinit(n_values);
+
+  for (unsigned int i = 0; i < n_values; ++i)
+    {
+      if (!markers[i])
+        continue;
+
+      Point<dim>   p_found;
+      unsigned int j_found = 0;
+      double       d2_min  = -1;
+
+      // number of segments is n_points-1
+      for (unsigned int j = 0; j + 1 < n_points; ++j)
+        {
+          Point<dim> p_trial =
+            closest_segment_point(target_points[i], points[j], points[j + 1]);
+
+          double d2 = (p_trial - target_points[i]).norm();
+          if (d2 < d2_min || d2_min < 0)
+            {
+              d2_min  = d2;
+              p_found = p_trial;
+              j_found = j;
+            }
+        }
+
+      const auto t2 =
+        barycentric_coordinates(p_found, points[j_found], points[j_found + 1]);
+      for (unsigned int k = 0; k < 2; ++k)
+        target_values[i] += t2[k] * source_field[j_found + k];
+    }
+
+  std::cout << "  done in " << timer() << " s\n";
+}
+
+void
+SurfaceInterpolator2D::interpolate(
+  const std::string &                field_name,
+  const std::vector<Point<dim + 1>> &target_points,
+  const std::vector<bool> &          markers,
+  Vector<double> &                   target_values) const
+{
+  const unsigned int n_values = target_points.size();
+
+  std::vector<Point<dim>> points_2d(n_values);
+
+  // convert from 3D (x,y,z) to 2D cylindrical coordinates (r,z)
+  for (unsigned int i = 0; i < n_values; ++i)
+    {
+      points_2d[i][0] = std::hypot(target_points[i][0], target_points[i][1]);
+      points_2d[i][1] = target_points[i][2];
+    }
+
+  interpolate(field_name, points_2d, markers, target_values);
+}
+
+const std::vector<double> &
+SurfaceInterpolator2D::field(const std::string &field_name) const
+{
+  const auto &it = fields.find(field_name);
+
+  if (it == fields.end())
+    throw std::runtime_error("Field '" + field_name + "' does not exist.");
+
+  return it->second;
+}
+
+void
+SurfaceInterpolator2D::clear()
+{
+  points.clear();
+  fields.clear();
+}
+
+void
+SurfaceInterpolator2D::info() const
+{
+  std::cout << "n_points:" << points.size() << "\n";
+
+  for (const auto &it : fields)
+    std::cout << "PointData " << it.first << " " << it.second.size() << "\n";
 }
 
 #endif

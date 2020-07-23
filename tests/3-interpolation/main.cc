@@ -58,6 +58,20 @@ Problem<dim>::make_grid()
   triangulation.set_all_manifold_ids(0);
   triangulation.set_manifold(0, manifold);
   triangulation.refine_global(3);
+
+  typename Triangulation<dim>::active_cell_iterator cell = triangulation
+                                                             .begin_active(),
+                                                    endc = triangulation.end();
+  for (; cell != endc; ++cell)
+    {
+      for (unsigned int i = 0; i < GeometryInfo<dim>::faces_per_cell; ++i)
+        {
+          auto face = cell->face(i);
+          if (face->at_boundary() && face->boundary_id() == 0 &&
+              face->center()[1] < 0)
+            face->set_boundary_id(3);
+        }
+    }
 }
 
 template <int dim>
@@ -69,7 +83,7 @@ Problem<dim>::initialize()
 
   std::vector<Point<dim>> points;
   std::vector<bool>       boundary_dofs;
-  const unsigned int      boundary_id = 0;
+  unsigned int            boundary_id = 0;
   solver.get_boundary_points(boundary_id, points, boundary_dofs);
   Vector<double> q(points.size());
 
@@ -88,6 +102,15 @@ Problem<dim>::initialize()
     SurfaceInterpolator3D::PointField, "q", points, boundary_dofs, q);
 
   std::function<double(double)> zero = [=](double T) { return 0; };
+  solver.set_bc_rad_mixed(boundary_id, q, zero, zero);
+
+
+  SurfaceInterpolator2D surf2;
+  surf2.read_txt("q-2d.txt");
+
+  boundary_id = 3;
+  solver.get_boundary_points(boundary_id, points, boundary_dofs);
+  surf2.interpolate("q", points, boundary_dofs, q);
   solver.set_bc_rad_mixed(boundary_id, q, zero, zero);
 }
 
