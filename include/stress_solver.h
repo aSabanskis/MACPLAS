@@ -1,8 +1,10 @@
 #ifndef macplas_stress_solver_h
 #define macplas_stress_solver_h
 
+#include <deal.II/base/multithread_info.h>
 #include <deal.II/base/parameter_handler.h>
 #include <deal.II/base/timer.h>
+#include <deal.II/base/work_stream.h>
 
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/dofs/dof_renumbering.h>
@@ -114,9 +116,42 @@ private:
   void
   prepare_for_solve();
 
-  /// Assemble the system matrix and right-hand-side vector
+  /// Assemble the system matrix and right-hand-side vector (multithreaded)
   void
   assemble_system();
+
+  /// Structure that holds scratch data
+  struct AssemblyScratchData
+  {
+    AssemblyScratchData(const Quadrature<dim> &   quadrature,
+                        const FiniteElement<dim> &fe_temp,
+                        const FiniteElement<dim> &fe);
+    AssemblyScratchData(const AssemblyScratchData &scratch_data);
+
+    FEValues<dim> fe_values_temp;
+    FEValues<dim> fe_values;
+  };
+  /// Structure that holds local contributions
+  struct AssemblyCopyData
+  {
+    FullMatrix<double>                   cell_matrix;
+    Vector<double>                       cell_rhs;
+    std::vector<types::global_dof_index> local_dof_indices;
+  };
+  /// Iterator tuple
+  typedef std_cxx11::tuple<typename DoFHandler<dim>::active_cell_iterator,
+                           typename DoFHandler<dim>::active_cell_iterator>
+    IteratorTuple;
+  /// Iterator pair
+  typedef SynchronousIterators<IteratorTuple> IteratorPair;
+  /// Local assembly function
+  void
+  local_assemble_system(const IteratorPair & cell_pair,
+                        AssemblyScratchData &scratch_data,
+                        AssemblyCopyData &   copy_data);
+  /// Copy local contributions to global
+  void
+  copy_local_to_global(const AssemblyCopyData &copy_data);
 
   /// Solve the system of linear equations
   void
@@ -208,6 +243,11 @@ StressSolver<dim>::StressSolver(const unsigned int order)
                     Patterns::Double(),
                     "Reference temperature in K");
 
+  prm.declare_entry("Number of threads",
+                    "0",
+                    Patterns::Integer(),
+                    "Maximum number of threads to be used (0 - default)");
+
   prm.declare_entry("Output precision",
                     "8",
                     Patterns::Integer(1),
@@ -243,6 +283,10 @@ StressSolver<dim>::initialize_parameters()
   m_C_12 = m_E * m_nu / ((1 + m_nu) * (1 - 2 * m_nu));
   m_C_44 = m_E / (2 * (1 + m_nu));
 
+  const auto n_threads = prm.get_integer("Number of threads");
+  MultithreadInfo::set_thread_limit(n_threads > 0 ? n_threads :
+                                                    MultithreadInfo::n_cores());
+
   std::cout << "  done\n";
 
   std::cout << "E=" << m_E << "\n"
@@ -252,6 +296,9 @@ StressSolver<dim>::initialize_parameters()
             << "C_11=" << m_C_11 << "\n"
             << "C_12=" << m_C_12 << "\n"
             << "C_44=" << m_C_44 << "\n";
+
+  std::cout << "n_cores=" << MultithreadInfo::n_cores() << "\n"
+            << "n_threads=" << MultithreadInfo::n_threads() << "\n";
 }
 
 template <int dim>
@@ -481,6 +528,26 @@ StressSolver<dim>::prepare_for_solve()
 }
 
 template <int dim>
+StressSolver<dim>::AssemblyScratchData::AssemblyScratchData(
+  const Quadrature<dim> &   quadrature,
+  const FiniteElement<dim> &fe_temp,
+  const FiniteElement<dim> &fe)
+  : fe_values_temp(fe_temp, quadrature, update_values)
+  , fe_values(fe, quadrature, update_gradients | update_JxW_values)
+{}
+
+template <int dim>
+StressSolver<dim>::AssemblyScratchData::AssemblyScratchData(
+  const AssemblyScratchData &scratch_data)
+  : fe_values_temp(scratch_data.fe_values_temp.get_fe(),
+                   scratch_data.fe_values_temp.get_quadrature(),
+                   scratch_data.fe_values_temp.get_update_flags())
+  , fe_values(scratch_data.fe_values.get_fe(),
+              scratch_data.fe_values.get_quadrature(),
+              scratch_data.fe_values.get_update_flags())
+{}
+
+template <int dim>
 void
 StressSolver<dim>::assemble_system()
 {
@@ -495,85 +562,14 @@ StressSolver<dim>::assemble_system()
   system_matrix = 0;
   system_rhs    = 0;
 
-  FEValues<dim> fe_values_temp(fe_temp, quadrature, update_values);
-  FEValues<dim> fe_values(fe, quadrature, update_gradients | update_JxW_values);
-
-  const unsigned int dofs_per_cell = fe.dofs_per_cell;
-  const unsigned int n_q_points    = quadrature.size();
-
-  FullMatrix<double> cell_matrix(dofs_per_cell, dofs_per_cell);
-  Vector<double>     cell_rhs(dofs_per_cell);
-
-  std::vector<double> T_q(n_q_points);
-
-  std::vector<std::vector<double>> epsilon_c_q(n_components,
-                                               std::vector<double>(n_q_points));
-
-  std::vector<types::global_dof_index> local_dof_indices(dofs_per_cell);
-
-  const SymmetricTensor<2, n_components> stiffness = get_stiffness_tensor();
-
-  typename DoFHandler<dim>::active_cell_iterator cell_temp =
-                                                   dh_temp.begin_active(),
-                                                 endc_temp = dh_temp.end(),
-                                                 cell      = dh.begin_active(),
-                                                 endc      = dh.end();
-  for (; cell != endc; ++cell_temp, ++cell)
-    {
-      cell_matrix = 0;
-      cell_rhs    = 0;
-
-      fe_values_temp.reinit(cell_temp);
-      fe_values.reinit(cell);
-
-      fe_values_temp.get_function_values(temperature, T_q);
-
-      for (unsigned int i = 0; i < n_components; ++i)
-        {
-          fe_values_temp.get_function_values(strain_c.block(i), epsilon_c_q[i]);
-        }
-
-      for (unsigned int q = 0; q < n_q_points; ++q)
-        {
-          const Tensor<1, n_components> epsilon_T_q = get_strain(T_q[q]);
-
-          // sum of thermal and creep strain
-          Tensor<1, n_components> epsilon_T_c_q = epsilon_T_q;
-          for (unsigned int i = 0; i < n_components; ++i)
-            epsilon_T_c_q[i] += epsilon_c_q[i][q];
-
-          for (unsigned int i = 0; i < dofs_per_cell; ++i)
-            {
-              const Tensor<1, n_components> strain_i =
-                get_strain(fe_values, i, q);
-
-              const Tensor<1, n_components> strain_i_stiffness =
-                strain_i * stiffness;
-
-              for (unsigned int j = 0; j < dofs_per_cell; ++j)
-                {
-                  const Tensor<1, n_components> strain_j =
-                    get_strain(fe_values, j, q);
-
-                  cell_matrix(i, j) +=
-                    (strain_i_stiffness * strain_j) * fe_values.JxW(q);
-                }
-              cell_rhs(i) +=
-                (strain_i_stiffness * epsilon_T_c_q) * fe_values.JxW(q);
-            }
-        }
-
-      cell->get_dof_indices(local_dof_indices);
-      for (unsigned int i = 0; i < dofs_per_cell; ++i)
-        {
-          for (unsigned int j = 0; j < dofs_per_cell; ++j)
-            system_matrix.add(local_dof_indices[i],
-                              local_dof_indices[j],
-                              cell_matrix(i, j));
-
-          system_rhs(local_dof_indices[i]) += cell_rhs(i);
-        }
-    }
+  WorkStream::run(IteratorPair(
+                    IteratorTuple(dh_temp.begin_active(), dh.begin_active())),
+                  IteratorPair(IteratorTuple(dh_temp.end(), dh.end())),
+                  *this,
+                  &StressSolver::local_assemble_system,
+                  &StressSolver::copy_local_to_global,
+                  AssemblyScratchData(quadrature, fe_temp, fe),
+                  AssemblyCopyData());
 
   // Apply boundary conditions for displacement
   std::map<types::global_dof_index, double> boundary_values;
@@ -596,6 +592,101 @@ StressSolver<dim>::assemble_system()
                                      system_rhs);
 
   std::cout << "  done in " << timer() << " s\n";
+}
+
+template <int dim>
+void
+StressSolver<dim>::local_assemble_system(const IteratorPair & cell_pair,
+                                         AssemblyScratchData &scratch_data,
+                                         AssemblyCopyData &   copy_data)
+{
+  FEValues<dim> &        fe_values_temp = scratch_data.fe_values_temp;
+  FEValues<dim> &        fe_values      = scratch_data.fe_values;
+  const Quadrature<dim> &quadrature     = fe_values.get_quadrature();
+
+  const unsigned int dofs_per_cell = fe.dofs_per_cell;
+  const unsigned int n_q_points    = quadrature.size();
+
+  FullMatrix<double> &cell_matrix = copy_data.cell_matrix;
+  Vector<double> &    cell_rhs    = copy_data.cell_rhs;
+
+  cell_matrix.reinit(dofs_per_cell, dofs_per_cell);
+  cell_rhs.reinit(dofs_per_cell);
+
+  std::vector<double> T_q(n_q_points);
+
+  std::vector<std::vector<double>> epsilon_c_q(n_components,
+                                               std::vector<double>(n_q_points));
+
+  std::vector<types::global_dof_index> &local_dof_indices =
+    copy_data.local_dof_indices;
+
+  local_dof_indices.resize(dofs_per_cell);
+
+  const SymmetricTensor<2, n_components> stiffness = get_stiffness_tensor();
+
+  cell_matrix = 0;
+  cell_rhs    = 0;
+
+  const typename DoFHandler<dim>::active_cell_iterator &cell_temp =
+    std_cxx11::get<0>(*cell_pair);
+  const typename DoFHandler<dim>::active_cell_iterator &cell =
+    std_cxx11::get<1>(*cell_pair);
+
+  fe_values_temp.reinit(cell_temp);
+  fe_values.reinit(cell);
+
+  fe_values_temp.get_function_values(temperature, T_q);
+
+  for (unsigned int i = 0; i < n_components; ++i)
+    {
+      fe_values_temp.get_function_values(strain_c.block(i), epsilon_c_q[i]);
+    }
+
+  for (unsigned int q = 0; q < n_q_points; ++q)
+    {
+      const Tensor<1, n_components> epsilon_T_q = get_strain(T_q[q]);
+
+      // sum of thermal and creep strain
+      Tensor<1, n_components> epsilon_T_c_q = epsilon_T_q;
+      for (unsigned int i = 0; i < n_components; ++i)
+        epsilon_T_c_q[i] += epsilon_c_q[i][q];
+
+      for (unsigned int i = 0; i < dofs_per_cell; ++i)
+        {
+          const Tensor<1, n_components> strain_i = get_strain(fe_values, i, q);
+
+          const Tensor<1, n_components> strain_i_stiffness =
+            strain_i * stiffness;
+
+          for (unsigned int j = 0; j < dofs_per_cell; ++j)
+            {
+              const Tensor<1, n_components> strain_j =
+                get_strain(fe_values, j, q);
+
+              cell_matrix(i, j) +=
+                (strain_i_stiffness * strain_j) * fe_values.JxW(q);
+            }
+          cell_rhs(i) +=
+            (strain_i_stiffness * epsilon_T_c_q) * fe_values.JxW(q);
+        }
+    }
+
+  cell->get_dof_indices(local_dof_indices);
+}
+
+template <int dim>
+void
+StressSolver<dim>::copy_local_to_global(const AssemblyCopyData &copy_data)
+{
+  for (unsigned int i = 0; i < copy_data.local_dof_indices.size(); ++i)
+    {
+      for (unsigned int j = 0; j < copy_data.local_dof_indices.size(); ++j)
+        system_matrix.add(copy_data.local_dof_indices[i],
+                          copy_data.local_dof_indices[j],
+                          copy_data.cell_matrix(i, j));
+      system_rhs(copy_data.local_dof_indices[i]) += copy_data.cell_rhs(i);
+    }
 }
 
 template <int dim>
