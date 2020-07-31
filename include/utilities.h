@@ -149,7 +149,7 @@ private:
   std::vector<Point<dim>> points;
 
   /// Connectivity matrix \c (v0,v1,v2) - only triangles
-  std::vector<std::array<unsigned int, 3>> triangles;
+  std::vector<std::array<unsigned long, 3>> triangles;
 
   /// Fields defined on cells
   std::map<std::string, std::vector<double>> cell_fields;
@@ -432,7 +432,7 @@ SurfaceInterpolator3D::read_vtk(const std::string &file_name)
     {
       if (s == "POINTS")
         {
-          int n;
+          unsigned int n;
           file >> n >> s /*data type*/;
           points.resize(n);
 
@@ -443,7 +443,7 @@ SurfaceInterpolator3D::read_vtk(const std::string &file_name)
         }
       else if (s == "CELLS")
         {
-          int n;
+          unsigned int n;
           file >> n >> s /*size*/;
           triangles.resize(n);
 
@@ -480,7 +480,7 @@ SurfaceInterpolator3D::read_vtk(const std::string &file_name)
 
           if (s == "FIELD")
             {
-              int n_fields;
+              unsigned int n_fields;
               file >> s /*FieldData*/ >> n_fields;
 
               for (unsigned int k = 0; k < n_fields; ++k)
@@ -625,9 +625,9 @@ SurfaceInterpolator3D::read_vtu(const std::string &file_name)
                         {
                           unsigned int k = 3 * i;
 
-                          triangles[i] = {std::stoi(data[k]),
-                                          std::stoi(data[k + 1]),
-                                          std::stoi(data[k + 2])};
+                          triangles[i] = {std::stoul(data[k]),
+                                          std::stoul(data[k + 1]),
+                                          std::stoul(data[k + 2])};
                         }
                     }
 
@@ -915,7 +915,6 @@ SurfaceInterpolator3D::point_to_cell(const std::string &source_name,
 
   std::cout << "Convering field '" << source_name << "' from point to cell";
 
-  const unsigned int n_points    = points.size();
   const unsigned int n_triangles = triangles.size();
 
   const std::vector<double> &source_field = field(PointField, source_name);

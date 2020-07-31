@@ -101,7 +101,7 @@ Problem<dim>::initialize()
   surf.interpolate(
     SurfaceInterpolator3D::PointField, "q", points, boundary_dofs, q);
 
-  std::function<double(double)> zero = [=](double T) { return 0; };
+  std::function<double(double)> zero = [=](double) { return 0; };
   solver.set_bc_rad_mixed(boundary_id, q, zero, zero);
 
 

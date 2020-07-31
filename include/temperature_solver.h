@@ -425,7 +425,10 @@ TemperatureSolver<dim>::get_boundary_points(
   boundary_dofs.resize(n_dofs);
 
   DoFTools::map_dofs_to_support_points(MappingQ1<dim>(), dh, points);
-  DoFTools::extract_boundary_dofs(dh, ComponentMask(), boundary_dofs, {id});
+  DoFTools::extract_boundary_dofs(dh,
+                                  ComponentMask(),
+                                  boundary_dofs,
+                                  {static_cast<types::boundary_id>(id)});
 }
 
 template <int dim>
@@ -494,7 +497,8 @@ TemperatureSolver<dim>::output_results() const
       DoFTools::extract_boundary_dofs(dh,
                                       ComponentMask(),
                                       boundary_dofs,
-                                      {data.first});
+                                      {static_cast<types::boundary_id>(
+                                        data.first)});
 
       for (unsigned int i = 0; i < temperature.size(); ++i)
         {
