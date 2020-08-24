@@ -523,7 +523,7 @@ TemperatureSolver<dim>::output_results() const
 
   data_out.write_vtk(output);
 
-  std::cout << "  done in " << timer() << " s\n";
+  std::cout << "  done in " << timer.wall_time() << " s\n";
 }
 
 template <int dim>
@@ -543,7 +543,7 @@ TemperatureSolver<dim>::output_mesh() const
   grid_out.set_flags(GridOutFlags::Msh(true));
   grid_out.write_msh(triangulation, output);
 
-  std::cout << "  done in " << timer() << " s\n";
+  std::cout << "  done in " << timer.wall_time() << " s\n";
 }
 
 template <int dim>
@@ -592,7 +592,7 @@ TemperatureSolver<dim>::output_probes() const
     output << " " << v;
   output << "\n";
 
-  std::cout << "  done in " << timer() << " s\n";
+  std::cout << "  done in " << timer.wall_time() << " s\n";
 }
 
 template <int dim>
@@ -686,7 +686,7 @@ TemperatureSolver<dim>::assemble_system()
                                      temperature_update,
                                      system_rhs);
 
-  std::cout << "  done in " << timer() << " s\n";
+  std::cout << "  done in " << timer.wall_time() << " s\n";
 }
 
 template <int dim>
@@ -715,6 +715,7 @@ TemperatureSolver<dim>::local_assemble_system(
   FullMatrix<double> &cell_matrix = copy_data.cell_matrix;
   Vector<double> &    cell_rhs    = copy_data.cell_rhs;
 
+  // resize and initialize with zeros
   cell_matrix.reinit(dofs_per_cell, dofs_per_cell);
   cell_rhs.reinit(dofs_per_cell);
 
@@ -730,9 +731,6 @@ TemperatureSolver<dim>::local_assemble_system(
 
   local_dof_indices.resize(dofs_per_cell);
 
-
-  cell_matrix = 0;
-  cell_rhs    = 0;
 
   fe_values.reinit(cell);
 
@@ -841,7 +839,7 @@ TemperatureSolver<dim>::solve_system()
   A.initialize(system_matrix);
   A.vmult(temperature_update, system_rhs);
 
-  std::cout << "  done in " << timer() << " s\n";
+  std::cout << "  done in " << timer.wall_time() << " s\n";
 }
 
 #endif
