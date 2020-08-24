@@ -78,12 +78,12 @@ Problem<dim>::initialize()
   const double c1 = r_a * (T_a - T_b) / (1 - r_a / r_b);
   const double c2 = (T_b - T_a * r_a / r_b) / (1 - r_a / r_b);
 
-  std::cout << "r_a=" << r_a << "\n";
-  std::cout << "r_b=" << r_b << "\n";
-  std::cout << "T_a=" << T_a << "\n";
-  std::cout << "T_b=" << T_b << "\n";
-  std::cout << "c1=" << c1 << "\n";
-  std::cout << "c2=" << c2 << "\n";
+  std::cout << "r_a=" << r_a << "\n"
+            << "r_b=" << r_b << "\n"
+            << "T_a=" << T_a << "\n"
+            << "T_b=" << T_b << "\n"
+            << "c1=" << c1 << "\n"
+            << "c2=" << c2 << "\n";
 
   solver.initialize();
 

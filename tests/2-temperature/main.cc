@@ -52,7 +52,7 @@ Problem<dim>::make_grid()
   Triangulation<dim> &triangulation = solver.get_mesh();
   GridGenerator::hyper_cube(triangulation, 0, 1, true);
 
-  triangulation.refine_global(3);
+  triangulation.refine_global(4);
 
   const unsigned int n_probes = 6;
   for (unsigned int i = 0; i < n_probes; ++i)
@@ -103,12 +103,6 @@ Problem<dim>::initialize()
 int
 main()
 {
-  Problem<1> p1d;
-  p1d.run();
-
-  Problem<2> p2d;
-  p2d.run();
-
   Problem<3> p3d;
   p3d.run();
 

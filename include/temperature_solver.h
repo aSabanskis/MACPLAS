@@ -145,6 +145,13 @@ private:
 
     FEValues<dim>     fe_values;
     FEFaceValues<dim> fe_face_values;
+
+    std::vector<double>         lambda_data;
+    std::vector<double>         T_q;
+    std::vector<double>         T_prev_q;
+    std::vector<Tensor<1, dim>> grad_T_q;
+    std::vector<double>         T_face_q;
+    std::vector<double>         heat_flux_in_face_q;
   };
   // Structure that holds local contributions
   struct AssemblyCopyData
@@ -632,9 +639,14 @@ TemperatureSolver<dim>::AssemblyScratchData::AssemblyScratchData(
   const FiniteElement<dim> &fe)
   : fe_values(fe,
               quadrature,
-              update_values | update_gradients | update_quadrature_points |
-                update_JxW_values)
+              update_values | update_gradients | update_JxW_values)
   , fe_face_values(fe, face_quadrature, update_values | update_JxW_values)
+  , lambda_data(2)
+  , T_q(quadrature.size())
+  , T_prev_q(quadrature.size())
+  , grad_T_q(quadrature.size())
+  , T_face_q(face_quadrature.size())
+  , heat_flux_in_face_q(face_quadrature.size())
 {}
 
 template <int dim>
@@ -642,11 +654,16 @@ TemperatureSolver<dim>::AssemblyScratchData::AssemblyScratchData(
   const AssemblyScratchData &scratch_data)
   : fe_values(scratch_data.fe_values.get_fe(),
               scratch_data.fe_values.get_quadrature(),
-              update_values | update_gradients | update_quadrature_points |
-                update_JxW_values)
+              scratch_data.fe_values.get_update_flags())
   , fe_face_values(scratch_data.fe_face_values.get_fe(),
                    scratch_data.fe_face_values.get_quadrature(),
-                   update_values | update_JxW_values)
+                   scratch_data.fe_face_values.get_update_flags())
+  , lambda_data(scratch_data.lambda_data)
+  , T_q(scratch_data.T_q)
+  , T_prev_q(scratch_data.T_prev_q)
+  , grad_T_q(scratch_data.grad_T_q)
+  , T_face_q(scratch_data.T_face_q)
+  , heat_flux_in_face_q(scratch_data.heat_flux_in_face_q)
 {}
 
 template <int dim>
@@ -696,11 +713,12 @@ TemperatureSolver<dim>::local_assemble_system(
   AssemblyScratchData &                                 scratch_data,
   AssemblyCopyData &                                    copy_data)
 {
+  // precalculate constant parameters
   const double dt     = get_time_step();
   const double inv_dt = dt == 0 ? 0 : 1 / dt;
-
-  const double rho = prm.get_double("Density");
-  const double c_p = prm.get_double("Specific heat capacity");
+  const double rho    = prm.get_double("Density");
+  const double c_p    = prm.get_double("Specific heat capacity");
+  const double tmp    = inv_dt * rho * c_p;
 
   FEValues<dim> &            fe_values       = scratch_data.fe_values;
   FEFaceValues<dim> &        fe_face_values  = scratch_data.fe_face_values;
@@ -719,12 +737,10 @@ TemperatureSolver<dim>::local_assemble_system(
   cell_matrix.reinit(dofs_per_cell, dofs_per_cell);
   cell_rhs.reinit(dofs_per_cell);
 
-  std::vector<double>         lambda_data(2);
-  std::vector<double>         T_q(n_q_points);
-  std::vector<double>         T_prev_q(n_q_points);
-  std::vector<Tensor<1, dim>> grad_T_q(n_q_points);
-  std::vector<double>         T_face_q(n_face_q_points);
-  std::vector<double>         heat_flux_in_face_q(n_face_q_points);
+  std::vector<double> &        lambda_data = scratch_data.lambda_data;
+  std::vector<double> &        T_q         = scratch_data.T_q;
+  std::vector<double> &        T_prev_q    = scratch_data.T_prev_q;
+  std::vector<Tensor<1, dim>> &grad_T_q    = scratch_data.grad_T_q;
 
   std::vector<types::global_dof_index> &local_dof_indices =
     copy_data.local_dof_indices;
@@ -741,13 +757,18 @@ TemperatureSolver<dim>::local_assemble_system(
   for (unsigned int q = 0; q < n_q_points; ++q)
     {
       lambda.value(T_q[q], lambda_data);
-      const double lambda_q      = lambda_data[0];
-      const double grad_lambda_q = lambda_data[1];
+      const double lambda_q       = lambda_data[0];
+      const double lambda_deriv_q = lambda_data[1];
 
       for (unsigned int i = 0; i < dofs_per_cell; ++i)
         {
           const double &        phi_i      = fe_values.shape_value(i, q);
           const Tensor<1, dim> &grad_phi_i = fe_values.shape_grad(i, q);
+
+          // hand-written optimizations
+          const double tmp_i      = tmp * phi_i;
+          const double tmp_grad_i = grad_T_q[q] * grad_phi_i;
+          const double tmp2_i     = lambda_deriv_q * tmp_grad_i + tmp_i;
 
           for (unsigned int j = 0; j < dofs_per_cell; ++j)
             {
@@ -756,15 +777,13 @@ TemperatureSolver<dim>::local_assemble_system(
 
               // Newthon's method
               cell_matrix(i, j) +=
-                ((lambda_q * grad_phi_j + grad_lambda_q * phi_j * grad_T_q[q]) *
-                   grad_phi_i +
-                 inv_dt * rho * c_p * phi_j * phi_i) *
+                (lambda_q * (grad_phi_j * grad_phi_i) + tmp2_i * phi_j) *
                 fe_values.JxW(q);
             }
 
-          cell_rhs(i) -= (lambda_q * grad_T_q[q] * grad_phi_i +
-                          inv_dt * rho * c_p * (T_q[q] - T_prev_q[q]) * phi_i) *
-                         fe_values.JxW(q);
+          cell_rhs(i) -=
+            (lambda_q * tmp_grad_i + tmp_i * (T_q[q] - T_prev_q[q])) *
+            fe_values.JxW(q);
         }
     }
 
@@ -778,6 +797,10 @@ TemperatureSolver<dim>::local_assemble_system(
       auto it = bc_rad_mixed_data.find(cell->face(face_number)->boundary_id());
       if (it == bc_rad_mixed_data.end())
         continue;
+
+      std::vector<double> &T_face_q = scratch_data.T_face_q;
+      std::vector<double> &heat_flux_in_face_q =
+        scratch_data.heat_flux_in_face_q;
 
       fe_face_values.reinit(cell, face_number);
 
