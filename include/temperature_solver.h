@@ -20,6 +20,8 @@
 
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/full_matrix.h>
+#include <deal.II/lac/precondition_selector.h>
+#include <deal.II/lac/solver_selector.h>
 #include <deal.II/lac/sparse_direct.h>
 #include <deal.II/lac/sparse_matrix.h>
 
@@ -232,6 +234,32 @@ TemperatureSolver<dim>::TemperatureSolver(const unsigned int order)
                     Patterns::Double(),
                     "Max time in seconds");
 
+  prm.declare_entry("Linear solver type",
+                    "minres",
+                    Patterns::Selection("UMFPACK|" +
+                                        SolverSelector<>::get_solver_names()),
+                    "Name of linear solver");
+
+  prm.declare_entry("Linear solver iterations",
+                    "1000",
+                    Patterns::Integer(0),
+                    "Max number of iterations of linear solver");
+
+  prm.declare_entry("Linear solver tolerance",
+                    "1e-8",
+                    Patterns::Double(0),
+                    "Tolerance (max residual norm) of linear solver");
+
+  prm.declare_entry("Preconditioner type",
+                    "jacobi",
+                    Patterns::Selection(
+                      PreconditionSelector<>::get_precondition_names()),
+                    "Name of preconditioner");
+
+  prm.declare_entry("Preconditioner relaxation",
+                    "1.0",
+                    Patterns::Double(0),
+                    "Relaxation factor of preconditioner");
 
   prm.declare_entry("Number of threads",
                     "0",
@@ -243,6 +271,7 @@ TemperatureSolver<dim>::TemperatureSolver(const unsigned int order)
     "8",
     Patterns::Integer(1),
     "Precision of double variables for output of field and probe data");
+
 
   // Physical parameters from https://doi.org/10.1016/S0022-0248(03)01253-3
   prm.declare_entry("Density",
@@ -281,6 +310,8 @@ void
 TemperatureSolver<dim>::initialize_parameters()
 {
   std::cout << "Intializing parameters";
+
+  deallog.depth_console(2);
 
   // no built-in function exists, parse manually
   std::string              lambda_raw = prm.get("Thermal conductivity");
@@ -858,9 +889,42 @@ TemperatureSolver<dim>::solve_system()
 
   std::cout << "Solving system";
 
-  SparseDirectUMFPACK A;
-  A.initialize(system_matrix);
-  A.vmult(temperature_update, system_rhs);
+  const std::string solver_type = prm.get("Linear solver type");
+
+  if (solver_type == "UMFPACK")
+    {
+      std::cout << " (" << solver_type << ")";
+
+      SparseDirectUMFPACK A;
+      A.initialize(system_matrix);
+      A.vmult(temperature_update, system_rhs);
+    }
+  else
+    {
+      std::cout << "\n";
+
+      SolverSelector<> solver;
+      solver.select(solver_type);
+
+      const int solver_iterations = prm.get_integer("Linear solver iterations");
+      const double solver_tolerance = prm.get_double("Linear solver tolerance");
+
+      IterationNumberControl control(solver_iterations, solver_tolerance);
+      solver.set_control(control);
+
+      const std::string preconditioner_type = prm.get("Preconditioner type");
+      const double      preconditioner_relaxation =
+        prm.get_double("Preconditioner relaxation");
+
+      PreconditionSelector<> preconditioner(preconditioner_type,
+                                            preconditioner_relaxation);
+      preconditioner.use_matrix(system_matrix);
+
+      solver.solve(system_matrix,
+                   temperature_update,
+                   system_rhs,
+                   preconditioner);
+    }
 
   std::cout << "  done in " << timer.wall_time() << " s\n";
 }
