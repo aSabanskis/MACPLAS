@@ -903,13 +903,12 @@ TemperatureSolver<dim>::solve_system()
     {
       std::cout << "\n";
 
-      SolverSelector<> solver;
-      solver.select(solver_type);
-
       const int solver_iterations = prm.get_integer("Linear solver iterations");
       const double solver_tolerance = prm.get_double("Linear solver tolerance");
-
       IterationNumberControl control(solver_iterations, solver_tolerance);
+
+      SolverSelector<> solver;
+      solver.select(solver_type);
       solver.set_control(control);
 
       const std::string preconditioner_type = prm.get("Preconditioner type");

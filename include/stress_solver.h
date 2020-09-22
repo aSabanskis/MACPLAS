@@ -747,13 +747,12 @@ StressSolver<dim>::solve_system()
     {
       std::cout << "\n";
 
-      SolverSelector<BlockVector<double>> solver;
-      solver.select(solver_type);
-
       const int solver_iterations = prm.get_integer("Linear solver iterations");
       const double solver_tolerance = prm.get_double("Linear solver tolerance");
-
       IterationNumberControl control(solver_iterations, solver_tolerance);
+
+      SolverSelector<BlockVector<double>> solver;
+      solver.select(solver_type);
       solver.set_control(control);
 
       // PreconditionSelector doesn't work with BlockSparseMatrix
