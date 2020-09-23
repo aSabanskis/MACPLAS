@@ -1,0 +1,14 @@
+set Density                   = 500
+set Linear solver iterations  = 1000
+set Linear solver tolerance   = 1e-8
+set Linear solver type        = minres
+set Max Newton iterations     = 6
+set Max absolute change       = 1e-3
+set Max time                  = 1000
+set Number of threads         = 0
+set Output precision          = 8
+set Preconditioner relaxation = 1.0
+set Preconditioner type       = jacobi
+set Specific heat capacity    = 1000
+set Thermal conductivity      = 200
+set Time step                 = 1

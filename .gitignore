@@ -35,8 +35,6 @@ log
 html
 latex
 *.pdf
-*.gnu
-*.plt
 
 # Data files
 *.vt[uk]
@@ -50,7 +48,7 @@ latex
 *.mp4
 
 # Parameter files
-*.prm
+*-default.prm
 
 # Allow some ignored files
 !CMakeLists.txt

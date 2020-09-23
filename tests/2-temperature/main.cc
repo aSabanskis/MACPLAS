@@ -38,7 +38,7 @@ Problem<dim>::run()
   while (true)
     {
       const bool keep_going = solver.solve();
-      solver.output_results();
+      // solver.output_results();
 
       if (!keep_going)
         break;
@@ -54,7 +54,7 @@ Problem<dim>::make_grid()
 
   triangulation.refine_global(4);
 
-  const unsigned int n_probes = 6;
+  const unsigned int n_probes = 11;
   for (unsigned int i = 0; i < n_probes; ++i)
     {
       Point<dim> p;
@@ -71,6 +71,13 @@ Problem<dim>::initialize()
   const double T0 = 1687;
 
   solver.initialize(); // sets T=0
+
+  // use natural boundary conditions for 1D benchmark case
+  if (dim == 1)
+    {
+      solver.set_bc1(0, 1000);
+      return;
+    }
 
   Vector<double> &temperature = solver.get_temperature();
   temperature.add(T0);
@@ -103,8 +110,8 @@ Problem<dim>::initialize()
 int
 main()
 {
-  Problem<3> p3d;
-  p3d.run();
+  Problem<1> p;
+  p.run();
 
   return 0;
 }
