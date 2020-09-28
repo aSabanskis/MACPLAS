@@ -569,7 +569,7 @@ DislocationSolver<dim>::output_results() const
 
   data_out.write_vtk(output);
 
-  std::cout << "  done in " << timer.wall_time() << " s\n";
+  std::cout << " " << format_time(timer) << "\n";
 }
 
 template <int dim>
@@ -590,7 +590,7 @@ DislocationSolver<dim>::output_mesh() const
   grid_out.set_flags(GridOutFlags::Msh(true));
   grid_out.write_msh(get_mesh(), output);
 
-  std::cout << "  done in " << timer.wall_time() << " s\n";
+  std::cout << " " << format_time(timer) << "\n";
 }
 
 template <int dim>
@@ -730,7 +730,7 @@ DislocationSolver<dim>::output_probes() const
     }
   output << "\n";
 
-  std::cout << "  done in " << timer.wall_time() << " s\n";
+  std::cout << " " << format_time(timer) << "\n";
 }
 
 template <int dim>

@@ -23,6 +23,12 @@ using namespace dealii;
 double
 sqr(const double x);
 
+/// Prints time in seconds, enclosed in parenthesis
+std::string
+format_time(const double x);
+std::string
+format_time(const Timer &timer);
+
 /// Get point on a line segment which is closest to the given point \f$p\f$
 template <int dim>
 Point<dim>
@@ -249,6 +255,18 @@ double
 sqr(const double x)
 {
   return x * x;
+}
+
+std::string
+format_time(const double x)
+{
+  return "(" + std::to_string(x) + " s)";
+}
+
+std::string
+format_time(const Timer &timer)
+{
+  return format_time(timer.wall_time());
 }
 
 template <int dim>
@@ -502,7 +520,7 @@ SurfaceInterpolator3D::read_vtk(const std::string &file_name)
         }
     }
 
-  std::cout << "  done in " << timer() << " s\n";
+  std::cout << " " << format_time(timer) << "\n";
 
   info();
   preprocess();
@@ -641,7 +659,7 @@ SurfaceInterpolator3D::read_vtu(const std::string &file_name)
         }
     }
 
-  std::cout << "  done in " << timer() << " s\n";
+  std::cout << " " << format_time(timer) << "\n";
 
   info();
   preprocess();
@@ -737,7 +755,7 @@ SurfaceInterpolator3D::write_vtu(const std::string &file_name) const
            "</UnstructuredGrid>\n"
            "</VTKFile>\n";
 
-  std::cout << "  done in " << timer() << " s\n";
+  std::cout << " " << format_time(timer) << "\n";
 }
 
 void
@@ -806,7 +824,7 @@ SurfaceInterpolator3D::interpolate(const FieldType &              field_type,
         }
     }
 
-  std::cout << "  done in " << timer() << " s\n";
+  std::cout << " " << format_time(timer) << "\n";
 }
 
 void
@@ -904,7 +922,7 @@ SurfaceInterpolator3D::cell_to_point(const std::string &source_name,
         target_field[i] /= count[i];
     }
 
-  std::cout << "  done in " << timer() << " s\n";
+  std::cout << " " << format_time(timer) << "\n";
 }
 
 void
@@ -941,7 +959,7 @@ SurfaceInterpolator3D::point_to_cell(const std::string &source_name,
         target_field[i] /= count[i];
     }
 
-  std::cout << "  done in " << timer() << " s\n";
+  std::cout << " " << format_time(timer) << "\n";
 }
 
 void
@@ -1001,7 +1019,7 @@ SurfaceInterpolator3D::preprocess()
       longest_side[i] = triangle.longest_side();
     }
 
-  std::cout << "  done in " << timer() << " s\n";
+  std::cout << " " << format_time(timer) << "\n";
 }
 
 // SurfaceInterpolator2D
@@ -1063,7 +1081,7 @@ SurfaceInterpolator2D::read_txt(const std::string &file_name)
   for (unsigned int i = 0; i < field_names.size(); ++i)
     fields[field_names[i]] = field_values[i];
 
-  std::cout << "  done in " << timer() << " s\n";
+  std::cout << " " << format_time(timer) << "\n";
 
   info();
 }
@@ -1114,7 +1132,7 @@ SurfaceInterpolator2D::interpolate(const std::string &            field_name,
         target_values[i] += t2[k] * source_field[j_found + k];
     }
 
-  std::cout << "  done in " << timer() << " s\n";
+  std::cout << " " << format_time(timer) << "\n";
 }
 
 void

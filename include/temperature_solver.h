@@ -32,6 +32,8 @@
 
 #include <fstream>
 
+#include "utilities.h"
+
 using namespace dealii;
 
 /// Stefan–Boltzmann constant, W m<sup>-2</sup> K<sup>-4</sup>
@@ -568,7 +570,7 @@ TemperatureSolver<dim>::output_results() const
 
   data_out.write_vtk(output);
 
-  std::cout << "  done in " << timer.wall_time() << " s\n";
+  std::cout << " " << format_time(timer) << "\n";
 }
 
 template <int dim>
@@ -588,7 +590,7 @@ TemperatureSolver<dim>::output_mesh() const
   grid_out.set_flags(GridOutFlags::Msh(true));
   grid_out.write_msh(triangulation, output);
 
-  std::cout << "  done in " << timer.wall_time() << " s\n";
+  std::cout << " " << format_time(timer) << "\n";
 }
 
 template <int dim>
@@ -637,7 +639,7 @@ TemperatureSolver<dim>::output_probes() const
     output << " " << v;
   output << "\n";
 
-  std::cout << "  done in " << timer.wall_time() << " s\n";
+  std::cout << " " << format_time(timer) << "\n";
 }
 
 template <int dim>
@@ -741,7 +743,7 @@ TemperatureSolver<dim>::assemble_system()
                                      temperature_update,
                                      system_rhs);
 
-  std::cout << "  done in " << timer.wall_time() << " s\n";
+  std::cout << " " << format_time(timer) << "\n";
 }
 
 template <int dim>
@@ -932,7 +934,7 @@ TemperatureSolver<dim>::solve_system()
                    preconditioner);
     }
 
-  std::cout << "  done in " << timer.wall_time() << " s\n";
+  std::cout << " " << format_time(timer) << "\n";
 }
 
 #endif

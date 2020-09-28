@@ -436,7 +436,7 @@ StressSolver<dim>::initialize()
   stress_deviator.reinit(n_components, n_dofs_temp);
   strain_c.reinit(n_components, n_dofs_temp);
 
-  std::cout << "  done in " << timer.wall_time() << " s\n";
+  std::cout << " " << format_time(timer) << "\n";
 
   std::cout << "Number of active cells: " << triangulation.n_active_cells()
             << "\n"
@@ -517,7 +517,7 @@ StressSolver<dim>::output_results() const
 
   data_out.write_vtk(output);
 
-  std::cout << "  done in " << timer.wall_time() << " s\n";
+  std::cout << " " << format_time(timer) << "\n";
 }
 
 template <int dim>
@@ -537,7 +537,7 @@ StressSolver<dim>::output_mesh() const
   grid_out.set_flags(GridOutFlags::Msh(true));
   grid_out.write_msh(triangulation, output);
 
-  std::cout << "  done in " << timer.wall_time() << " s\n";
+  std::cout << " " << format_time(timer) << "\n";
 }
 
 template <int dim>
@@ -637,7 +637,7 @@ StressSolver<dim>::assemble_system()
                                      displacement,
                                      system_rhs);
 
-  std::cout << "  done in " << timer.wall_time() << " s\n";
+  std::cout << " " << format_time(timer) << "\n";
 }
 
 template <int dim>
@@ -782,7 +782,7 @@ StressSolver<dim>::solve_system()
         }
     }
 
-  std::cout << "  done in " << timer.wall_time() << " s\n";
+  std::cout << " " << format_time(timer) << "\n";
 }
 
 template <int dim>
@@ -924,7 +924,7 @@ StressSolver<dim>::calculate_stress()
   stress_deviator.block(1) -= stress_hydrostatic;
   stress_deviator.block(2) -= stress_hydrostatic;
 
-  std::cout << "  done in " << timer.wall_time() << " s\n";
+  std::cout << " " << format_time(timer) << "\n";
 }
 
 template <int dim>
