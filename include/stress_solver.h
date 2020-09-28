@@ -227,6 +227,15 @@ StressSolver<dim>::StressSolver(const unsigned int order)
   , fe(FE_Q<dim>(order), dim)
   , dh(triangulation)
 {
+  std::cout << "Creating stress solver, order=" << order << ", dim=" << dim
+            << " ("
+#ifdef DEBUG
+               "Debug"
+#else
+               "Release"
+#endif
+               ")\n";
+
   AssertThrow(dim == 3, ExcNotImplemented());
 
   // Physical parameters from https://doi.org/10.1016/S0022-0248(01)01322-7
@@ -429,9 +438,7 @@ StressSolver<dim>::initialize()
 
   std::cout << "  done in " << timer.wall_time() << " s\n";
 
-  std::cout << "dim=" << dim << "\n"
-            << "order=" << fe.degree << "\n"
-            << "Number of active cells: " << triangulation.n_active_cells()
+  std::cout << "Number of active cells: " << triangulation.n_active_cells()
             << "\n"
             << "Number of degrees of freedom for temperature: " << n_dofs_temp
             << "\n";

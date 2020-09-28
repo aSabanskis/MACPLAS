@@ -214,6 +214,15 @@ TemperatureSolver<dim>::TemperatureSolver(const unsigned int order)
   , dh(triangulation)
   , current_step(0)
 {
+  std::cout << "Creating temperature solver, order=" << order << ", dim=" << dim
+            << " ("
+#ifdef DEBUG
+               "Debug"
+#else
+               "Release"
+#endif
+               ")\n";
+
   prm.declare_entry("Max absolute change",
                     "1e-3",
                     Patterns::Double(),
@@ -443,9 +452,7 @@ TemperatureSolver<dim>::initialize()
   temperature.reinit(n_dofs);
   temperature_update.reinit(n_dofs);
 
-  std::cout << "dim=" << dim << "\n"
-            << "order=" << fe.degree << "\n"
-            << "Number of active cells: " << triangulation.n_active_cells()
+  std::cout << "Number of active cells: " << triangulation.n_active_cells()
             << "\n"
             << "Number of degrees of freedom for temperature: " << n_dofs
             << "\n";

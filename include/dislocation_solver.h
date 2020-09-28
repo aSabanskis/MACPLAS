@@ -241,6 +241,16 @@ DislocationSolver<dim>::DislocationSolver(const unsigned int order)
   : stress_solver(order)
   , current_step(0)
 {
+  std::cout << "Creating dislocation density solver, order=" << order
+            << ", dim=" << dim
+            << " ("
+#ifdef DEBUG
+               "Debug"
+#else
+               "Release"
+#endif
+               ")\n";
+
   // Physical parameters from https://doi.org/10.1016/j.jcrysgro.2016.05.027
   prm.declare_entry("Burgers vector",
                     "3.8e-10",
