@@ -23,6 +23,10 @@ using namespace dealii;
 double
 sqr(const double x);
 
+/// Integrate analytically dot_x = a + b * (x-x_0)
+double
+dx_analytical(const double a, const double b, const double dt);
+
 /// Prints time in seconds, enclosed in parenthesis
 std::string
 format_time(const double x);
@@ -255,6 +259,15 @@ double
 sqr(const double x)
 {
   return x * x;
+}
+
+double
+dx_analytical(const double a, const double b, const double dt)
+{
+  if (b == 0)
+    return a * dt; // a*dt + b*sqr(dt)/2
+
+  return a / b * (std::exp(b * dt) - 1);
 }
 
 std::string

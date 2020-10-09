@@ -847,6 +847,9 @@ DislocationSolver<dim>::derivative_strain(const double N_m,
                                           const double T,
                                           const double S) const
 {
+  if (J_2 == 0)
+    return 0;
+
   const double tau = tau_eff(N_m, J_2);
 
   return m_b * m_k_0 * N_m * std::pow(tau, m_p) * std::exp(-m_Q / (m_k_B * T)) *
@@ -1031,7 +1034,7 @@ DislocationSolver<dim>::integrate_linearized_N_m()
       const double b = derivative2_N_m_N_m(N_m[i], J_2[i], T[i]);
 
       // integrate analytically, assuming constant stresses
-      const double d_N_m = a / b * (std::exp(b * dt) - 1);
+      const double d_N_m = dx_analytical(a, b, dt);
 
       // update N_m
       N_m[i] += d_N_m;
@@ -1076,7 +1079,7 @@ DislocationSolver<dim>::integrate_linearized_N_m_midpoint()
       const double b = derivative2_N_m_N_m(N_m[i], J_2[i], T[i]);
 
       // integrate analytically, assuming constant stresses
-      N_m[i] += a / b * (std::exp(b * dt / 2) - 1);
+      N_m[i] += dx_analytical(a, b, dt / 2);
     }
 
   // recalculate stresses
@@ -1096,7 +1099,7 @@ DislocationSolver<dim>::integrate_linearized_N_m_midpoint()
       const double b = derivative2_N_m_N_m(N_m_0[i], J_2[i], T[i]);
 
       // update N_m
-      N_m[i] = N_m_0[i] + a / b * (std::exp(b * dt) - 1);
+      N_m[i] = N_m_0[i] + dx_analytical(a, b, dt);
     }
 
   stress_solver.solve();
