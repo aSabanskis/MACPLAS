@@ -254,44 +254,44 @@ DislocationSolver<dim>::DislocationSolver(const unsigned int order)
   // Physical parameters from https://doi.org/10.1016/j.jcrysgro.2016.05.027
   prm.declare_entry("Burgers vector",
                     "3.8e-10",
-                    Patterns::Double(),
+                    Patterns::Double(0),
                     "Magnitude of Burgers vector in m");
 
   prm.declare_entry("Peierls potential",
                     "2.17",
-                    Patterns::Double(),
+                    Patterns::Double(0),
                     "Peierls potential in eV");
 
   prm.declare_entry("Strain hardening factor",
                     "4.3",
-                    Patterns::Double(),
+                    Patterns::Double(0),
                     "Strain hardening factor in N/m");
 
   prm.declare_entry("Material constant K",
                     "3.1e-4",
-                    Patterns::Double(),
+                    Patterns::Double(0),
                     "Material constant K in m/N");
 
   prm.declare_entry("Material constant k_0",
                     "8.6e-4",
-                    Patterns::Double(),
+                    Patterns::Double(0),
                     "Material constant k_0 in m^(2p+l)/N^p/s");
 
   prm.declare_entry("Material constant l",
                     "1.0",
-                    Patterns::Double(),
+                    Patterns::Double(0),
                     "Material constant l (dimensionless)");
 
   prm.declare_entry("Material constant p",
                     "1.1",
-                    Patterns::Double(),
+                    Patterns::Double(0),
                     "Material constant p (dimensionless)");
 
 
   prm.declare_entry("Time step",
                     "1",
-                    Patterns::Double(),
-                    "Time step in seconds (0 - steady-state)");
+                    Patterns::Double(0),
+                    "Time step in seconds");
 
   prm.declare_entry("Max time",
                     "10",

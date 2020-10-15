@@ -287,7 +287,7 @@ StressSolver<dim>::StressSolver(const unsigned int order)
 
   prm.declare_entry("Number of threads",
                     "0",
-                    Patterns::Integer(),
+                    Patterns::Integer(0),
                     "Maximum number of threads to be used (0 - default)");
 
   prm.declare_entry("Output precision",
@@ -756,7 +756,20 @@ StressSolver<dim>::solve_system()
 
       const int solver_iterations = prm.get_integer("Linear solver iterations");
       const double solver_tolerance = prm.get_double("Linear solver tolerance");
-      IterationNumberControl control(solver_iterations, solver_tolerance);
+
+      const bool log_history = false;
+      const bool log_result =
+#ifdef DEBUG
+        true
+#else
+        false
+#endif
+        ;
+
+      IterationNumberControl control(solver_iterations,
+                                     solver_tolerance,
+                                     log_history,
+                                     log_result);
 
       SolverSelector<BlockVector<double>> solver;
       solver.select(solver_type);
@@ -837,9 +850,8 @@ StressSolver<dim>::calculate_stress()
 
   typename DoFHandler<dim>::active_cell_iterator cell_temp =
                                                    dh_temp.begin_active(),
-                                                 endc_temp = dh_temp.end(),
-                                                 cell      = dh.begin_active(),
-                                                 endc      = dh.end();
+                                                 cell = dh.begin_active(),
+                                                 endc = dh.end();
   for (; cell != endc; ++cell_temp, ++cell)
     {
       fe_values_temp.reinit(cell_temp);

@@ -227,22 +227,22 @@ TemperatureSolver<dim>::TemperatureSolver(const unsigned int order)
 
   prm.declare_entry("Max absolute change",
                     "1e-3",
-                    Patterns::Double(),
+                    Patterns::Double(0),
                     "Max magnitute of Newton update");
 
   prm.declare_entry("Max Newton iterations",
                     "6",
-                    Patterns::Integer(),
+                    Patterns::Integer(0),
                     "Max number of Newton iterations (0 - unlimited)");
 
   prm.declare_entry("Time step",
                     "1",
-                    Patterns::Double(),
+                    Patterns::Double(0),
                     "Time step in seconds (0 - steady-state)");
 
   prm.declare_entry("Max time",
                     "10",
-                    Patterns::Double(),
+                    Patterns::Double(0),
                     "Max time in seconds");
 
   prm.declare_entry("Linear solver type",
@@ -274,7 +274,7 @@ TemperatureSolver<dim>::TemperatureSolver(const unsigned int order)
 
   prm.declare_entry("Number of threads",
                     "0",
-                    Patterns::Integer(),
+                    Patterns::Integer(0),
                     "Maximum number of threads to be used (0 - default)");
 
   prm.declare_entry(
@@ -914,7 +914,20 @@ TemperatureSolver<dim>::solve_system()
 
       const int solver_iterations = prm.get_integer("Linear solver iterations");
       const double solver_tolerance = prm.get_double("Linear solver tolerance");
-      IterationNumberControl control(solver_iterations, solver_tolerance);
+
+      const bool log_history = false;
+      const bool log_result =
+#ifdef DEBUG
+        true
+#else
+        false
+#endif
+        ;
+
+      IterationNumberControl control(solver_iterations,
+                                     solver_tolerance,
+                                     log_history,
+                                     log_result);
 
       SolverSelector<> solver;
       solver.select(solver_type);

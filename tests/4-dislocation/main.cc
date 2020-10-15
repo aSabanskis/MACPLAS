@@ -38,7 +38,7 @@ Problem<dim>::Problem(const unsigned int order)
 
   prm.declare_entry("Initial dislocation density",
                     "1e3",
-                    Patterns::Double(),
+                    Patterns::Double(0),
                     "Initial dislocation density in m^-2");
 
   prm.declare_entry("Strain rate",
