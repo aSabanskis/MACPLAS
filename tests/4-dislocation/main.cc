@@ -41,10 +41,12 @@ Problem<dim>::Problem(const unsigned int order)
                     Patterns::Double(),
                     "Initial dislocation density in m^-2");
 
-  prm.declare_entry("Displacement",
-                    "1e-7",
+  prm.declare_entry("Strain rate",
+                    "1e-5",
                     Patterns::Double(),
-                    "Displacement in m");
+                    "Strain rate in s^-1");
+
+  prm.declare_entry("L", "0.020", Patterns::Double(0), "Cube size in m");
 
   try
     {
@@ -68,8 +70,12 @@ Problem<dim>::run()
 
   while (true)
     {
+      const double t  = solver.get_time();
+      const double dx = prm.get_double("L") * prm.get_double("Strain rate") * t;
+      solver.get_stress_solver().set_bc1(1, 0, -dx); // compression
+
       const bool keep_going = solver.solve();
-      //solver.output_results();
+      // solver.output_results();
 
       if (!keep_going)
         break;
@@ -82,7 +88,7 @@ Problem<dim>::make_grid()
 {
   Triangulation<dim> &triangulation = solver.get_mesh();
 
-  GridGenerator::hyper_cube(triangulation, 0, 0.02, true);
+  GridGenerator::hyper_cube(triangulation, 0, prm.get_double("L"), true);
 
   // a single probe point at the origin
   solver.add_probe(Point<dim>());
@@ -104,7 +110,7 @@ Problem<dim>::initialize()
   dislocation_density.add(prm.get_double("Initial dislocation density"));
 
   solver.get_stress_solver().set_bc1(0, 0, 0.0);
-  solver.get_stress_solver().set_bc1(1, 0, prm.get_double("Displacement"));
+  solver.get_stress_solver().set_bc1(1, 0, 0.0);
 }
 
 int

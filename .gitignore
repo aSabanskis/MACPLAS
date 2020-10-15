@@ -32,6 +32,7 @@ CMakeCache.txt
 *.bak*
 log
 *.log*
+results
 html
 latex
 *.pdf
