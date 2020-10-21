@@ -85,9 +85,17 @@ public:
   /// Current time, s
   double
   get_time() const;
+  /// Current time, s
+  double &
+  get_time();
+
   /// Time step, s
   double
   get_time_step() const;
+  /// Time step, s
+  double &
+  get_time_step();
+
   /// Final time, s
   double
   get_max_time() const;
@@ -175,6 +183,10 @@ private:
   copy_local_to_global(const AssemblyCopyData &copy_data);
 
 
+  /// Time stepping: advance time
+  void
+  advance_time();
+
   /// Solve the system of linear equations
   void
   solve_system();
@@ -207,14 +219,16 @@ private:
 
   ParameterHandler prm; ///< Parameter handler
 
-  int current_step; ///< Time stepping: index of the current time step
+  double current_time;      ///< Time stepping: current time, s
+  double current_time_step; ///< Time stepping: current time step, s
 };
 
 template <int dim>
 TemperatureSolver<dim>::TemperatureSolver(const unsigned int order)
   : fe(order)
   , dh(triangulation)
-  , current_step(0)
+  , current_time(0)
+  , current_time_step(0)
 {
   std::cout << "Creating temperature solver, order=" << order << ", dim=" << dim
             << " ("
@@ -337,6 +351,8 @@ TemperatureSolver<dim>::initialize_parameters()
   MultithreadInfo::set_thread_limit(n_threads > 0 ? n_threads :
                                                     MultithreadInfo::n_cores());
 
+  get_time_step() = prm.get_double("Time step");
+
   std::cout << "  done\n";
 
   // some of the parameters are only fetched when needed
@@ -355,10 +371,10 @@ template <int dim>
 bool
 TemperatureSolver<dim>::solve()
 {
-  if (current_step == 0)
+  if (get_time() == 0)
     output_probes();
 
-  current_step++;
+  advance_time();
   const double dt    = get_time_step();
   const double t     = get_time();
   const double t_max = get_max_time();
@@ -427,14 +443,28 @@ template <int dim>
 double
 TemperatureSolver<dim>::get_time() const
 {
-  return get_time_step() * current_step;
+  return current_time;
+}
+
+template <int dim>
+double &
+TemperatureSolver<dim>::get_time()
+{
+  return current_time;
 }
 
 template <int dim>
 double
 TemperatureSolver<dim>::get_time_step() const
 {
-  return prm.get_double("Time step");
+  return current_time_step;
+}
+
+template <int dim>
+double &
+TemperatureSolver<dim>::get_time_step()
+{
+  return current_time_step;
 }
 
 template <int dim>
@@ -609,7 +639,7 @@ TemperatureSolver<dim>::output_probes() const
 
   const double t = get_time();
 
-  if (current_step == 0)
+  if (t == 0)
     {
       // write header at the first time step
       std::ofstream output(file_name);
@@ -888,6 +918,13 @@ TemperatureSolver<dim>::copy_local_to_global(const AssemblyCopyData &copy_data)
                           copy_data.cell_matrix(i, j));
       system_rhs(copy_data.local_dof_indices[i]) += copy_data.cell_rhs(i);
     }
+}
+
+template <int dim>
+void
+TemperatureSolver<dim>::advance_time()
+{
+  get_time() += get_time_step();
 }
 
 template <int dim>

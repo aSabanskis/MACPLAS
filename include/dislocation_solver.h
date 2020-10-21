@@ -86,9 +86,17 @@ public:
   /// Current time, s
   double
   get_time() const;
+  /// Current time, s
+  double &
+  get_time();
+
   /// Time step, s
   double
   get_time_step() const;
+  /// Time step, s
+  double &
+  get_time_step();
+
   /// Final time, s
   double
   get_max_time() const;
@@ -113,6 +121,10 @@ private:
   /// Initialize parameters. Called by the constructor
   void
   initialize_parameters();
+
+  /// Time stepping: advance time
+  void
+  advance_time();
 
   /// Write current values of fields at probe points to disk
   void
@@ -220,7 +232,8 @@ private:
 
   std::string time_scheme; ///< Time integration scheme
 
-  int current_step; ///< Time stepping: index of the current time step
+  double current_time;      ///< Time stepping: current time, s
+  double current_time_step; ///< Time stepping: current time step, s
 
   double m_b; ///< Magnitude of Burgers vector \f$b\f$, m
   double m_Q; ///< Peierls potential \f$Q\f$, eV
@@ -239,7 +252,8 @@ private:
 template <int dim>
 DislocationSolver<dim>::DislocationSolver(const unsigned int order)
   : stress_solver(order)
-  , current_step(0)
+  , current_time(0)
+  , current_time_step(0)
 {
   std::cout << "Creating dislocation density solver, order=" << order
             << ", dim=" << dim
@@ -329,13 +343,13 @@ bool
 DislocationSolver<dim>::solve()
 {
   // first time step: calculate stresses
-  if (current_step == 0)
+  if (get_time() == 0)
     {
       stress_solver.solve();
       output_probes();
     }
 
-  current_step++;
+  advance_time();
   const double dt    = get_time_step();
   const double t     = get_time();
   const double t_max = get_max_time();
@@ -460,14 +474,28 @@ template <int dim>
 double
 DislocationSolver<dim>::get_time() const
 {
-  return get_time_step() * current_step;
+  return current_time;
+}
+
+template <int dim>
+double &
+DislocationSolver<dim>::get_time()
+{
+  return current_time;
 }
 
 template <int dim>
 double
 DislocationSolver<dim>::get_time_step() const
 {
-  return prm.get_double("Time step");
+  return current_time_step;
+}
+
+template <int dim>
+double &
+DislocationSolver<dim>::get_time_step()
+{
+  return current_time_step;
 }
 
 template <int dim>
@@ -609,6 +637,8 @@ DislocationSolver<dim>::initialize_parameters()
 
   time_scheme = prm.get("Time scheme");
 
+  get_time_step() = prm.get_double("Time step");
+
   std::cout << "  done\n";
 
   std::cout << "b=" << m_b << "\n"
@@ -620,6 +650,13 @@ DislocationSolver<dim>::initialize_parameters()
             << "p=" << m_p << "\n"
             << "k_B=" << m_k_B << "\n"
             << "time_scheme=" << time_scheme << "\n";
+}
+
+template <int dim>
+void
+DislocationSolver<dim>::advance_time()
+{
+  get_time() += get_time_step();
 }
 
 template <int dim>
@@ -641,7 +678,7 @@ DislocationSolver<dim>::output_probes() const
   const BlockVector<double> &s   = get_stress();
   const BlockVector<double> &e_c = get_strain_c();
 
-  if (current_step == 0)
+  if (t == 0)
     {
       // write header at the first time step
       std::ofstream output(file_name);
