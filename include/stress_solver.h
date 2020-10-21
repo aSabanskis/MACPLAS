@@ -1,6 +1,7 @@
 #ifndef macplas_stress_solver_h
 #define macplas_stress_solver_h
 
+#include <deal.II/base/function_parser.h>
 #include <deal.II/base/multithread_info.h>
 #include <deal.II/base/parameter_handler.h>
 #include <deal.II/base/timer.h>
@@ -162,6 +163,10 @@ private:
   void
   solve_system();
 
+  /// Calculate the temperature-dependent thermal expansion coefficient
+  double
+  calc_alpha(const double T) const;
+
   /// Calculate the stresses from the displacement field
   void
   calculate_stress();
@@ -211,8 +216,11 @@ private:
 
   ParameterHandler prm; ///< Parameter handler
 
-  double m_E;     ///< Young's modulus, Pa
-  double m_alpha; ///< Thermal expansion coefficient, K<sup>-1</sup>
+  double m_E; ///< Young's modulus, Pa
+
+  /// Thermal expansion coefficient, K<sup>-1</sup>
+  FunctionParser<1> m_alpha;
+
   double m_nu;    ///< Poisson's ratio, -
   double m_T_ref; ///< Reference temperature, K
   double m_C_11; ///< Second-order elastic constant (stiffness) \f$C_{11}\f$, Pa
@@ -238,6 +246,8 @@ StressSolver<dim>::StressSolver(const unsigned int order)
 
   AssertThrow(dim == 3, ExcNotImplemented());
 
+  const std::string info_T = " (accepts temperature function)";
+
   // Physical parameters from https://doi.org/10.1016/S0022-0248(01)01322-7
   prm.declare_entry("Young's modulus",
                     "1.56e11",
@@ -246,8 +256,8 @@ StressSolver<dim>::StressSolver(const unsigned int order)
 
   prm.declare_entry("Thermal expansion coefficient",
                     "3.2e-6",
-                    Patterns::Double(0),
-                    "Thermal expansion coefficient in 1/K");
+                    Patterns::Anything(),
+                    "Thermal expansion coefficient in 1/K" + info_T);
 
   prm.declare_entry("Poisson's ratio",
                     "0.25",
@@ -318,8 +328,14 @@ StressSolver<dim>::initialize_parameters()
 
   deallog.depth_console(2);
 
-  m_E     = prm.get_double("Young's modulus");
-  m_alpha = prm.get_double("Thermal expansion coefficient");
+  m_E = prm.get_double("Young's modulus");
+
+  const std::string m_alpha_expression =
+    prm.get("Thermal expansion coefficient");
+  m_alpha.initialize("T",
+                     m_alpha_expression,
+                     typename FunctionParser<1>::ConstMap());
+
   m_nu    = prm.get_double("Poisson's ratio");
   m_T_ref = prm.get_double("Reference temperature");
 
@@ -334,7 +350,7 @@ StressSolver<dim>::initialize_parameters()
   std::cout << "  done\n";
 
   std::cout << "E=" << m_E << "\n"
-            << "alpha=" << m_alpha << "\n"
+            << "alpha=" << m_alpha_expression << "\n"
             << "nu=" << m_nu << "\n"
             << "T_ref=" << m_T_ref << "\n"
             << "C_11=" << m_C_11 << "\n"
@@ -486,6 +502,11 @@ StressSolver<dim>::output_results() const
 
   data_out.attach_dof_handler(dh_temp);
   data_out.add_data_vector(temperature, "T");
+
+  Vector<double> alpha(temperature.size());
+  for (unsigned int i = 0; i < temperature.size(); ++i)
+    alpha[i] = calc_alpha(temperature[i]);
+  data_out.add_data_vector(alpha, "alpha");
 
   for (unsigned int i = 0; i < displacement.n_blocks(); ++i)
     {
@@ -799,6 +820,13 @@ StressSolver<dim>::solve_system()
 }
 
 template <int dim>
+double
+StressSolver<dim>::calc_alpha(const double T) const
+{
+  return m_alpha.value(Point<1>(T));
+}
+
+template <int dim>
 void
 StressSolver<dim>::calculate_stress()
 {
@@ -982,7 +1010,9 @@ StressSolver<dim>::get_strain(const double &           T,
 {
   AssertThrow(dim == 3, ExcNotImplemented());
 
-  strain[0] = strain[1] = strain[2] = m_alpha * (T - m_T_ref);
+  const double alpha_T = calc_alpha(T);
+
+  strain[0] = strain[1] = strain[2] = alpha_T * (T - m_T_ref);
   strain[3] = strain[4] = strain[5] = 0;
 }
 
