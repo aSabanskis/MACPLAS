@@ -20,29 +20,29 @@ using namespace dealii;
 // helper functions
 
 /// Calculate the square \f$x^2\f$
-double
+inline double
 sqr(const double x);
 
 /// Integrate analytically dot_x = a + b * (x-x_0)
-double
+inline double
 dx_analytical(const double a, const double b, const double dt);
 
 /// Prints time in seconds, enclosed in parenthesis
-std::string
+inline std::string
 format_time(const double x);
-std::string
+inline std::string
 format_time(const Timer &timer);
 
 /// Get point on a line segment which is closest to the given point \f$p\f$
 template <int dim>
-Point<dim>
+inline Point<dim>
 closest_segment_point(const Point<dim> &p,
                       const Point<dim> &segment_p0,
                       const Point<dim> &segment_p1);
 
 /// Get barycentric coordinates of point \f$p\f$ of a line segment
 template <int dim>
-std::array<double, 2>
+inline std::array<double, 2>
 barycentric_coordinates(const Point<dim> &p,
                         const Point<dim> &segment_p0,
                         const Point<dim> &segment_p1);
@@ -55,49 +55,49 @@ class Triangle
 {
 public:
   /// Set the triangle vertices
-  void
+  inline void
   reinit(const Point<dim> &p0, const Point<dim> &p1, const Point<dim> &p2);
 
   /// Get the triangle center
-  Point<dim>
+  inline Point<dim>
   center() const;
 
   /// Get the triangle normal
-  Point<dim>
+  inline Point<dim>
   normal() const;
 
   /// Get the triangle area
-  double
+  inline double
   area() const;
 
   /// Get the longest triangle side
-  double
+  inline double
   longest_side() const;
 
   /// Get triangle point which is closest to the given point \f$p\f$
-  Point<dim>
+  inline Point<dim>
   closest_triangle_point(const Point<dim> &p) const;
 
   /// Get barycentric coordinates of the given point \f$p\f$
-  std::array<double, 3>
+  inline std::array<double, 3>
   barycentric_coordinates(const Point<dim> &p) const;
 
 private:
   /// Calculate triangle normal and area in one go
-  void
+  inline void
   calculate_normal_and_area();
 
   /// Calculate signed area of another triangle
 
   /// The normal direction of the current triangle is taken into account to get
   /// the correct sign.
-  double
+  inline double
   signed_area(const Point<dim> &p0,
               const Point<dim> &p1,
               const Point<dim> &p2) const;
 
   /// Project the given point \f$p\f$ to the triangle place
-  Point<dim>
+  inline Point<dim>
   project_to_triangle_plane(const Point<dim> &p) const;
 
   std::array<Point<dim>, 3> m_points;       ///< Vertices
@@ -126,19 +126,19 @@ public:
   };
 
   /// Read mesh and fields from \c vtk file
-  void
+  inline void
   read_vtk(const std::string &file_name);
 
   /// Read mesh and fields from \c vtu file
-  void
+  inline void
   read_vtu(const std::string &file_name);
 
   /// Write mesh and fields to \c vtu file
-  void
+  inline void
   write_vtu(const std::string &file_name) const;
 
   /// Interpolate field to the specified points
-  void
+  inline void
   interpolate(const FieldType &              field_type,
               const std::string &            field_name,
               const std::vector<Point<dim>> &target_points,
@@ -148,7 +148,7 @@ public:
   /// Convert between cell and point fields
 
   /// If target_name is not specified it is set to source_name.
-  void
+  inline void
   convert(const FieldType &  source_type,
           const std::string &source_name,
           const FieldType &  target_type,
@@ -175,33 +175,33 @@ private:
 
 
   /// Get field
-  const std::vector<double> &
+  inline const std::vector<double> &
   field(const FieldType &field_type, const std::string &field_name) const;
   /// Get field
-  std::vector<double> &
+  inline std::vector<double> &
   field(const FieldType &field_type, const std::string &field_name);
   /// Get vector field
-  const std::vector<Point<dim>> &
+  inline const std::vector<Point<dim>> &
   vector_field(const FieldType &  field_type,
                const std::string &field_name) const;
 
   /// Convert cell field to point field
-  void
+  inline void
   cell_to_point(const std::string &source_name, const std::string &target_name);
   /// Convert point field to cell field
-  void
+  inline void
   point_to_cell(const std::string &source_name, const std::string &target_name);
 
   /// Clear all data
-  void
+  inline void
   clear();
 
   /// Print mesh and field information
-  void
+  inline void
   info() const;
 
   /// Precalculate auxiliary data (cell areas, centers, normals)
-  void
+  inline void
   preprocess();
 };
 
@@ -216,17 +216,17 @@ private:
 
 public:
   /// Read mesh and fields from plain text file
-  void
+  inline void
   read_txt(const std::string &file_name);
 
   /// Interpolate field to the specified points
-  void
+  inline void
   interpolate(const std::string &            field_name,
               const std::vector<Point<dim>> &target_points,
               const std::vector<bool> &      markers,
               Vector<double> &               target_values) const;
   /// Same as above, for target points in 3D
-  void
+  inline void
   interpolate(const std::string &                field_name,
               const std::vector<Point<dim + 1>> &target_points,
               const std::vector<bool> &          markers,
@@ -240,15 +240,15 @@ private:
   std::map<std::string, std::vector<double>> fields;
 
   /// Get field
-  const std::vector<double> &
+  inline const std::vector<double> &
   field(const std::string &field_name) const;
 
   /// Clear all data
-  void
+  inline void
   clear();
 
   /// Print mesh and field information
-  void
+  inline void
   info() const;
 };
 
