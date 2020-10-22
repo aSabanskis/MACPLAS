@@ -163,6 +163,22 @@ private:
   void
   solve_system();
 
+  /// Calculate the temperature-dependent Young's modulus
+  double
+  calc_E(const double T) const;
+
+  /// Calculate the second-order elastic constant (stiffness) \f$C_{11}\f$, Pa
+  double
+  calc_C_11(const double T) const;
+
+  /// Calculate the second-order elastic constant (stiffness) \f$C_{12}\f$, Pa
+  double
+  calc_C_12(const double T) const;
+
+  /// Calculate the second-order elastic constant (stiffness) \f$C_{44}\f$, Pa
+  double
+  calc_C_44(const double T) const;
+
   /// Calculate the temperature-dependent thermal expansion coefficient
   double
   calc_alpha(const double T) const;
@@ -173,7 +189,7 @@ private:
 
   /// Get stiffness tensor
   SymmetricTensor<2, StressSolver<dim>::n_components>
-  get_stiffness_tensor() const;
+  get_stiffness_tensor(const double &T) const;
 
   /// Get strain from FEValues
   void
@@ -216,16 +232,14 @@ private:
 
   ParameterHandler prm; ///< Parameter handler
 
-  double m_E; ///< Young's modulus, Pa
+  ///< Young's modulus (temperature function), Pa
+  FunctionParser<1> m_E;
 
-  /// Thermal expansion coefficient, K<sup>-1</sup>
+  /// Thermal expansion coefficient (temperature function), K<sup>-1</sup>
   FunctionParser<1> m_alpha;
 
   double m_nu;    ///< Poisson's ratio, -
   double m_T_ref; ///< Reference temperature, K
-  double m_C_11; ///< Second-order elastic constant (stiffness) \f$C_{11}\f$, Pa
-  double m_C_12; ///< Second-order elastic constant (stiffness) \f$C_{12}\f$, Pa
-  double m_C_44; ///< Second-order elastic constant (stiffness) \f$C_{44}\f$, Pa
 };
 
 template <int dim>
@@ -251,8 +265,8 @@ StressSolver<dim>::StressSolver(const unsigned int order)
   // Physical parameters from https://doi.org/10.1016/S0022-0248(01)01322-7
   prm.declare_entry("Young's modulus",
                     "1.56e11",
-                    Patterns::Double(0),
-                    "Young's modulus in Pa");
+                    Patterns::Anything(),
+                    "Young's modulus in Pa" + info_T);
 
   prm.declare_entry("Thermal expansion coefficient",
                     "3.2e-6",
@@ -328,7 +342,8 @@ StressSolver<dim>::initialize_parameters()
 
   deallog.depth_console(2);
 
-  m_E = prm.get_double("Young's modulus");
+  const std::string m_E_expression = prm.get("Young's modulus");
+  m_E.initialize("T", m_E_expression, typename FunctionParser<1>::ConstMap());
 
   const std::string m_alpha_expression =
     prm.get("Thermal expansion coefficient");
@@ -339,23 +354,16 @@ StressSolver<dim>::initialize_parameters()
   m_nu    = prm.get_double("Poisson's ratio");
   m_T_ref = prm.get_double("Reference temperature");
 
-  m_C_11 = m_E * (1 - m_nu) / ((1 + m_nu) * (1 - 2 * m_nu));
-  m_C_12 = m_E * m_nu / ((1 + m_nu) * (1 - 2 * m_nu));
-  m_C_44 = m_E / (2 * (1 + m_nu));
-
   const auto n_threads = prm.get_integer("Number of threads");
   MultithreadInfo::set_thread_limit(n_threads > 0 ? n_threads :
                                                     MultithreadInfo::n_cores());
 
   std::cout << "  done\n";
 
-  std::cout << "E=" << m_E << "\n"
+  std::cout << "E=" << m_E_expression << "\n"
             << "alpha=" << m_alpha_expression << "\n"
             << "nu=" << m_nu << "\n"
-            << "T_ref=" << m_T_ref << "\n"
-            << "C_11=" << m_C_11 << "\n"
-            << "C_12=" << m_C_12 << "\n"
-            << "C_44=" << m_C_44 << "\n";
+            << "T_ref=" << m_T_ref << "\n";
 
   std::cout << "n_cores=" << MultithreadInfo::n_cores() << "\n"
             << "n_threads=" << MultithreadInfo::n_threads() << "\n";
@@ -502,6 +510,26 @@ StressSolver<dim>::output_results() const
 
   data_out.attach_dof_handler(dh_temp);
   data_out.add_data_vector(temperature, "T");
+
+  Vector<double> E(temperature.size());
+  for (unsigned int i = 0; i < temperature.size(); ++i)
+    E[i] = calc_E(temperature[i]);
+  data_out.add_data_vector(E, "E");
+
+  Vector<double> C_11(temperature.size());
+  for (unsigned int i = 0; i < temperature.size(); ++i)
+    C_11[i] = calc_C_11(temperature[i]);
+  data_out.add_data_vector(C_11, "C_11");
+
+  Vector<double> C_12(temperature.size());
+  for (unsigned int i = 0; i < temperature.size(); ++i)
+    C_12[i] = calc_C_12(temperature[i]);
+  data_out.add_data_vector(C_12, "C_12");
+
+  Vector<double> C_44(temperature.size());
+  for (unsigned int i = 0; i < temperature.size(); ++i)
+    C_44[i] = calc_C_44(temperature[i]);
+  data_out.add_data_vector(C_44, "C_44");
 
   Vector<double> alpha(temperature.size());
   for (unsigned int i = 0; i < temperature.size(); ++i)
@@ -691,8 +719,6 @@ StressSolver<dim>::local_assemble_system(const IteratorPair & cell_pair,
 
   Tensor<1, n_components> strain_i, strain_j, epsilon_T_q;
 
-  const SymmetricTensor<2, n_components> stiffness = get_stiffness_tensor();
-
   const typename DoFHandler<dim>::active_cell_iterator &cell_temp =
     std_cxx11::get<0>(*cell_pair);
   const typename DoFHandler<dim>::active_cell_iterator &cell =
@@ -710,6 +736,9 @@ StressSolver<dim>::local_assemble_system(const IteratorPair & cell_pair,
 
   for (unsigned int q = 0; q < n_q_points; ++q)
     {
+      const SymmetricTensor<2, n_components> stiffness =
+        get_stiffness_tensor(T_q[q]);
+
       get_strain(T_q[q], epsilon_T_q);
 
       // sum of thermal and creep strain
@@ -821,6 +850,34 @@ StressSolver<dim>::solve_system()
 
 template <int dim>
 double
+StressSolver<dim>::calc_E(const double T) const
+{
+  return m_E.value(Point<1>(T));
+}
+
+template <int dim>
+double
+StressSolver<dim>::calc_C_11(const double T) const
+{
+  return calc_E(T) * (1 - m_nu) / ((1 + m_nu) * (1 - 2 * m_nu));
+}
+
+template <int dim>
+double
+StressSolver<dim>::calc_C_12(const double T) const
+{
+  return calc_E(T) * m_nu / ((1 + m_nu) * (1 - 2 * m_nu));
+}
+
+template <int dim>
+double
+StressSolver<dim>::calc_C_44(const double T) const
+{
+  return calc_E(T) / (2 * (1 + m_nu));
+}
+
+template <int dim>
+double
 StressSolver<dim>::calc_alpha(const double T) const
 {
   return m_alpha.value(Point<1>(T));
@@ -874,8 +931,6 @@ StressSolver<dim>::calculate_stress()
 
   Tensor<1, n_components> epsilon_T_q, epsilon_e_q;
 
-  const SymmetricTensor<2, n_components> stiffness = get_stiffness_tensor();
-
   typename DoFHandler<dim>::active_cell_iterator cell_temp =
                                                    dh_temp.begin_active(),
                                                  cell = dh.begin_active(),
@@ -894,6 +949,9 @@ StressSolver<dim>::calculate_stress()
 
       for (unsigned int q = 0; q < n_q_points; ++q)
         {
+          const SymmetricTensor<2, n_components> stiffness =
+            get_stiffness_tensor(T_q[q]);
+
           get_strain(T_q[q], epsilon_T_q);
           get_strain(grad_displacement_q[q], epsilon_e_q);
 
@@ -969,14 +1027,14 @@ StressSolver<dim>::calculate_stress()
 
 template <int dim>
 SymmetricTensor<2, StressSolver<dim>::n_components>
-StressSolver<dim>::get_stiffness_tensor() const
+StressSolver<dim>::get_stiffness_tensor(const double &T) const
 {
   AssertThrow(dim == 3, ExcNotImplemented());
 
   SymmetricTensor<2, n_components> tmp;
-  tmp[0][0] = tmp[1][1] = tmp[2][2] = m_C_11;
-  tmp[3][3] = tmp[4][4] = tmp[5][5] = m_C_44;
-  tmp[2][1] = tmp[2][0] = tmp[1][0] = m_C_12;
+  tmp[0][0] = tmp[1][1] = tmp[2][2] = calc_C_11(T);
+  tmp[3][3] = tmp[4][4] = tmp[5][5] = calc_C_44(T);
+  tmp[2][1] = tmp[2][0] = tmp[1][0] = calc_C_12(T);
 
   return tmp;
 }
