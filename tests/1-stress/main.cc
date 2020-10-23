@@ -60,7 +60,8 @@ Problem<dim>::make_grid()
   Assert(r_b > r_a, ExcMessage("r_b must be larger than r_b"));
 
   Triangulation<dim> &triangulation = solver.get_mesh();
-  GridGenerator::hyper_shell(triangulation, Point<dim>(), r_a, r_b, 0, true);
+  GridGenerator::quarter_hyper_shell(
+    triangulation, Point<dim>(), r_a, r_b, 0, true);
 
   triangulation.set_all_manifold_ids(0);
   triangulation.set_manifold(0, manifold);
@@ -97,6 +98,14 @@ Problem<dim>::initialize()
     {
       temperature[i] = c1 / support_points[i].norm() + c2;
     }
+
+  // set symmetry boundary conditions
+  // u_x(x=0) = u_y(y=0) = u_z(z=0) = 0
+  for (unsigned int k = 0; k < dim; ++k)
+    {
+      // for boundary numbering, see documentation of quarter_hyper_shell
+      solver.set_bc1(k + 2, k, 0);
+    }
 }
 
 int
@@ -104,6 +113,9 @@ main()
 {
   for (unsigned int order = 1; order <= 2; ++order)
     {
+      Problem<2> p2d(order);
+      p2d.run();
+
       Problem<3> p3d(order);
       p3d.run();
     }

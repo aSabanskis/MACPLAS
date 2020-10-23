@@ -202,7 +202,9 @@ private:
   get_strain(const double &T, Tensor<1, n_components> &strain) const;
   /// Get strain from displacement
   void
-  get_strain(const std::vector<Tensor<1, dim>> &grad_displacement,
+  get_strain(const Point<dim> &                 point_q,
+             const Vector<double> &             displacement_q,
+             const std::vector<Tensor<1, dim>> &grad_displacement,
              Tensor<1, n_components> &          strain) const;
 
   Triangulation<dim> triangulation; ///< Mesh
@@ -258,7 +260,7 @@ StressSolver<dim>::StressSolver(const unsigned int order)
 #endif
                ")\n";
 
-  AssertThrow(dim == 3, ExcNotImplemented());
+  AssertThrow(dim == 2 || dim == 3, ExcNotImplemented());
 
   const std::string info_T = " (accepts temperature function)";
 
@@ -624,7 +626,10 @@ StressSolver<dim>::AssemblyScratchData::AssemblyScratchData(
   const FiniteElement<dim> &fe_temp,
   const FiniteElement<dim> &fe)
   : fe_values_temp(fe_temp, quadrature, update_values)
-  , fe_values(fe, quadrature, update_gradients | update_JxW_values)
+  , fe_values(fe,
+              quadrature,
+              update_quadrature_points | update_values | update_gradients |
+                update_JxW_values)
   , T_q(quadrature.size())
   , epsilon_c_q(n_components, std::vector<double>(quadrature.size()))
 {}
@@ -646,8 +651,6 @@ template <int dim>
 void
 StressSolver<dim>::assemble_system()
 {
-  AssertThrow(dim == 3, ExcNotImplemented());
-
   Timer timer;
 
   std::cout << "Assembling system";
@@ -741,6 +744,10 @@ StressSolver<dim>::local_assemble_system(const IteratorPair & cell_pair,
 
       get_strain(T_q[q], epsilon_T_q);
 
+      const double weight =
+        dim == 2 ? fe_values.JxW(q) * fe_values.quadrature_point(q)[0] :
+                   fe_values.JxW(q);
+
       // sum of thermal and creep strain
       Tensor<1, n_components> epsilon_T_c_q = epsilon_T_q;
       for (unsigned int i = 0; i < n_components; ++i)
@@ -757,11 +764,9 @@ StressSolver<dim>::local_assemble_system(const IteratorPair & cell_pair,
             {
               get_strain(fe_values, j, q, strain_j);
 
-              cell_matrix(i, j) +=
-                (strain_i_stiffness * strain_j) * fe_values.JxW(q);
+              cell_matrix(i, j) += (strain_i_stiffness * strain_j) * weight;
             }
-          cell_rhs(i) +=
-            (strain_i_stiffness * epsilon_T_c_q) * fe_values.JxW(q);
+          cell_rhs(i) += (strain_i_stiffness * epsilon_T_c_q) * weight;
         }
     }
 
@@ -887,8 +892,6 @@ template <int dim>
 void
 StressSolver<dim>::calculate_stress()
 {
-  AssertThrow(dim == 3, ExcNotImplemented());
-
   Timer timer;
 
   std::cout << "Postprocessing results";
@@ -896,7 +899,10 @@ StressSolver<dim>::calculate_stress()
   const QGauss<dim> quadrature(fe.degree + 1);
 
   FEValues<dim> fe_values_temp(fe_temp, quadrature, update_values);
-  FEValues<dim> fe_values(fe, quadrature, update_gradients);
+  FEValues<dim> fe_values(fe,
+                          quadrature,
+                          update_quadrature_points | update_values |
+                            update_gradients);
 
   const unsigned int n_dofs_temp        = dh_temp.n_dofs();
   const unsigned int dofs_per_cell_temp = fe_temp.dofs_per_cell;
@@ -917,6 +923,8 @@ StressSolver<dim>::calculate_stress()
 
   std::vector<std::vector<double>> epsilon_c_q(n_components,
                                                std::vector<double>(n_q_points));
+
+  std::vector<Vector<double>> displacement_q(n_q_points, Vector<double>(dim));
 
   std::vector<std::vector<Tensor<1, dim>>> grad_displacement_q(
     n_q_points, std::vector<Tensor<1, dim>>(dim));
@@ -942,6 +950,8 @@ StressSolver<dim>::calculate_stress()
 
       fe_values_temp.get_function_values(temperature, T_q);
 
+      fe_values.get_function_values(displacement, displacement_q);
+
       fe_values.get_function_gradients(displacement, grad_displacement_q);
 
       for (unsigned int i = 0; i < n_components; ++i)
@@ -953,7 +963,10 @@ StressSolver<dim>::calculate_stress()
             get_stiffness_tensor(T_q[q]);
 
           get_strain(T_q[q], epsilon_T_q);
-          get_strain(grad_displacement_q[q], epsilon_e_q);
+          get_strain(fe_values.quadrature_point(q),
+                     displacement_q[q],
+                     grad_displacement_q[q],
+                     epsilon_e_q);
 
           // sum of thermal and creep strain
           Tensor<1, n_components> epsilon_T_c_q = epsilon_T_q;
@@ -1005,12 +1018,12 @@ StressSolver<dim>::calculate_stress()
       stress_hydrostatic[i] =
         (stress.block(0)[i] + stress.block(1)[i] + stress.block(2)[i]) / 3;
 
-      stress_von_Mises[i] =
-        sqr(stress.block(0)[i] - stress.block(1)[i]) +
-        sqr(stress.block(1)[i] - stress.block(2)[i]) +
-        sqr(stress.block(2)[i] - stress.block(0)[i]) +
-        6 * (sqr(stress.block(3)[i]) + sqr(stress.block(4)[i]) +
-             sqr(stress.block(5)[i]));
+      stress_von_Mises[i] = sqr(stress.block(0)[i] - stress.block(1)[i]) +
+                            sqr(stress.block(1)[i] - stress.block(2)[i]) +
+                            sqr(stress.block(2)[i] - stress.block(0)[i]);
+
+      for (unsigned int k = 3; k < n_components; ++k)
+        stress_von_Mises[i] += 6 * sqr(stress.block(k)[i]);
 
       stress_von_Mises[i] = std::sqrt(stress_von_Mises[i] / 2);
 
@@ -1029,12 +1042,14 @@ template <int dim>
 SymmetricTensor<2, StressSolver<dim>::n_components>
 StressSolver<dim>::get_stiffness_tensor(const double &T) const
 {
-  AssertThrow(dim == 3, ExcNotImplemented());
-
   SymmetricTensor<2, n_components> tmp;
   tmp[0][0] = tmp[1][1] = tmp[2][2] = calc_C_11(T);
-  tmp[3][3] = tmp[4][4] = tmp[5][5] = calc_C_44(T);
   tmp[2][1] = tmp[2][0] = tmp[1][0] = calc_C_12(T);
+
+  if (dim == 2)
+    tmp[3][3] = calc_C_44(T);
+  else if (dim == 3)
+    tmp[3][3] = tmp[4][4] = tmp[5][5] = calc_C_44(T);
 
   return tmp;
 }
@@ -1046,19 +1061,33 @@ StressSolver<dim>::get_strain(const FEValues<dim> &    fe_values,
                               const unsigned int &     q,
                               Tensor<1, n_components> &strain) const
 {
-  AssertThrow(dim == 3, ExcNotImplemented());
+  if (dim == 2)
+    {
+      const auto grad_0 = fe_values.shape_grad_component(shape_func, q, 0);
+      const auto grad_1 = fe_values.shape_grad_component(shape_func, q, 1);
 
-  const auto grad_0 = fe_values.shape_grad_component(shape_func, q, 0);
-  const auto grad_1 = fe_values.shape_grad_component(shape_func, q, 1);
-  const auto grad_2 = fe_values.shape_grad_component(shape_func, q, 2);
+      strain[0] = grad_0[0];
+      strain[1] = grad_1[1];
 
-  strain[0] = grad_0[0];
-  strain[1] = grad_1[1];
-  strain[2] = grad_2[2];
+      strain[2] = fe_values.shape_value_component(shape_func, q, 0) /
+                  fe_values.quadrature_point(q)[0];
 
-  strain[3] = grad_2[1] + grad_1[2];
-  strain[4] = grad_2[0] + grad_0[2];
-  strain[5] = grad_1[0] + grad_0[1];
+      strain[3] = grad_1[0] + grad_0[1];
+    }
+  else if (dim == 3)
+    {
+      const auto grad_0 = fe_values.shape_grad_component(shape_func, q, 0);
+      const auto grad_1 = fe_values.shape_grad_component(shape_func, q, 1);
+      const auto grad_2 = fe_values.shape_grad_component(shape_func, q, 2);
+
+      strain[0] = grad_0[0];
+      strain[1] = grad_1[1];
+      strain[2] = grad_2[2];
+
+      strain[3] = grad_2[1] + grad_1[2];
+      strain[4] = grad_2[0] + grad_0[2];
+      strain[5] = grad_1[0] + grad_0[1];
+    }
 }
 
 template <int dim>
@@ -1066,29 +1095,43 @@ void
 StressSolver<dim>::get_strain(const double &           T,
                               Tensor<1, n_components> &strain) const
 {
-  AssertThrow(dim == 3, ExcNotImplemented());
-
   const double alpha_T = calc_alpha(T);
 
   strain[0] = strain[1] = strain[2] = alpha_T * (T - m_T_ref);
-  strain[3] = strain[4] = strain[5] = 0;
+
+  if (dim == 2)
+    strain[3] = 0;
+  else if (dim == 3)
+    strain[3] = strain[4] = strain[5] = 0;
 }
 
 template <int dim>
 void
 StressSolver<dim>::get_strain(
+  const Point<dim> &                 point_q,
+  const Vector<double> &             displacement_q,
   const std::vector<Tensor<1, dim>> &grad_displacement,
   Tensor<1, n_components> &          strain) const
 {
-  AssertThrow(dim == 3, ExcNotImplemented());
+  if (dim == 2)
+    {
+      strain[0] = grad_displacement[0][0];
+      strain[1] = grad_displacement[1][1];
 
-  strain[0] = grad_displacement[0][0];
-  strain[1] = grad_displacement[1][1];
-  strain[2] = grad_displacement[2][2];
+      strain[2] = displacement_q[0] / point_q[0];
 
-  strain[3] = grad_displacement[2][1] + grad_displacement[1][2];
-  strain[4] = grad_displacement[2][0] + grad_displacement[0][2];
-  strain[5] = grad_displacement[1][0] + grad_displacement[0][1];
+      strain[3] = grad_displacement[1][0] + grad_displacement[0][1];
+    }
+  else if (dim == 3)
+    {
+      strain[0] = grad_displacement[0][0];
+      strain[1] = grad_displacement[1][1];
+      strain[2] = grad_displacement[2][2];
+
+      strain[3] = grad_displacement[2][1] + grad_displacement[1][2];
+      strain[4] = grad_displacement[2][0] + grad_displacement[0][2];
+      strain[5] = grad_displacement[1][0] + grad_displacement[0][1];
+    }
 }
 
 #endif
