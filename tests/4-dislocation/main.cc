@@ -36,11 +36,6 @@ Problem<dim>::Problem(const unsigned int order)
                     Patterns::Double(),
                     "Initial temperature in K");
 
-  prm.declare_entry("Initial dislocation density",
-                    "1e3",
-                    Patterns::Double(0),
-                    "Initial dislocation density in m^-2");
-
   prm.declare_entry("Strain rate",
                     "1e-5",
                     Patterns::Double(),
@@ -100,14 +95,10 @@ Problem<dim>::initialize()
 {
   solver.initialize();
 
-  Vector<double> &temperature         = solver.get_temperature();
-  Vector<double> &dislocation_density = solver.get_dislocation_density();
+  Vector<double> &temperature = solver.get_temperature();
 
   temperature = 0;
   temperature.add(prm.get_double("Initial temperature"));
-
-  dislocation_density = 0;
-  dislocation_density.add(prm.get_double("Initial dislocation density"));
 
   solver.get_stress_solver().set_bc1(0, 0, 0.0);
   solver.get_stress_solver().set_bc1(1, 0, 0.0);

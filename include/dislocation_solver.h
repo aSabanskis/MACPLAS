@@ -302,6 +302,12 @@ DislocationSolver<dim>::DislocationSolver(const unsigned int order)
                     "Material constant p (dimensionless)");
 
 
+  prm.declare_entry("Initial dislocation density",
+                    "1e6",
+                    Patterns::Double(0),
+                    "Initial dislocation density in m^-2");
+
+
   prm.declare_entry("Time step",
                     "1",
                     Patterns::Double(0),
@@ -514,6 +520,7 @@ DislocationSolver<dim>::initialize()
   const unsigned int n_dofs_temp = get_temperature().size();
 
   dislocation_density.reinit(n_dofs_temp);
+  dislocation_density.add(prm.get_double("Initial dislocation density"));
 }
 
 template <int dim>
