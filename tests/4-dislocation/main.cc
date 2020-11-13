@@ -63,6 +63,8 @@ Problem<dim>::run()
   make_grid();
   initialize();
 
+  solver.output_results();
+
   while (true)
     {
       const double t  = solver.get_time();
@@ -70,11 +72,12 @@ Problem<dim>::run()
       solver.get_stress_solver().set_bc1(1, 0, -dx); // compression
 
       const bool keep_going = solver.solve();
-      // solver.output_results();
 
       if (!keep_going)
         break;
     };
+
+  solver.output_results();
 }
 
 template <int dim>

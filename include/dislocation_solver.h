@@ -571,9 +571,6 @@ DislocationSolver<dim>::output_results() const
     }
 
   const Vector<double> &stress_J_2 = get_stress_J_2();
-  data_out.add_data_vector(get_stress_J_2(), "stress_J_2");
-
-  const unsigned int n_dofs_temp = T.size();
 
   const Vector<double> tau     = tau_eff(N_m, stress_J_2);
   const Vector<double> dot_N_m = derivative_N_m(N_m, stress_J_2, T);
@@ -586,6 +583,7 @@ DislocationSolver<dim>::output_results() const
         derivative_strain(N_m, stress_J_2, T, stress_deviator.block(i));
     }
 
+  data_out.add_data_vector(stress_J_2, "stress_J_2");
   data_out.add_data_vector(tau, "tau_eff");
   data_out.add_data_vector(dot_N_m, "dot_N_m");
   data_out.add_data_vector(v, "v");

@@ -461,6 +461,7 @@ StressSolver<dim>::initialize()
   stress.reinit(n_components, n_dofs_temp);
   stress_deviator.reinit(n_components, n_dofs_temp);
   strain_c.reinit(n_components, n_dofs_temp);
+  stress_J_2.reinit(n_dofs_temp);
 
   std::cout << " " << format_time(timer) << "\n";
 
