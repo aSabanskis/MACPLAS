@@ -50,6 +50,41 @@ Problem<dim>::run()
 
   solver.solve();
   solver.output_results();
+
+  // write results on x axis
+  std::stringstream ss;
+  ss << "result-" << dim << "d-order"
+     << solver.get_dof_handler().get_fe().degree << "-x.dat";
+  const std::string file_name = ss.str();
+  std::cout << "Saving postprocessed results to '" << file_name << "'";
+
+  const Vector<double> &     temperature = solver.get_temperature();
+  const BlockVector<double> &stress      = solver.get_stress();
+
+  std::ofstream f(file_name);
+  f << (dim == 2 ? "x y" : "x y z");
+  f << " T[K]";
+  for (unsigned int k = 0; k < stress.n_blocks(); ++k)
+    f << " stress_" << k << "[Pa]";
+  f << '\n';
+  f << std::setprecision(8);
+
+  std::vector<Point<dim>> support_points;
+  solver.get_support_points(support_points);
+
+  for (unsigned int i = 0; i < support_points.size(); ++i)
+    {
+      // select points with y=z=0
+      Point<dim> p = support_points[i];
+      p[0]         = 0;
+      if (p.norm_square() > 1e-8)
+        continue;
+
+      f << support_points[i] << " " << temperature[i];
+      for (unsigned int k = 0; k < stress.n_blocks(); ++k)
+        f << " " << stress.block(k)[i];
+      f << '\n';
+    }
 }
 
 template <int dim>
