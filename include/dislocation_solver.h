@@ -1,6 +1,7 @@
 #ifndef macplas_dislocation_solver_h
 #define macplas_dislocation_solver_h
 
+#include <deal.II/base/function_parser.h>
 #include <deal.II/base/parameter_handler.h>
 #include <deal.II/base/timer.h>
 #include <deal.II/base/utilities.h>
@@ -18,6 +19,7 @@
 #include <iostream>
 
 #include "stress_solver.h"
+#include "utilities.h"
 
 using namespace dealii;
 
@@ -134,15 +136,27 @@ private:
   std::vector<double>
   get_field_at_probes(const Vector<double> &source) const;
 
+  /// Calculate the temperature-dependent Peierls potential
+  double
+  calc_Q(const double T) const;
+
+  /// Calculate the temperature-dependent strain hardening factor
+  double
+  calc_D(const double T) const;
+
   /// Calculate the effective stress \f$\tau_\mathrm{eff}\f$
   double
-  tau_eff(const double N_m, const double J_2) const;
+  tau_eff(const double N_m, const double J_2, const double T) const;
   /// Same as above, for vector arguments
   std::vector<double>
-  tau_eff(const std::vector<double> &N_m, const std::vector<double> &J_2) const;
+  tau_eff(const std::vector<double> &N_m,
+          const std::vector<double> &J_2,
+          const std::vector<double> &T) const;
   /// Same as above, for Vector arguments
   Vector<double>
-  tau_eff(const Vector<double> &N_m, const Vector<double> &J_2) const;
+  tau_eff(const Vector<double> &N_m,
+          const Vector<double> &J_2,
+          const Vector<double> &T) const;
 
   /// Calculate the time derivative of dislocation density \f$\dot{N_m}\f$
   double
@@ -235,9 +249,14 @@ private:
   double current_time;      ///< Time stepping: current time, s
   double current_time_step; ///< Time stepping: current time step, s
 
+
+  /// Peierls potential \f$Q\f$ (temperature function), eV
+  FunctionParser<1> m_Q;
+
+  /// Strain hardening factor \f$D\f$ (temperature function), N m<sup>-1</sup>
+  FunctionParser<1> m_D;
+
   double m_b; ///< Magnitude of Burgers vector \f$b\f$, m
-  double m_Q; ///< Peierls potential \f$Q\f$, eV
-  double m_D; ///< Strain hardening factor \f$D\f$, N m<sup>-1</sup>
   double m_K; ///< Material constant \f$K\f$, m N<sup>-1</sup>
 
   /// Material constant \f$k_0, \text{m}^{2p+l}\;\text{N}^{-p}\;\text{s}^{-1}\f$
@@ -273,12 +292,12 @@ DislocationSolver<dim>::DislocationSolver(const unsigned int order)
 
   prm.declare_entry("Peierls potential",
                     "2.17",
-                    Patterns::Double(0),
+                    Patterns::Anything(),
                     "Peierls potential in eV");
 
   prm.declare_entry("Strain hardening factor",
                     "4.3",
-                    Patterns::Double(0),
+                    Patterns::Anything(),
                     "Strain hardening factor in N/m");
 
   prm.declare_entry("Material constant K",
@@ -556,6 +575,16 @@ DislocationSolver<dim>::output_results() const
   data_out.add_data_vector(T, "T");
   data_out.add_data_vector(N_m, "N_m");
 
+  Vector<double> Q(T.size());
+  for (unsigned int i = 0; i < T.size(); ++i)
+    Q[i] = calc_Q(T[i]);
+  data_out.add_data_vector(Q, "Q");
+
+  Vector<double> D(T.size());
+  for (unsigned int i = 0; i < T.size(); ++i)
+    D[i] = calc_D(T[i]);
+  data_out.add_data_vector(D, "D");
+
   const BlockVector<double> &stress = get_stress();
   for (unsigned int i = 0; i < stress.n_blocks(); ++i)
     {
@@ -572,7 +601,7 @@ DislocationSolver<dim>::output_results() const
 
   const Vector<double> &stress_J_2 = get_stress_J_2();
 
-  const Vector<double> tau     = tau_eff(N_m, stress_J_2);
+  const Vector<double> tau     = tau_eff(N_m, stress_J_2, T);
   const Vector<double> dot_N_m = derivative_N_m(N_m, stress_J_2, T);
   const Vector<double> v       = dislocation_velocity(N_m, stress_J_2, T);
 
@@ -632,9 +661,13 @@ DislocationSolver<dim>::initialize_parameters()
 {
   std::cout << "Intializing parameters";
 
+  const std::string m_Q_expression = prm.get("Peierls potential");
+  m_Q.initialize("T", m_Q_expression, typename FunctionParser<1>::ConstMap());
+
+  const std::string m_D_expression = prm.get("Strain hardening factor");
+  m_D.initialize("T", m_D_expression, typename FunctionParser<1>::ConstMap());
+
   m_b   = prm.get_double("Burgers vector");
-  m_Q   = prm.get_double("Peierls potential");
-  m_D   = prm.get_double("Strain hardening factor");
   m_K   = prm.get_double("Material constant K");
   m_k_0 = prm.get_double("Material constant k_0");
   m_l   = prm.get_double("Material constant l");
@@ -647,8 +680,8 @@ DislocationSolver<dim>::initialize_parameters()
   std::cout << "  done\n";
 
   std::cout << "b=" << m_b << "\n"
-            << "Q=" << m_Q << "\n"
-            << "D=" << m_D << "\n"
+            << "Q=" << m_Q_expression << "\n"
+            << "D=" << m_D_expression << "\n"
             << "K=" << m_K << "\n"
             << "k_0=" << m_k_0 << "\n"
             << "l=" << m_l << "\n"
@@ -734,7 +767,8 @@ DislocationSolver<dim>::output_probes() const
     values_e_c[i] = get_field_at_probes(e_c.block(i));
 
   // calculate additional fields
-  const std::vector<double> values_tau = tau_eff(values_N_m, values_J_2);
+  const std::vector<double> values_tau =
+    tau_eff(values_N_m, values_J_2, values_T);
 
   const std::vector<double> values_dot_N_m =
     derivative_N_m(values_N_m, values_J_2, values_T);
@@ -789,22 +823,39 @@ DislocationSolver<dim>::get_field_at_probes(const Vector<double> &source) const
 
 template <int dim>
 double
-DislocationSolver<dim>::tau_eff(const double N_m, const double J_2) const
+DislocationSolver<dim>::calc_Q(const double T) const
 {
-  return std::max(std::sqrt(J_2) - m_D * std::sqrt(N_m), 0.0);
+  return m_Q.value(Point<1>(T));
+}
+
+template <int dim>
+double
+DislocationSolver<dim>::calc_D(const double T) const
+{
+  return m_D.value(Point<1>(T));
+}
+
+template <int dim>
+double
+DislocationSolver<dim>::tau_eff(const double N_m,
+                                const double J_2,
+                                const double T) const
+{
+  return std::max(std::sqrt(J_2) - calc_D(T) * std::sqrt(N_m), 0.0);
 }
 
 template <int dim>
 std::vector<double>
 DislocationSolver<dim>::tau_eff(const std::vector<double> &N_m,
-                                const std::vector<double> &J_2) const
+                                const std::vector<double> &J_2,
+                                const std::vector<double> &T) const
 {
   const unsigned int N = N_m.size();
 
   std::vector<double> result(N);
 
   for (unsigned int i = 0; i < N; ++i)
-    result[i] = tau_eff(N_m[i], J_2[i]);
+    result[i] = tau_eff(N_m[i], J_2[i], T[i]);
 
   return result;
 }
@@ -812,14 +863,15 @@ DislocationSolver<dim>::tau_eff(const std::vector<double> &N_m,
 template <int dim>
 Vector<double>
 DislocationSolver<dim>::tau_eff(const Vector<double> &N_m,
-                                const Vector<double> &J_2) const
+                                const Vector<double> &J_2,
+                                const Vector<double> &T) const
 {
   const unsigned int N = N_m.size();
 
   Vector<double> result(N);
 
   for (unsigned int i = 0; i < N; ++i)
-    result[i] = tau_eff(N_m[i], J_2[i]);
+    result[i] = tau_eff(N_m[i], J_2[i], T[i]);
 
   return result;
 }
@@ -830,10 +882,10 @@ DislocationSolver<dim>::derivative_N_m(const double N_m,
                                        const double J_2,
                                        const double T) const
 {
-  const double tau = tau_eff(N_m, J_2);
+  const double tau = tau_eff(N_m, J_2, T);
 
-  return m_K * m_k_0 * std::pow(tau, m_p + m_l) * std::exp(-m_Q / (m_k_B * T)) *
-         N_m;
+  return m_K * m_k_0 * std::pow(tau, m_p + m_l) *
+         std::exp(-calc_Q(T) / (m_k_B * T)) * N_m;
 }
 
 template <int dim>
@@ -874,12 +926,12 @@ DislocationSolver<dim>::derivative2_N_m_N_m(const double N_m,
                                             const double J_2,
                                             const double T) const
 {
-  const double tau = tau_eff(N_m, J_2);
+  const double tau = tau_eff(N_m, J_2, T);
 
-  return m_K * m_k_0 * std::exp(-m_Q / (m_k_B * T)) *
+  return m_K * m_k_0 * std::exp(-calc_Q(T) / (m_k_B * T)) *
          (std::pow(tau, m_p + m_l) - (m_p + m_l) *
                                        std::pow(tau, m_p + m_l - 1) *
-                                       std::sqrt(N_m) * m_D / 2);
+                                       std::sqrt(N_m) * calc_D(T) / 2);
 }
 
 template <int dim>
@@ -892,10 +944,10 @@ DislocationSolver<dim>::derivative_strain(const double N_m,
   if (J_2 == 0)
     return 0;
 
-  const double tau = tau_eff(N_m, J_2);
+  const double tau = tau_eff(N_m, J_2, T);
 
-  return m_b * m_k_0 * N_m * std::pow(tau, m_p) * std::exp(-m_Q / (m_k_B * T)) *
-         S / (2 * std::sqrt(J_2));
+  return m_b * m_k_0 * N_m * std::pow(tau, m_p) *
+         std::exp(-calc_Q(T) / (m_k_B * T)) * S / (2 * std::sqrt(J_2));
 }
 
 template <int dim>
@@ -938,9 +990,9 @@ DislocationSolver<dim>::dislocation_velocity(const double N_m,
                                              const double J_2,
                                              const double T) const
 {
-  const double tau = tau_eff(N_m, J_2);
+  const double tau = tau_eff(N_m, J_2, T);
 
-  return m_k_0 * std::pow(tau, m_p) * std::exp(-m_Q / (m_k_B * T));
+  return m_k_0 * std::pow(tau, m_p) * std::exp(-calc_Q(T) / (m_k_B * T));
 }
 
 template <int dim>
