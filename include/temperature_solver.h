@@ -645,11 +645,11 @@ TemperatureSolver<dim>::output_probes() const
       std::ofstream output(file_name);
 
       for (unsigned int i = 0; i < N; ++i)
-        output << "# probe " << i << ": " << probes[i] << "\n";
+        output << "# probe " << i << ":\t" << probes[i] << "\n";
 
       output << "t[s]";
       for (unsigned int i = 0; i < N; ++i)
-        output << " T_" << i << "[K]";
+        output << "\tT_" << i << "[K]";
       output << "\n";
     }
 
@@ -666,7 +666,7 @@ TemperatureSolver<dim>::output_probes() const
 
   output << t;
   for (const auto &v : values)
-    output << " " << v;
+    output << '\t' << v;
   output << "\n";
 
   std::cout << " " << format_time(timer) << "\n";

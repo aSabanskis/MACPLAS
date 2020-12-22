@@ -722,29 +722,27 @@ DislocationSolver<dim>::output_probes() const
       std::ofstream output(file_name);
 
       for (unsigned int i = 0; i < N; ++i)
-        output << "# probe " << i << ": " << probes[i] << "\n";
+        output << "# probe " << i << ":\t" << probes[i] << "\n";
 
-      // Write column titles, avoiding spaces in the units.
-      // In future, consider using tabs as separators.
       output << "t[s]";
       for (unsigned int i = 0; i < N; ++i)
         {
-          output << " T_" << i << "[K]"
-                 << " N_m_" << i << "[m^-2]"
-                 << " dot_N_m_" << i << "[m^-2s^-1]"
-                 << " v_" << i << "[ms^-1]";
+          output << "\tT_" << i << "[K]"
+                 << "\tN_m_" << i << "[m^-2]"
+                 << "\tdot_N_m_" << i << "[m^-2s^-1]"
+                 << "\tv_" << i << "[ms^-1]";
 
           for (unsigned int j = 0; j < s.n_blocks(); ++j)
-            output << " stress_" << j << "_" << i << "[Pa]";
+            output << "\tstress_" << j << "_" << i << "[Pa]";
 
           for (unsigned int j = 0; j < e_c.n_blocks(); ++j)
-            output << " strain_c_" << j << "_" << i << "[-]";
+            output << "\tstrain_c_" << j << "_" << i << "[-]";
 
           for (unsigned int j = 0; j < e_c.n_blocks(); ++j)
-            output << " dot_strain_c_" << j << "_" << i << "[s^-1]";
+            output << "\tdot_strain_c_" << j << "_" << i << "[s^-1]";
 
-          output << " tau_eff_" << i << "[Pa]"
-                 << " J_2_" << i << "[Pa^2]";
+          output << "\ttau_eff_" << i << "[Pa]"
+                 << "\tJ_2_" << i << "[Pa^2]";
         }
       output << "\n";
     }
@@ -790,19 +788,19 @@ DislocationSolver<dim>::output_probes() const
   output << t;
   for (unsigned int i = 0; i < N; ++i)
     {
-      output << " " << values_T[i] << " " << values_N_m[i] << " "
-             << values_dot_N_m[i] << " " << values_v[i];
+      output << '\t' << values_T[i] << '\t' << values_N_m[i] << '\t'
+             << values_dot_N_m[i] << '\t' << values_v[i];
 
       for (unsigned int j = 0; j < s.n_blocks(); ++j)
-        output << " " << values_s[j][i];
+        output << '\t' << values_s[j][i];
 
       for (unsigned int j = 0; j < e_c.n_blocks(); ++j)
-        output << " " << values_e_c[j][i];
+        output << '\t' << values_e_c[j][i];
 
       for (unsigned int j = 0; j < e_c.n_blocks(); ++j)
-        output << " " << values_dot_e_c[j][i];
+        output << '\t' << values_dot_e_c[j][i];
 
-      output << " " << values_tau[i] << " " << values_J_2[i];
+      output << '\t' << values_tau[i] << '\t' << values_J_2[i];
     }
   output << "\n";
 

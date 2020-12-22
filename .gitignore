@@ -30,7 +30,7 @@ CMakeCache.txt
 *project
 *.json
 *.bak*
-log
+log*
 *.log*
 results
 html
