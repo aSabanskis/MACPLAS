@@ -367,13 +367,6 @@ template <int dim>
 bool
 DislocationSolver<dim>::solve()
 {
-  // first time step: calculate stresses
-  if (get_time() == 0)
-    {
-      stress_solver.solve();
-      output_probes();
-    }
-
   advance_time();
   const double dt    = get_time_step();
   const double t     = get_time();
@@ -540,6 +533,10 @@ DislocationSolver<dim>::initialize()
 
   dislocation_density.reinit(n_dofs_temp);
   dislocation_density.add(prm.get_double("Initial dislocation density"));
+
+  // first time step: calculate stresses
+  stress_solver.solve();
+  output_probes();
 }
 
 template <int dim>

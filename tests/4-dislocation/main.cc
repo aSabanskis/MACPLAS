@@ -67,7 +67,7 @@ Problem<dim>::run()
 
   while (true)
     {
-      const double t  = solver.get_time();
+      const double t  = solver.get_time() + solver.get_time_step();
       const double dx = prm.get_double("L") * prm.get_double("Strain rate") * t;
       solver.get_stress_solver().set_bc1(1, 0, -dx); // compression
 
