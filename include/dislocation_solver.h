@@ -23,250 +23,353 @@
 
 using namespace dealii;
 
-/// Class for calculation of the time-dependent dislocation density
+/** Class for calculation of the time-dependent dislocation density
+ */
 template <int dim>
 class DislocationSolver
 {
 public:
-  /// Constructor
-
-  /// Initialize the solver parameters from \c dislocation.prm.
-  /// If it doesn't exist, the default parameter values are written to
-  /// \c dislocation-default.prm.
+  /** Constructor.
+   * Initialize the solver parameters from \c dislocation.prm.
+   * If it doesn't exist, the default parameter values are written to
+   * \c dislocation-default.prm.
+   */
   DislocationSolver(const unsigned int order = 2);
 
-  /// Calculate the dislocation density and creep strain
+  /** Calculate the dislocation density and creep strain.
+   *  Advance one time step.
+   */
   bool
   solve();
 
-  /// Get mesh
+  /** Get mesh
+   */
   const Triangulation<dim> &
   get_mesh() const;
-  /// Get mesh
+
+  /** Get mesh
+   */
   Triangulation<dim> &
   get_mesh();
 
-  /// Get temperature
+  /** Get temperature \f$T\f$, K
+   */
   const Vector<double> &
   get_temperature() const;
-  /// Get temperature
+
+  /** Get temperature \f$T\f$, K
+   */
   Vector<double> &
   get_temperature();
 
-  /// Get dislocation density
+  /** Get dislocation density \f$N_m\f$, m<sup>-2</sup>
+   */
   const Vector<double> &
   get_dislocation_density() const;
-  /// Get dislocation density
+
+  /** Get dislocation density \f$N_m\f$, m<sup>-2</sup>
+   */
   Vector<double> &
   get_dislocation_density();
 
-  /// Get stress
+  /** Get stress \f$\sigma_{ij}\f$, Pa.
+   * Calls \c StressSolver::get_stress
+   */
   const BlockVector<double> &
   get_stress() const;
-  /// Get stress deviator
+
+  /** Get stress deviator \f$S_{ij}\f$, Pa.
+   * Calls \c StressSolver::get_stress_deviator
+   */
   const BlockVector<double> &
   get_stress_deviator() const;
-  /// Get second invariant of deviatoric stress
+
+  /** Get second invariant of deviatoric stress \f$J_2\f$, Pa<sup>2</sup>.
+   * Calls \c StressSolver::get_stress_J_2
+   */
   const Vector<double> &
   get_stress_J_2() const;
 
-  /// Get creep strain
+  /** Get creep strain \f$\varepsilon^c_{ij}\f$, -
+   */
   const BlockVector<double> &
   get_strain_c() const;
-  /// Get creep strain
+
+  /** Get creep strain \f$\varepsilon^c_{ij}\f$, -
+   */
   BlockVector<double> &
   get_strain_c();
 
-  /// Get degrees of freedom for temperature
+  /** Get degrees of freedom for temperature
+   */
   const DoFHandler<dim> &
   get_dof_handler() const;
 
-  /// Get stress solver (for setting boundary conditions)
+  /** Get stress solver (for setting boundary conditions)
+   */
   StressSolver<dim> &
   get_stress_solver();
 
-  /// Current time, s
+  /** Current time \f$t\f$, s
+   */
   double
   get_time() const;
-  /// Current time, s
+
+  /** Current time \f$t\f$, s
+   */
   double &
   get_time();
 
-  /// Time step, s
+  /** Time step \f$\Delta t\f$, s
+   */
   double
   get_time_step() const;
-  /// Time step, s
+
+  /** Time step \f$\Delta t\f$, s
+   */
   double &
   get_time_step();
 
-  /// Final time, s
+  /** Final time, s
+   */
   double
   get_max_time() const;
 
-  /// Initialize fields
+  /** Initialize fields
+   */
   void
   initialize();
 
-  /// Add probe point
+  /** Add probe point
+   */
   void
   add_probe(const Point<dim> &p);
 
-  /// Save results to disk
+  /** Save results to disk
+   */
   void
   output_results() const;
 
-  /// Save mesh to disk
+  /** Save mesh to disk
+   */
   void
   output_mesh() const;
 
 private:
-  /// Initialize parameters. Called by the constructor
+  /** Initialize parameters. Called by the constructor
+   */
   void
   initialize_parameters();
 
-  /// Time stepping: advance time
+  /** Time stepping: advance time \f$t \to t + \Delta t\f$
+   */
   void
   advance_time();
 
-  /// Write current values of fields at probe points to disk
+  /** Write current values of fields at probe points to disk
+   */
   void
   output_probes() const;
 
-  /// Evaluate values of source field at probe points
+  /** Evaluate values of source field at probe points
+   */
   std::vector<double>
   get_field_at_probes(const Vector<double> &source) const;
 
-  /// Calculate the temperature-dependent Peierls potential
+  /** Calculate the temperature-dependent Peierls potential \f$Q\f$
+   */
   double
   calc_Q(const double T) const;
 
-  /// Calculate the temperature-dependent strain hardening factor
+  /** Calculate the temperature-dependent strain hardening factor \f$D\f$
+   */
   double
   calc_D(const double T) const;
 
-  /// Calculate the effective stress \f$\tau_\mathrm{eff}\f$
+  /** Calculate the effective stress \f$\tau_\mathrm{eff} =
+   * \left\langle \sqrt{J_2} - D \sqrt{N_m} \right\rangle\f$
+   */
   double
   tau_eff(const double N_m, const double J_2, const double T) const;
-  /// Same as above, for vector arguments
+
+  /** Same as above, for \c vector arguments
+   */
   std::vector<double>
   tau_eff(const std::vector<double> &N_m,
           const std::vector<double> &J_2,
           const std::vector<double> &T) const;
-  /// Same as above, for Vector arguments
+
+  /** Same as above, for \c Vector arguments
+   */
   Vector<double>
   tau_eff(const Vector<double> &N_m,
           const Vector<double> &J_2,
           const Vector<double> &T) const;
 
-  /// Calculate the time derivative of dislocation density \f$\dot{N_m}\f$
+  /** Calculate the time derivative of dislocation density \f$\dot{N_m} =
+   * K v \tau_\mathrm{eff}^l N_m\f$
+   */
   double
   derivative_N_m(const double N_m, const double J_2, const double T) const;
-  /// Same as above, for vector arguments
+
+  /** Same as above, for \c vector arguments
+   */
   std::vector<double>
   derivative_N_m(const std::vector<double> &N_m,
                  const std::vector<double> &J_2,
                  const std::vector<double> &T) const;
-  /// Same as above, for Vector arguments
+  /** Same as above, for \c Vector arguments
+   */
   Vector<double>
   derivative_N_m(const Vector<double> &N_m,
                  const Vector<double> &J_2,
                  const Vector<double> &T) const;
 
-  /// Calculate the partial derivative \f$\partial \dot{N_m} / \partial N_m\f$
+  /** Calculate the partial derivative \f$\partial \dot{N_m} / \partial N_m\f$
+   */
   double
   derivative2_N_m_N_m(const double N_m, const double J_2, const double T) const;
 
-  /// Calculate the creep strain rate \f$\dot{\varepsilon^c_{ij}}\f$
+  /** Calculate the creep strain rate \f$\dot{\varepsilon^c_{ij}} =
+   * \frac{b v N_m}{2\sqrt{J_2}} S_{ij}\f$
+   */
   double
   derivative_strain(const double N_m,
                     const double J_2,
                     const double T,
                     const double S) const;
-  /// Same as above, for vector arguments
+
+  /** Same as above, for \c vector arguments
+   */
   std::vector<double>
   derivative_strain(const std::vector<double> &N_m,
                     const std::vector<double> &J_2,
                     const std::vector<double> &T,
                     const std::vector<double> &S) const;
-  /// Same as above, for Vector arguments
+
+  /** Same as above, for \c Vector arguments
+   */
   Vector<double>
   derivative_strain(const Vector<double> &N_m,
                     const Vector<double> &J_2,
                     const Vector<double> &T,
                     const Vector<double> &S) const;
 
-  /// Calculate the dislocation velocity \f$v\f$
+  /** Calculate the dislocation velocity \f$v =
+   * k_0 \tau_\mathrm{eff}^p \exp\left(-\frac{Q}{k_B T}\right)\f$
+   */
   double
   dislocation_velocity(const double N_m,
                        const double J_2,
                        const double T) const;
-  /// Same as above, for vector arguments
+
+  /** Same as above, for \c vector arguments
+   */
   std::vector<double>
   dislocation_velocity(const std::vector<double> &N_m,
                        const std::vector<double> &J_2,
                        const std::vector<double> &T) const;
-  /// Same as above, for Vector arguments
+
+  /** Same as above, for \c Vector arguments
+   */
   Vector<double>
   dislocation_velocity(const Vector<double> &N_m,
                        const Vector<double> &J_2,
                        const Vector<double> &T) const;
 
-  /// Time integration using the forward Euler method (explicit)
+  /** Time integration using the forward Euler method (explicit)
+   */
   void
   integrate_Euler();
 
-  /// Time integration using the midpoint method (explicit), also known as RK2
+  /** Time integration using the midpoint method (explicit).
+   * Also known as RK2
+   */
   void
   integrate_midpoint();
 
-  /// Time integration using analytical expression for linearized N_m
+  /** Time integration using analytical expression for linearized \f$N_m\f$
+   */
   void
   integrate_linearized_N_m();
 
-  /// Time integration using analytical expression for linearized N_m but the
-  /// midpoint method for creep strain
+  /** Time integration using analytical expression for linearized \f$N_m\f$ but
+   *  the midpoint method for creep strain
+   */
   void
   integrate_linearized_N_m_midpoint();
 
-  /// Time integration using the backward Euler method (implicit)
+  /** Time integration using the backward Euler method (implicit)
+   */
   void
   integrate_implicit();
 
-  /// Stress solver
-
-  /// To avoid redundancy, mesh, finite element, degree handler and temperature
-  /// field is not stored in DislocationSolver but in StressSolver
+  /** Stress solver.
+   *  To avoid redundancy, mesh, finite element, degree handler and temperature
+   *  field is not stored in \c DislocationSolver but in \c StressSolver
+   */
   StressSolver<dim> stress_solver;
 
-  Vector<double> dislocation_density; ///< Dislocation density, m<sup>-2</sup>
+  /** Dislocation density \f$N_m\f$, m<sup>-2</sup>
+   */
+  Vector<double> dislocation_density;
 
-  std::vector<Point<dim>> probes; ///< Locations of probe points
+  /** Locations of probe points
+   */
+  std::vector<Point<dim>> probes;
 
-  ParameterHandler prm; ///< Parameter handler
+  /** Parameter handler
+   */
+  ParameterHandler prm;
 
-  std::string time_scheme; ///< Time integration scheme
+  /** Time integration scheme.
+   * Default: Euler
+   */
+  std::string time_scheme;
 
-  double current_time;      ///< Time stepping: current time, s
-  double current_time_step; ///< Time stepping: current time step, s
+  /** Time stepping: current time \f$t\f$, s
+   */
+  double current_time;
 
+  /** Time stepping: current time step \f$\Delta t\f$, s
+   */
+  double current_time_step;
 
-  /// Peierls potential \f$Q\f$ (temperature function), eV
+  /** Peierls potential \f$Q\f$ (temperature function), eV
+   */
   FunctionParser<1> m_Q;
 
-  /// Strain hardening factor \f$D\f$ (temperature function), N m<sup>-1</sup>
+  /** Strain hardening factor \f$D\f$ (temperature function), N m<sup>-1</sup>
+   */
   FunctionParser<1> m_D;
 
-  double m_b; ///< Magnitude of Burgers vector \f$b\f$, m
-  double m_K; ///< Material constant \f$K\f$, m N<sup>-1</sup>
+  /** Magnitude of Burgers vector \f$b\f$, m
+   */
+  double m_b;
 
-  /// Material constant \f$k_0, \text{m}^{2p+l}\;\text{N}^{-p}\;\text{s}^{-1}\f$
+  /** Material constant \f$K\f$, m N<sup>-1</sup>
+   */
+  double m_K;
+
+  /** Material constant \f$k_0, \text{m}^{2p+l}\;\text{N}^{-p}\;\text{s}^{-1}\f$
+   */
   double m_k_0;
-  double m_l; ///< Material constant \f$l\f$, -
-  double m_p; ///< Material constant \f$p\f$, -
 
-  /// Boltzmann constant \f$k_B\f$, eV/K
+  /** Material constant \f$l\f$, -
+   */
+  double m_l;
+
+  /** Material constant \f$p\f$, -
+   */
+  double m_p;
+
+  /** Boltzmann constant \f$k_B\f$, eV/K
+   */
   static constexpr double m_k_B = 8.617e-5;
 };
+
+
+// IMPLEMENTATION
 
 template <int dim>
 DislocationSolver<dim>::DislocationSolver(const unsigned int order)

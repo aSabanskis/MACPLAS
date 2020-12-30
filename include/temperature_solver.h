@@ -36,118 +36,154 @@
 
 using namespace dealii;
 
-/// Stefan–Boltzmann constant, W m<sup>-2</sup> K<sup>-4</sup>
+/** Stefan–Boltzmann constant \f$\sigma_\mathrm{SB}\f$,
+ * W m<sup>-2</sup> K<sup>-4</sup>
+ */
 static const double sigma_SB = 5.67e-8;
 
-/// Data structure for thermal radiation and incoming heat flux density BC
+
+/** Data structure for thermal radiation and incoming heat flux density BC
+ */
 struct heat_flux_data
 {
-  /// Incoming heat flux density, W m<sup>-2</sup>
+  /** Incoming heat flux density \f$q_\mathrm{in}\f$, W m<sup>-2</sup>
+   */
   Vector<double> q_in;
-  /// Temperature-dependent emissivity, -
+
+  /** Temperature-dependent emissivity \f$\varepsilon(T)\f$, -
+   */
   std::function<double(double)> emissivity;
-  /// Emissivity temperature derivative, K<sup>-1</sup>
+
+  /** Emissivity temperature derivative \f$d\varepsilon(T)/dT\f$, K<sup>-1</sup>
+   */
   std::function<double(double)> emissivity_deriv;
 };
 
-/// Class for calculation of the time-dependent temperature field
+
+/** Class for calculation of the time-dependent temperature field
+ */
 template <int dim>
 class TemperatureSolver
 {
 public:
-  /// Constructor
-
-  /// Initializes the solver parameters from \c temperature.prm.
-  /// If it doesn't exist, the default parameter values are written to
-  /// \c temperature-default.prm.
+  /** Constructor.
+   * Initializes the solver parameters from \c temperature.prm.
+   * If it doesn't exist, the default parameter values are written to
+   * \c temperature-default.prm.
+   */
   TemperatureSolver(const unsigned int order = 2);
 
-  /// Calculate the temperature field
-
-  /// @returns \c true if the final time has been reached
+  /** Calculate the temperature field.
+   * @returns \c true if the final time has been reached
+   */
   bool
   solve();
 
-  /// Get mesh
+  /** Get mesh
+   */
   const Triangulation<dim> &
   get_mesh() const;
-  /// Get mesh
+
+  /** Get mesh
+   */
   Triangulation<dim> &
   get_mesh();
 
-  /// Get temperature
+  /** Get temperature \f$T\f$, K
+   */
   const Vector<double> &
   get_temperature() const;
-  /// Get temperature
+
+  /** Get temperature \f$T\f$, K
+   */
   Vector<double> &
   get_temperature();
 
-  /// Current time, s
+  /** Current time \f$t\f$, s
+   */
   double
   get_time() const;
-  /// Current time, s
+
+  /** Current time \f$t\f$, s
+   */
   double &
   get_time();
 
-  /// Time step, s
+  /** Time step \f$\Delta t\f$, s
+   */
   double
   get_time_step() const;
-  /// Time step, s
+
+  /** Time step \f$\Delta t\f$, s
+   */
   double &
   get_time_step();
 
-  /// Final time, s
+  /** Final time, s
+   */
   double
   get_max_time() const;
 
-  /// Initialize fields
+  /** Initialize fields
+   */
   void
   initialize();
 
-  /// Get coordinates of boundary DOFs
+  /** Get coordinates of boundary DOFs
+   */
   void
   get_boundary_points(const unsigned int       id,
                       std::vector<Point<dim>> &points,
                       std::vector<bool> &      boundary_dofs) const;
 
-  /// Set first-type boundary condition
+  /** Set first-type boundary condition
+   */
   void
   set_bc1(const unsigned int id, const double val);
 
-  /// Set thermal radiation and incoming heat flux density boundary condition
+  /** Set thermal radiation and incoming heat flux density boundary condition
+   * \f$q = \sigma_\mathrm{SB} \varepsilon(T) T^4 - q_\mathrm{in}\f$
+   */
   void
   set_bc_rad_mixed(const unsigned int            id,
                    const Vector<double> &        q_in,
                    std::function<double(double)> emissivity,
                    std::function<double(double)> emissivity_deriv);
 
-  /// Add probe point
+  /** Add probe point
+   */
   void
   add_probe(const Point<dim> &p);
 
-  /// Save results to disk
+  /** Save results to disk
+   */
   void
   output_results() const;
 
-  /// Save mesh to disk
+  /** Save mesh to disk
+   */
   void
   output_mesh() const;
 
 private:
-  /// Initialize parameters. Called by the constructor
+  /** Initialize parameters. Called by the constructor
+   */
   void
   initialize_parameters();
 
-  /// Initialize data before calculation
+  /** Initialize data before calculation
+   */
   void
   prepare_for_solve();
 
-  /// Assemble the system matrix and right-hand-side vector
+  /** Assemble the system matrix and right-hand-side vector
+   */
   void
   assemble_system();
 
 
-  // Structure that holds scratch data
+  /** Structure that holds scratch data
+   */
   struct AssemblyScratchData
   {
     AssemblyScratchData(const Quadrature<dim>     quadrature,
@@ -165,63 +201,118 @@ private:
     std::vector<double>         T_face_q;
     std::vector<double>         heat_flux_in_face_q;
   };
-  // Structure that holds local contributions
+
+  /** Structure that holds local contributions
+   */
   struct AssemblyCopyData
   {
     FullMatrix<double>                   cell_matrix;
     Vector<double>                       cell_rhs;
     std::vector<types::global_dof_index> local_dof_indices;
   };
-  // Local assembly function
+
+  /** Local assembly function
+   */
   void
   local_assemble_system(
     const typename DoFHandler<dim>::active_cell_iterator &cell,
     AssemblyScratchData &                                 scratch_data,
     AssemblyCopyData &                                    copy_data);
-  // Copy local contributions to global
+
+  /** Copy local contributions to global
+   */
   void
   copy_local_to_global(const AssemblyCopyData &copy_data);
 
 
-  /// Time stepping: advance time
+  /** Time stepping: advance time
+   */
   void
   advance_time();
 
-  /// Solve the system of linear equations
+  /** Solve the system of linear equations
+   */
   void
   solve_system();
 
-  /// Write temperature at probe points to disk
+  /** Write temperature at probe points to disk
+   */
   void
   output_probes() const;
 
-  Triangulation<dim> triangulation; ///< Mesh
-  FE_Q<dim>          fe;            ///< Finite element
-  DoFHandler<dim>    dh;            ///< Degrees of freedom
+  /** Mesh
+   */
+  Triangulation<dim> triangulation;
 
-  SparsityPattern      sparsity_pattern; ///< Sparsity pattern
-  SparseMatrix<double> system_matrix;    ///< System matrix
-  Vector<double>       system_rhs;       ///< Right-hand-side vector
+  /** Finite element
+   */
+  FE_Q<dim> fe;
 
-  Vector<double> temperature;        ///< Temperature
-  Vector<double> temperature_prev;   ///< Temperature at the previous time step
-  Vector<double> temperature_update; ///< Newton update for temperature
+  /** Degrees of freedom
+   */
+  DoFHandler<dim> dh;
 
-  /// Thermal conductivity, W m<sup>-1</sup> K<sup>-1</sup>
+  /** Sparsity pattern
+   */
+  SparsityPattern sparsity_pattern;
+
+  /** System matrix
+   */
+  SparseMatrix<double> system_matrix;
+
+  /** Right-hand-side vector
+   */
+  Vector<double> system_rhs;
+
+
+  /** Temperature \f$T\f$, K
+   */
+  Vector<double> temperature;
+
+  /** Temperature at the previous time step \f$T_\mathrm{prev}\f$, K
+   */
+  Vector<double> temperature_prev;
+
+  /** Newton update for temperature \f$\delta T\f$, K
+   */
+  Vector<double> temperature_update;
+
+
+  /** Thermal conductivity \f$\lambda(T)\f$, W m<sup>-1</sup> K<sup>-1</sup>
+   */
   Polynomials::Polynomial<double> lambda;
 
-  /// Data for first-type BC
+
+  /** Data for first-type BC
+   */
   std::map<unsigned int, double> bc1_data;
-  /// Data for thermal radiation and incoming heat flux density BC
+
+  /** Data for thermal radiation and incoming heat flux density BC
+   */
   std::map<unsigned int, heat_flux_data> bc_rad_mixed_data;
 
-  std::vector<Point<dim>> probes; ///< Locations of probe points
 
-  ParameterHandler prm; ///< Parameter handler
+  /** Locations of probe points
+   */
+  std::vector<Point<dim>> probes;
 
-  double current_time;      ///< Time stepping: current time, s
-  double current_time_step; ///< Time stepping: current time step, s
+
+  /**  Parameter handler
+   */
+  ParameterHandler prm;
+
+
+  /** Time stepping: current time \f$t\f$, s
+   */
+  double current_time;
+
+  /** Time stepping: current time step \f$\Delta t\f$, s
+   */
+  double current_time_step;
 };
+
+
+// IMPLEMENTATION
 
 template <int dim>
 TemperatureSolver<dim>::TemperatureSolver(const unsigned int order)

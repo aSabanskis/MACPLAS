@@ -34,96 +34,126 @@
 
 using namespace dealii;
 
-/// Class for calculation of the thermal stresses for a given temperature field
+/** Class for calculation of the thermal stresses for a given temperature field.
+ * The creep strain is also taken into account.
+ */
 template <int dim>
 class StressSolver
 {
 public:
-  /// Constructor
-
-  /// Initializes the solver parameters from \c stress.prm.
-  /// If it doesn't exist, the default parameter values are written to
-  /// \c stress-default.prm.
+  /** Constructor.
+   * Initializes the solver parameters from \c stress.prm.
+   * If it doesn't exist, the default parameter values are written to
+   * \c stress-default.prm.
+   */
   StressSolver(const unsigned int order = 2);
 
-  /// Calculate the stresses
+  /** Calculate the stresses
+   */
   void
   solve();
 
-  /// Get mesh
+  /** Get mesh
+   */
   const Triangulation<dim> &
   get_mesh() const;
-  /// Get mesh
+
+  /** Get mesh
+   */
   Triangulation<dim> &
   get_mesh();
 
-  /// Get temperature
+  /** Get temperature \f$T\f$, K
+   */
   const Vector<double> &
   get_temperature() const;
-  /// Get temperature
+
+  /** Get temperature \f$T\f$, K
+   */
   Vector<double> &
   get_temperature();
 
-  /// Get stress
+  /** Get stress \f$\sigma_{ij}\f$, Pa
+   */
   const BlockVector<double> &
   get_stress() const;
-  /// Get stress deviator
+
+  /** Get stress deviator \f$S_{ij} =
+   * \sigma_{ij} - \frac{1}{3} \delta_{ij} \sigma_{kk}\f$, Pa
+   */
   const BlockVector<double> &
   get_stress_deviator() const;
-  /// Get second invariant of deviatoric stress
+
+  /** Get second invariant of deviatoric stress \f$J_2 =
+   * \frac{1}{2} S_{ij} S_{ij}\f$, Pa<sup>2</sup>
+   */
   const Vector<double> &
   get_stress_J_2() const;
 
-  /// Get creep strain
+  /** Get creep strain \f$\varepsilon^c_{ij}\f$, -
+   */
   const BlockVector<double> &
   get_strain_c() const;
-  /// Get creep strain
+
+  /** Get creep strain \f$\varepsilon^c_{ij}\f$, -
+   */
   BlockVector<double> &
   get_strain_c();
 
-  /// Initialize fields
+  /** Initialize fields
+   */
   void
   initialize();
 
-  /// Get coordinates of DOFs
+  /** Get coordinates of DOFs
+   */
   void
   get_support_points(std::vector<Point<dim>> &points) const;
 
-  /// Get degrees of freedom for temperature
+  /** Get degrees of freedom for temperature
+   */
   const DoFHandler<dim> &
   get_dof_handler() const;
 
-  /// Set first-type boundary condition
+  /** Set first-type boundary condition
+   */
   void
   set_bc1(const unsigned int id,
           const unsigned int component,
           const double       val);
 
-  /// Save results to disk
+  /** Save results to disk
+   */
   void
   output_results() const;
 
-  /// Save mesh to disk
+  /** Save mesh to disk
+   */
   void
   output_mesh() const;
 
-  /// Number of distinct elements of the stress tensor (3D: 6, 2D: 4)
+  /** Number of distinct elements of the stress tensor (3D: 6, 2D: 4)
+   */
   static const unsigned int n_components = 2 * dim;
 
 private:
-  /// Initialize parameters. Called by the constructor
+  /** Initialize parameters. Called by the constructor
+   */
   void
   initialize_parameters();
 
-  /// Initialize data before calculation
+  /** Initialize data before calculation
+   */
   void
   prepare_for_solve();
 
-  /// Assemble the system matrix and right-hand-side vector (multithreaded)
+  /** Assemble the system matrix and right-hand-side vector (multithreaded)
+   */
   void
   assemble_system();
 
-  /// Structure that holds scratch data
+  /** Structure that holds scratch data
+   */
   struct AssemblyScratchData
   {
     AssemblyScratchData(const Quadrature<dim> &   quadrature,
@@ -137,112 +167,197 @@ private:
     std::vector<double>              T_q;
     std::vector<std::vector<double>> epsilon_c_q;
   };
-  /// Structure that holds local contributions
+
+  /** Structure that holds local contributions
+   */
   struct AssemblyCopyData
   {
     FullMatrix<double>                   cell_matrix;
     Vector<double>                       cell_rhs;
     std::vector<types::global_dof_index> local_dof_indices;
   };
-  /// Iterator tuple
+
+  /** Iterator tuple
+   */
   typedef std_cxx11::tuple<typename DoFHandler<dim>::active_cell_iterator,
                            typename DoFHandler<dim>::active_cell_iterator>
     IteratorTuple;
-  /// Iterator pair
+
+  /** Iterator pair
+   */
   typedef SynchronousIterators<IteratorTuple> IteratorPair;
-  /// Local assembly function
+
+  /** Local assembly function
+   */
   void
   local_assemble_system(const IteratorPair & cell_pair,
                         AssemblyScratchData &scratch_data,
                         AssemblyCopyData &   copy_data);
-  /// Copy local contributions to global
+
+  /** Copy local contributions to global
+   */
   void
   copy_local_to_global(const AssemblyCopyData &copy_data);
 
-  /// Solve the system of linear equations
+  /** Solve the system of linear equations
+   */
   void
   solve_system();
 
-  /// Calculate the temperature-dependent Young's modulus
+  /** Calculate the temperature-dependent Young's modulus \f$E\f$, Pa
+   */
   double
   calc_E(const double T) const;
 
-  /// Calculate the second-order elastic constant (stiffness) \f$C_{11}\f$, Pa
+  /** Calculate the second-order elastic constant (stiffness) \f$C_{11} =
+   * E (1 - \nu) / ((1 + \nu) (1 - 2 \nu))\f$, Pa
+   */
   double
   calc_C_11(const double T) const;
 
-  /// Calculate the second-order elastic constant (stiffness) \f$C_{12}\f$, Pa
+  /** Calculate the second-order elastic constant (stiffness) \f$C_{12} =
+   * E \nu / ((1 + \nu) (1 - 2 \nu))\f$, Pa
+   */
   double
   calc_C_12(const double T) const;
 
-  /// Calculate the second-order elastic constant (stiffness) \f$C_{44}\f$, Pa
+  /** Calculate the second-order elastic constant (stiffness) \f$C_{44} =
+   * E / (2 (1 + \nu))\f$, Pa
+   */
   double
   calc_C_44(const double T) const;
 
-  /// Calculate the temperature-dependent thermal expansion coefficient
+  /** Calculate the temperature-dependent thermal expansion coefficient
+   * \f$\alpha\f$, K<sup>-1</sup>
+   */
   double
   calc_alpha(const double T) const;
 
-  /// Calculate the stresses from the displacement field
+  /** Calculate the stresses from the displacement field
+   */
   void
   calculate_stress();
 
-  /// Get stiffness tensor
+  /** Get stiffness tensor
+   */
   SymmetricTensor<2, StressSolver<dim>::n_components>
   get_stiffness_tensor(const double &T) const;
 
-  /// Get strain from FEValues
+  /** Get strain from \c FEValues
+   */
   void
   get_strain(const FEValues<dim> &    fe_values,
              const unsigned int &     shape_func,
              const unsigned int &     q,
              Tensor<1, n_components> &strain) const;
-  /// Get strain from temperature
+
+  /** Get strain from temperature
+   */
   void
   get_strain(const double &T, Tensor<1, n_components> &strain) const;
-  /// Get strain from displacement
+
+  /** Get strain from displacement
+   */
   void
   get_strain(const Point<dim> &                 point_q,
              const Vector<double> &             displacement_q,
              const std::vector<Tensor<1, dim>> &grad_displacement,
              Tensor<1, n_components> &          strain) const;
 
-  Triangulation<dim> triangulation; ///< Mesh
+  /** Mesh
+   */
+  Triangulation<dim> triangulation;
 
-  FE_Q<dim>       fe_temp;     ///< Finite element for temperature
-  DoFHandler<dim> dh_temp;     ///< Degrees of freedom for temperature
-  Vector<double>  temperature; ///< Temperature
+  /** Finite element for temperature
+   */
+  FE_Q<dim> fe_temp;
 
-  FESystem<dim>       fe;              ///< Finite element for displacement
-  DoFHandler<dim>     dh;              ///< Degrees of freedom for displacement
-  BlockVector<double> displacement;    ///< Displacement
-  BlockVector<double> stress;          ///< Stress
-  BlockVector<double> stress_deviator; ///< Stress deviator
+  /** Degrees of freedom for temperature
+   */
+  DoFHandler<dim> dh_temp;
 
-  BlockVector<double> strain_c; ///< Creep strain
+  /** Temperature \f$T\f$, K
+   */
+  Vector<double> temperature;
 
-  Vector<double> stress_hydrostatic; ///< Mean (hydrostatic) stress
-  Vector<double> stress_von_Mises;   ///< von Mises stress
-  Vector<double> stress_J_2;         ///< Second invariant of deviatoric stress
+  /** Finite element for displacement
+   */
+  FESystem<dim> fe;
 
-  BlockSparsityPattern      sparsity_pattern; ///< Sparsity pattern
-  BlockSparseMatrix<double> system_matrix;    ///< System matrix
-  BlockVector<double>       system_rhs;       ///< Right-hand-side vector
+  /** Degrees of freedom for displacement
+   */
+  DoFHandler<dim> dh;
 
-  /// Data for first-type BC
+  /** Displacement \f$\mathbf{u}\f$, m
+   */
+  BlockVector<double> displacement;
+
+  /** Stress \f$\sigma_{ij}\f$, Pa
+   */
+  BlockVector<double> stress;
+
+  /** Stress deviator \f$S_{ij}\f$, Pa
+   */
+  BlockVector<double> stress_deviator;
+
+  /** Creep strain \f$\varepsilon^c_{ij}\f$, -
+   */
+  BlockVector<double> strain_c;
+
+  /** Mean (hydrostatic) stress \f$\sigma_\mathrm{ave} =
+   * \frac{1}{3} \sigma_{kk}\f$, Pa
+   */
+  Vector<double> stress_hydrostatic;
+
+  /** von Mises stress \f$\sigma_\mathrm{vM} =
+   * \sqrt{3 J_2}\f$, Pa
+   */
+  Vector<double> stress_von_Mises;
+
+  /** Second invariant of deviatoric stress \f$J_2\f$, Pa
+   */
+  Vector<double> stress_J_2;
+
+  /** Sparsity pattern
+   */
+  BlockSparsityPattern sparsity_pattern;
+
+  /** System matrix
+   */
+  BlockSparseMatrix<double> system_matrix;
+
+  /** Right-hand-side vector
+   */
+  BlockVector<double> system_rhs;
+
+  /** Data for first-type BC
+   */
   std::map<unsigned int, std::pair<unsigned int, double>> bc1_data;
 
-  ParameterHandler prm; ///< Parameter handler
+  /** Parameter handler
+   */
+  ParameterHandler prm;
 
-  ///< Young's modulus (temperature function), Pa
+  /** Young's modulus (temperature function) \f$E\f$, Pa
+   */
   FunctionParser<1> m_E;
 
-  /// Thermal expansion coefficient (temperature function), K<sup>-1</sup>
+  /** Thermal expansion coefficient (temperature function) \f$\alpha\f$,
+   * K<sup>-1</sup>
+   */
   FunctionParser<1> m_alpha;
 
-  double m_nu;    ///< Poisson's ratio, -
-  double m_T_ref; ///< Reference temperature, K
+  /** Poisson's ratio \f$\nu\f$, -
+   */
+  double m_nu;
+
+  /** Reference temperature \f$T_\mathrm{ref}\f$, K
+   */
+  double m_T_ref;
 };
+
+
+// IMPLEMENTATION
 
 template <int dim>
 StressSolver<dim>::StressSolver(const unsigned int order)

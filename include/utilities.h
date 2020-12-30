@@ -19,28 +19,36 @@ using namespace dealii;
 
 // helper functions
 
-/// Calculate the square \f$x^2\f$
+/** Calculate the square \f$x^2\f$
+ */
 inline double
 sqr(const double x);
 
-/// Integrate analytically dot_x = a + b * (x-x_0)
+/** Integrate analytically \f$\dot{x} = a + b (x-x_0)\f$
+ */
 inline double
 dx_analytical(const double a, const double b, const double dt);
 
-/// Prints time in seconds, enclosed in parenthesis
+/** Prints time in seconds, enclosed in parenthesis
+ */
 inline std::string
 format_time(const double x);
+
+/** Same as above, for \c Timer
+ */
 inline std::string
 format_time(const Timer &timer);
 
-/// Get point on a line segment which is closest to the given point \f$p\f$
+/** Get point on a line segment which is closest to the given point \f$p\f$
+ */
 template <int dim>
 inline Point<dim>
 closest_segment_point(const Point<dim> &p,
                       const Point<dim> &segment_p0,
                       const Point<dim> &segment_p1);
 
-/// Get barycentric coordinates of point \f$p\f$ of a line segment
+/** Get barycentric coordinates of point \f$p\f$ of a line segment
+ */
 template <int dim>
 inline std::array<double, 2>
 barycentric_coordinates(const Point<dim> &p,
@@ -49,95 +57,126 @@ barycentric_coordinates(const Point<dim> &p,
 
 // helper classes
 
-/// Class for storing and quering geometrical information of a single triangle
+/** Class for storing and quering geometrical information of a single triangle
+ */
 template <int dim>
 class Triangle
 {
 public:
-  /// Set the triangle vertices
+  /** Set the triangle vertices
+   */
   inline void
   reinit(const Point<dim> &p0, const Point<dim> &p1, const Point<dim> &p2);
 
-  /// Get the triangle center
+  /** Get the triangle center
+   */
   inline Point<dim>
   center() const;
 
-  /// Get the triangle normal
+  /** Get the triangle normal
+   */
   inline Point<dim>
   normal() const;
 
-  /// Get the triangle area
+  /** Get the triangle area
+   */
   inline double
   area() const;
 
-  /// Get the longest triangle side
+  /** Get the longest triangle side
+   */
   inline double
   longest_side() const;
 
-  /// Get triangle point which is closest to the given point \f$p\f$
+  /** Get triangle point which is closest to the given point \f$p\f$
+   */
   inline Point<dim>
   closest_triangle_point(const Point<dim> &p) const;
 
-  /// Get barycentric coordinates of the given point \f$p\f$
+  /** Get barycentric coordinates of the given point \f$p\f$
+   */
   inline std::array<double, 3>
   barycentric_coordinates(const Point<dim> &p) const;
 
 private:
-  /// Calculate triangle normal and area in one go
+  /** Calculate triangle normal and area in one go
+   */
   inline void
   calculate_normal_and_area();
 
-  /// Calculate signed area of another triangle
-
-  /// The normal direction of the current triangle is taken into account to get
-  /// the correct sign.
+  /** Calculate signed area of another triangle.
+   * The normal direction of the current triangle is taken into account to get
+   * the correct sign.
+   */
   inline double
   signed_area(const Point<dim> &p0,
               const Point<dim> &p1,
               const Point<dim> &p2) const;
 
-  /// Project the given point \f$p\f$ to the triangle place
+  /** Project the given point \f$p\f$ to the triangle place
+   */
   inline Point<dim>
   project_to_triangle_plane(const Point<dim> &p) const;
 
-  std::array<Point<dim>, 3> m_points;       ///< Vertices
-  Point<dim>                m_normal;       ///< Normal
-  Point<dim>                m_center;       ///< Center
-  double                    m_area;         ///< Area
-  double                    m_longest_side; ///< Longest side
+  /** Vertices
+   */
+  std::array<Point<dim>, 3> m_points;
+
+  /** Normal
+   */
+  Point<dim> m_normal;
+
+  /** Center
+   */
+  Point<dim> m_center;
+
+  /** Area
+   */
+  double m_area;
+
+  /** Longest side
+   */
+  double m_longest_side;
 };
 
 
-/// Class for interpolation of 3D surface fields from external data.
-
-/// Used for interpolation of boundary conditions between different meshes.
-/// The source cell or point data are defined on a triangulated surface.
+/** Class for interpolation of 3D surface fields from external data.
+ * Used for interpolation of boundary conditions between different meshes.
+ * The source cell or point data are defined on a triangulated surface.
+ */
 class SurfaceInterpolator3D
 {
 private:
-  constexpr static unsigned int dim = 3; ///< Only 3D meshes are supported
+  /** Only 3D meshes are supported
+   */
+  constexpr static unsigned int dim = 3;
 
 public:
-  /// Field type
+  /** Field type
+   */
   enum FieldType
   {
     CellField, ///< Cell field
     PointField ///< Point field
   };
 
-  /// Read mesh and fields from \c vtk file
+  /** Read mesh and fields from \c vtk file
+   */
   inline void
   read_vtk(const std::string &file_name);
 
-  /// Read mesh and fields from \c vtu file
+  /** Read mesh and fields from \c vtu file
+   */
   inline void
   read_vtu(const std::string &file_name);
 
-  /// Write mesh and fields to \c vtu file
+  /** Write mesh and fields to \c vtu file
+   */
   inline void
   write_vtu(const std::string &file_name) const;
 
-  /// Interpolate field to the specified points
+  /** Interpolate field to the specified points
+   */
   inline void
   interpolate(const FieldType &              field_type,
               const std::string &            field_name,
@@ -145,9 +184,9 @@ public:
               const std::vector<bool> &      markers,
               Vector<double> &               target_values) const;
 
-  /// Convert between cell and point fields
-
-  /// If target_name is not specified it is set to source_name.
+  /** Convert between cell and point fields
+   * If target_name is not specified it is set to source_name.
+   */
   inline void
   convert(const FieldType &  source_type,
           const std::string &source_name,
@@ -155,77 +194,101 @@ public:
           const std::string &target_name = "");
 
 private:
-  /// Points \c (x,y,z)
+  /** Points \c (x,y,z)
+   */
   std::vector<Point<dim>> points;
 
-  /// Connectivity matrix \c (v0,v1,v2) - only triangles
+  /** Connectivity matrix \c (v0,v1,v2) - only triangles
+   */
   std::vector<std::array<unsigned long, 3>> triangles;
 
-  /// Fields defined on cells
+  /** Fields defined on cells
+   */
   std::map<std::string, std::vector<double>> cell_fields;
 
-  /// Fields defined on points
+  /** Fields defined on points
+   */
   std::map<std::string, std::vector<double>> point_fields;
 
-  /// Vector fields defined on cells
+  /** Vector fields defined on cells
+   */
   std::map<std::string, std::vector<Point<dim>>> cell_vector_fields;
 
-  /// Precalculated triangle areas, normals, centers etc.
+  /** Precalculated triangle areas, normals, centers etc.
+   */
   std::vector<Triangle<dim>> triangle_cache;
 
 
-  /// Get field
+  /** Get field
+   */
   inline const std::vector<double> &
   field(const FieldType &field_type, const std::string &field_name) const;
-  /// Get field
+
+  /** Get field
+   */
   inline std::vector<double> &
   field(const FieldType &field_type, const std::string &field_name);
-  /// Get vector field
+
+  /** Get vector field
+   */
   inline const std::vector<Point<dim>> &
   vector_field(const FieldType &  field_type,
                const std::string &field_name) const;
 
-  /// Convert cell field to point field
+  /** Convert cell field to point field
+   */
   inline void
   cell_to_point(const std::string &source_name, const std::string &target_name);
-  /// Convert point field to cell field
+
+  /** Convert point field to cell field
+   */
   inline void
   point_to_cell(const std::string &source_name, const std::string &target_name);
 
-  /// Clear all data
+  /** Clear all data
+   */
   inline void
   clear();
 
-  /// Print mesh and field information
+  /** Print mesh and field information
+   */
   inline void
   info() const;
 
-  /// Precalculate auxiliary data (cell areas, centers, normals)
+  /** Precalculate auxiliary data (cell areas, centers, normals)
+   */
   inline void
   preprocess();
 };
 
-/// Class for interpolation of 2D surface fields from external data.
 
-/// Used for interpolation of boundary conditions between different meshes.
-/// The source point data are defined on a polyline.
+/** Class for interpolation of 2D surface fields from external data.
+ * Used for interpolation of boundary conditions between different meshes.
+ * The source point data are defined on a polyline.
+ */
 class SurfaceInterpolator2D
 {
 private:
-  constexpr static unsigned int dim = 2; ///< Only 2D meshes are supported
+  /** Only 2D meshes are supported
+   */
+  constexpr static unsigned int dim = 2;
 
 public:
-  /// Read mesh and fields from plain text file
+  /** Read mesh and fields from plain text file
+   */
   inline void
   read_txt(const std::string &file_name);
 
-  /// Interpolate field to the specified points
+  /** Interpolate field to the specified points
+   */
   inline void
   interpolate(const std::string &            field_name,
               const std::vector<Point<dim>> &target_points,
               const std::vector<bool> &      markers,
               Vector<double> &               target_values) const;
-  /// Same as above, for target points in 3D
+
+  /** Same as above, for target points in 3D
+   */
   inline void
   interpolate(const std::string &                field_name,
               const std::vector<Point<dim + 1>> &target_points,
@@ -233,21 +296,26 @@ public:
               Vector<double> &                   target_values) const;
 
 private:
-  /// Points \c (x,y)
+  /** Points \c (x,y)
+   */
   std::vector<Point<dim>> points;
 
-  /// Fields defined on points
+  /** Fields defined on points
+   */
   std::map<std::string, std::vector<double>> fields;
 
-  /// Get field
+  /** Get field
+   */
   inline const std::vector<double> &
   field(const std::string &field_name) const;
 
-  /// Clear all data
+  /** Clear all data
+   */
   inline void
   clear();
 
-  /// Print mesh and field information
+  /** Print mesh and field information
+   */
   inline void
   info() const;
 };
