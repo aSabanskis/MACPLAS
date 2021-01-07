@@ -699,6 +699,13 @@ DislocationSolver<dim>::output_results() const
       data_out.add_data_vector(stress_deviator.block(i), name);
     }
 
+  const BlockVector<double> &epsilon_c = get_strain_c();
+  for (unsigned int i = 0; i < epsilon_c.n_blocks(); ++i)
+    {
+      const std::string name = "epsilon_c_" + std::to_string(i);
+      data_out.add_data_vector(epsilon_c.block(i), name);
+    }
+
   const Vector<double> &stress_J_2 = get_stress_J_2();
 
   const Vector<double> tau     = tau_eff(N_m, stress_J_2, T);
