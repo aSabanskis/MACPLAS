@@ -821,6 +821,7 @@ DislocationSolver<dim>::output_probes() const
   const double t = get_time();
 
   const BlockVector<double> &s   = get_stress();
+  const BlockVector<double> &S   = get_stress_deviator();
   const BlockVector<double> &e_c = get_strain_c();
 
   if (t == 0)
@@ -867,6 +868,10 @@ DislocationSolver<dim>::output_probes() const
   for (unsigned int i = 0; i < s.n_blocks(); ++i)
     values_s[i] = get_field_at_probes(s.block(i));
 
+  std::vector<std::vector<double>> values_S(S.n_blocks());
+  for (unsigned int i = 0; i < S.n_blocks(); ++i)
+    values_S[i] = get_field_at_probes(S.block(i));
+
   std::vector<std::vector<double>> values_e_c(e_c.n_blocks());
   for (unsigned int i = 0; i < e_c.n_blocks(); ++i)
     values_e_c[i] = get_field_at_probes(e_c.block(i));
@@ -884,7 +889,7 @@ DislocationSolver<dim>::output_probes() const
   std::vector<std::vector<double>> values_dot_e_c(e_c.n_blocks());
   for (unsigned int i = 0; i < e_c.n_blocks(); ++i)
     values_dot_e_c[i] =
-      derivative_strain(values_N_m, values_J_2, values_T, values_s[i]);
+      derivative_strain(values_N_m, values_J_2, values_T, values_S[i]);
 
   // header is already written, append values at the current time step
   std::ofstream output(file_name, std::ios::app);
