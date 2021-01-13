@@ -377,6 +377,11 @@ TemperatureSolver<dim>::TemperatureSolver(const unsigned int order)
                     Patterns::Double(0),
                     "Relaxation factor of preconditioner");
 
+  prm.declare_entry("Log convergence",
+                    "false",
+                    Patterns::Bool(),
+                    "Report convergence of linear solver");
+
   prm.declare_entry("Number of threads",
                     "0",
                     Patterns::Integer(0),
@@ -1043,12 +1048,12 @@ TemperatureSolver<dim>::solve_system()
       const int solver_iterations = prm.get_integer("Linear solver iterations");
       const double solver_tolerance = prm.get_double("Linear solver tolerance");
 
-      const bool log_history = false;
+      const bool log_history = prm.get_bool("Log convergence");
       const bool log_result =
 #ifdef DEBUG
         true
 #else
-        false
+        log_history
 #endif
         ;
 
