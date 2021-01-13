@@ -685,6 +685,13 @@ DislocationSolver<dim>::output_results() const
     D[i] = calc_D(T[i]);
   data_out.add_data_vector(D, "D");
 
+  const BlockVector<double> &displacement = stress_solver.get_displacement();
+  for (unsigned int i = 0; i < displacement.n_blocks(); ++i)
+    {
+      const std::string name = "displacement_" + std::to_string(i);
+      data_out.add_data_vector(displacement.block(i), name);
+    }
+
   const BlockVector<double> &stress = get_stress();
   for (unsigned int i = 0; i < stress.n_blocks(); ++i)
     {

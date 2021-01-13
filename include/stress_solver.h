@@ -73,6 +73,11 @@ public:
   Vector<double> &
   get_temperature();
 
+  /** Get displacement \f$\mathbf{u}\f$, m
+   */
+  const BlockVector<double> &
+  get_displacement() const;
+
   /** Get stress \f$\sigma_{ij}\f$, Pa
    */
   const BlockVector<double> &
@@ -527,6 +532,13 @@ Vector<double> &
 StressSolver<dim>::get_temperature()
 {
   return temperature;
+}
+
+template <int dim>
+const BlockVector<double> &
+StressSolver<dim>::get_displacement() const
+{
+  return displacement;
 }
 
 template <int dim>
