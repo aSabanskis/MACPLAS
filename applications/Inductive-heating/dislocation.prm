@@ -1,0 +1,12 @@
+set Burgers vector              = 3.8e-10
+set Initial dislocation density = 0e6
+set Material constant K         = 3.1e-4
+set Material constant k_0       = 8.6e-4
+set Material constant l         = 1.0
+set Material constant p         = 1.1
+set Max time                    = 1
+set Output precision            = 8
+set Peierls potential           = 2.17
+set Strain hardening factor     = 4.3
+set Time scheme                 = Euler
+set Time step                   = 1

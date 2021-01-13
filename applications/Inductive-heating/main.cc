@@ -2,6 +2,7 @@
 
 #include <fstream>
 
+#include "../../include/dislocation_solver.h"
 #include "../../include/temperature_solver.h"
 #include "../../include/utilities.h"
 
@@ -23,12 +24,14 @@ private:
   void
   initialize();
 
-  TemperatureSolver<dim> solver;
+  TemperatureSolver<dim> temperature_solver;
+  DislocationSolver<dim> dislocation_solver;
 };
 
 template <int dim>
 Problem<dim>::Problem(unsigned int order)
-  : solver(order)
+  : temperature_solver(order)
+  , dislocation_solver(order)
 {}
 
 template <int dim>
@@ -40,40 +43,48 @@ Problem<dim>::run()
 
   while (true)
     {
-      const bool keep_going = solver.solve();
+      const bool keep_going = temperature_solver.solve();
 
       if (!keep_going)
         break;
     };
 
-  solver.output_results();
+  temperature_solver.output_results();
+
+  // initialize dislocations and stresses
+  dislocation_solver.initialize();
+  dislocation_solver.get_temperature() = temperature_solver.get_temperature();
+  dislocation_solver.solve(true);
+  dislocation_solver.output_results();
 }
 
 template <int dim>
 void
 Problem<dim>::make_grid()
 {
-  Triangulation<dim> &triangulation = solver.get_mesh();
+  Triangulation<dim> &triangulation = temperature_solver.get_mesh();
 
   GridIn<dim> gi;
   gi.attach_triangulation(triangulation);
   std::ifstream f("mesh.msh");
   gi.read_msh(f);
+
+  dislocation_solver.get_mesh().copy_triangulation(triangulation);
 }
 
 template <int dim>
 void
 Problem<dim>::initialize()
 {
-  solver.initialize(); // sets T=0
+  temperature_solver.initialize(); // sets T=0
 
-  Vector<double> &temperature = solver.get_temperature();
+  Vector<double> &temperature = temperature_solver.get_temperature();
   temperature.add(1000);
 
   std::vector<Point<dim>> points;
   std::vector<bool>       boundary_dofs;
   unsigned int            boundary_id = 0;
-  solver.get_boundary_points(boundary_id, points, boundary_dofs);
+  temperature_solver.get_boundary_points(boundary_id, points, boundary_dofs);
   Vector<double> q(points.size());
 
   SurfaceInterpolator3D surf;
@@ -92,7 +103,10 @@ Problem<dim>::initialize()
   std::function<double(double)> emissivity       = [](double) { return 0.57; };
   std::function<double(double)> emissivity_deriv = [](double) { return 0.0; };
 
-  solver.set_bc_rad_mixed(boundary_id, q, emissivity, emissivity_deriv);
+  temperature_solver.set_bc_rad_mixed(boundary_id,
+                                      q,
+                                      emissivity,
+                                      emissivity_deriv);
 }
 
 int
