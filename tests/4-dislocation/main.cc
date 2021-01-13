@@ -63,8 +63,6 @@ Problem<dim>::run()
   make_grid();
   initialize();
 
-  solver.output_results();
-
   while (true)
     {
       const double t  = solver.get_time() + solver.get_time_step();
@@ -105,6 +103,10 @@ Problem<dim>::initialize()
 
   solver.get_stress_solver().set_bc1(0, 0, 0.0);
   solver.get_stress_solver().set_bc1(1, 0, 0.0);
+
+  // initialize stresses and output probes at zero time
+  solver.solve(true);
+  solver.output_results();
 }
 
 int

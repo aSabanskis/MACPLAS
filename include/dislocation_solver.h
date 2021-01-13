@@ -38,9 +38,11 @@ public:
 
   /** Calculate the dislocation density and creep strain.
    *  Advance one time step.
+   *
+   * If \c stress_only is enabled, only the stress is calculated.
    */
   bool
-  solve();
+  solve(const double stress_only = false);
 
   /** Get mesh
    */
@@ -468,8 +470,16 @@ DislocationSolver<dim>::DislocationSolver(const unsigned int order)
 
 template <int dim>
 bool
-DislocationSolver<dim>::solve()
+DislocationSolver<dim>::solve(const double stress_only)
 {
+  if (stress_only)
+    {
+      // calculate stresses and nothing more
+      stress_solver.solve();
+      output_probes();
+      return true;
+    }
+
   advance_time();
   const double dt    = get_time_step();
   const double t     = get_time();
@@ -636,10 +646,6 @@ DislocationSolver<dim>::initialize()
 
   dislocation_density.reinit(n_dofs_temp);
   dislocation_density.add(prm.get_double("Initial dislocation density"));
-
-  // first time step: calculate stresses
-  stress_solver.solve();
-  output_probes();
 }
 
 template <int dim>
