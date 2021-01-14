@@ -48,8 +48,15 @@ Problem<dim>::Problem(unsigned int order)
   : temperature_solver(order)
   , dislocation_solver(order)
 {
+  // Physical parameters from https://doi.org/10.1016/j.jcrysgro.2020.125842
+
   prm.declare_entry("Initial temperature",
                     "1000",
+                    Patterns::Double(0),
+                    "Initial temperature in K");
+
+  prm.declare_entry("Max temperature change",
+                    "0.1",
                     Patterns::Double(0),
                     "Initial temperature in K");
 
@@ -64,9 +71,14 @@ Problem<dim>::Problem(unsigned int order)
                     "Reference electrical conductivity (qEM.vtu) in S/m");
 
   prm.declare_entry("Electrical conductivity",
-                    "5e4",
+                    "100*10^(4.247-2924.0/T)",
                     Patterns::Anything(),
                     "Electrical conductivity in S/m");
+
+  prm.declare_entry("Emissivity",
+                    "0.57",
+                    Patterns::Double(0, 1),
+                    "Emissivity (dimensionless)");
 
   try
     {
@@ -119,7 +131,7 @@ Problem<dim>::calculate_temperature(void)
 
       std::cout << "max_dT=" << max_dT << " K\n";
     }
-  while (max_dT > 1);
+  while (max_dT > prm.get_double("Max temperature change"));
 
   temperature_solver.output_results();
 }
@@ -180,9 +192,10 @@ Problem<dim>::apply_q_em(void)
       q[i] *= i2 / std::sqrt(s);
     }
 
-  // Physical parameters from https://doi.org/10.1016/j.jcrysgro.2020.125842
-  std::function<double(double)> emissivity       = [](double) { return 0.57; };
-  std::function<double(double)> emissivity_deriv = [](double) { return 0.0; };
+  const double e = prm.get_double("Emissivity");
+
+  std::function<double(double)> emissivity       = [=](double) { return e; };
+  std::function<double(double)> emissivity_deriv = [=](double) { return 0.0; };
 
   temperature_solver.set_bc_rad_mixed(boundary_id,
                                       q,
