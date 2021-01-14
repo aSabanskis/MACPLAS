@@ -1,0 +1,4 @@
+set Electrical conductivity           = 100*10^(4.247-2924.0/T)
+set Inductor current                  = 66
+set Initial temperature               = 1000
+set Reference electrical conductivity = 5e4
