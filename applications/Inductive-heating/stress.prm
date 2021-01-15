@@ -9,4 +9,5 @@ set Preconditioner type           = jacobi
 set Reference temperature         = 1685
 set Thermal expansion coefficient = 4.4e-6
 set Young's modulus               = 1.25e11
-set Log convergence               = false
+set Log convergence full          = false
+set Log convergence final         = true

@@ -436,10 +436,15 @@ StressSolver<dim>::StressSolver(const unsigned int order)
                     Patterns::Double(0),
                     "Relaxation factor of preconditioner");
 
-  prm.declare_entry("Log convergence",
+  prm.declare_entry("Log convergence full",
                     "false",
                     Patterns::Bool(),
-                    "Report convergence of linear solver");
+                    "Report convergence progress of linear solver");
+
+  prm.declare_entry("Log convergence final",
+                    "true",
+                    Patterns::Bool(),
+                    "Report final achieved convergence of linear solver");
 
   prm.declare_entry("Number of threads",
                     "0",
@@ -970,14 +975,8 @@ StressSolver<dim>::solve_system()
       const int solver_iterations = prm.get_integer("Linear solver iterations");
       const double solver_tolerance = prm.get_double("Linear solver tolerance");
 
-      const bool log_history = prm.get_bool("Log convergence");
-      const bool log_result =
-#ifdef DEBUG
-        true
-#else
-        log_history
-#endif
-        ;
+      const bool log_history = prm.get_bool("Log convergence full");
+      const bool log_result  = prm.get_bool("Log convergence final");
 
       IterationNumberControl control(solver_iterations,
                                      solver_tolerance,
