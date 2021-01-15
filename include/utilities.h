@@ -39,6 +39,14 @@ format_time(const double x);
 inline std::string
 format_time(const Timer &timer);
 
+/** Save data (\c Vector, \c BlockVector) to disk.
+ *
+ * Internally calls \c block_write
+ */
+template <typename T>
+inline void
+write_data(const T &data, const std::string &file_name);
+
 /** Get point on a line segment which is closest to the given point \f$p\f$
  */
 template <int dim>
@@ -348,6 +356,22 @@ std::string
 format_time(const Timer &timer)
 {
   return format_time(timer.wall_time());
+}
+
+template <typename T>
+void
+write_data(const T &data, const std::string &file_name)
+{
+  try
+    {
+      std::cout << "Saving to '" << file_name << "'\n";
+      std::ofstream f(file_name);
+      data.block_write(f);
+    }
+  catch (std::exception &e)
+    {
+      std::cout << e.what() << "\n";
+    }
 }
 
 template <int dim>

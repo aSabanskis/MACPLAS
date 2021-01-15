@@ -44,6 +44,7 @@ latex
 *.pvsm
 *.txt
 *.dat
+*[1-3]d-order*
 *.[ct]sv
 *.zip
 *.png

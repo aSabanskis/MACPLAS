@@ -155,6 +155,11 @@ public:
   void
   add_probe(const Point<dim> &p);
 
+  /** Save raw results to disk
+   */
+  void
+  output_data() const;
+
   /** Save results to disk as .vtk
    */
   void
@@ -629,6 +634,23 @@ void
 TemperatureSolver<dim>::add_probe(const Point<dim> &p)
 {
   probes.push_back(p);
+}
+
+template <int dim>
+void
+TemperatureSolver<dim>::output_data() const
+{
+  Timer timer;
+
+  const double t = get_time();
+
+  std::stringstream ss;
+  ss << "-" << dim << "d-order" << fe.degree << "-t" << t;
+  const std::string s = ss.str();
+
+  write_data(get_temperature(), "temperature" + s);
+
+  std::cout << " " << format_time(timer) << "\n";
 }
 
 template <int dim>

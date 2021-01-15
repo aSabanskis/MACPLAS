@@ -127,6 +127,11 @@ public:
           const unsigned int component,
           const double       val);
 
+  /** Save raw results to disk
+   */
+  void
+  output_data() const;
+
   /** Save results to disk as .vtk
    */
   void
@@ -628,6 +633,26 @@ const DoFHandler<dim> &
 StressSolver<dim>::get_dof_handler() const
 {
   return dh_temp;
+}
+
+template <int dim>
+void
+StressSolver<dim>::output_data() const
+{
+  Timer timer;
+
+  std::stringstream ss;
+  ss << "-" << dim << "d-order" << fe.degree;
+  const std::string s = ss.str();
+
+  write_data(get_temperature(), "temperature" + s);
+  write_data(get_displacement(), "displacement" + s);
+  write_data(get_stress(), "stress" + s);
+  write_data(get_stress_deviator(), "stress_deviator" + s);
+  write_data(get_stress_J_2(), "stress_J_2" + s);
+  write_data(get_strain_c(), "strain_c" + s);
+
+  std::cout << " " << format_time(timer) << "\n";
 }
 
 template <int dim>

@@ -74,6 +74,12 @@ public:
   Vector<double> &
   get_dislocation_density();
 
+  /** Get displacement \f$\mathbf{u}\f$, m.
+   * Calls \c StressSolver::get_displacement
+   */
+  const BlockVector<double> &
+  get_displacement() const;
+
   /** Get stress \f$\sigma_{ij}\f$, Pa.
    * Calls \c StressSolver::get_stress
    */
@@ -146,6 +152,11 @@ public:
    */
   void
   add_probe(const Point<dim> &p);
+
+  /** Save raw results to disk
+   */
+  void
+  output_data() const;
 
   /** Save results to disk as .vtk
    */
@@ -554,6 +565,13 @@ DislocationSolver<dim>::get_dislocation_density()
 
 template <int dim>
 const BlockVector<double> &
+DislocationSolver<dim>::get_displacement() const
+{
+  return stress_solver.get_displacement();
+}
+
+template <int dim>
+const BlockVector<double> &
 DislocationSolver<dim>::get_stress() const
 {
   return stress_solver.get_stress();
@@ -657,6 +675,32 @@ DislocationSolver<dim>::add_probe(const Point<dim> &p)
 
 template <int dim>
 void
+DislocationSolver<dim>::output_data() const
+{
+  Timer timer;
+
+  const double t = get_time();
+
+  const DoFHandler<dim> &   dh = get_dof_handler();
+  const FiniteElement<dim> &fe = dh.get_fe();
+
+  std::stringstream ss;
+  ss << "-" << dim << "d-order" << fe.degree << "-t" << t;
+  const std::string s = ss.str();
+
+  write_data(get_temperature(), "temperature" + s);
+  write_data(get_dislocation_density(), "dislocation_density" + s);
+  write_data(get_displacement(), "displacement" + s);
+  write_data(get_stress(), "stress" + s);
+  write_data(get_stress_deviator(), "stress_deviator" + s);
+  write_data(get_stress_J_2(), "stress_J_2" + s);
+  write_data(get_strain_c(), "strain_c" + s);
+
+  std::cout << " " << format_time(timer) << "\n";
+}
+
+template <int dim>
+void
 DislocationSolver<dim>::output_vtk() const
 {
   Timer timer;
@@ -691,7 +735,7 @@ DislocationSolver<dim>::output_vtk() const
     D[i] = calc_D(T[i]);
   data_out.add_data_vector(D, "D");
 
-  const BlockVector<double> &displacement = stress_solver.get_displacement();
+  const BlockVector<double> &displacement = get_displacement();
   for (unsigned int i = 0; i < displacement.n_blocks(); ++i)
     {
       const std::string name = "displacement_" + std::to_string(i);

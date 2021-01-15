@@ -110,6 +110,7 @@ Problem<dim>::run()
   dislocation_solver.initialize();
   dislocation_solver.get_temperature() = temperature_solver.get_temperature();
   dislocation_solver.solve(true);
+  dislocation_solver.output_data();
   dislocation_solver.output_vtk();
 }
 
@@ -133,6 +134,7 @@ Problem<dim>::calculate_temperature(void)
     }
   while (max_dT > prm.get_double("Max temperature change"));
 
+  temperature_solver.output_data();
   temperature_solver.output_vtk();
 }
 
