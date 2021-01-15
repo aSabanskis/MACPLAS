@@ -19,7 +19,7 @@
 *.exe
 *.out*
 *.app
-macplas-test-*
+macplas-*
 
 # Temporary files and directories
 *.dir
@@ -36,6 +36,7 @@ results
 html
 latex
 *.pdf
+*.gnu
 
 # Data files
 *.vt[uk]
@@ -49,7 +50,7 @@ latex
 *.mp4
 
 # Parameter files
-*-default.prm
+*.prm
 
 # Allow some ignored files
 !CMakeLists.txt
