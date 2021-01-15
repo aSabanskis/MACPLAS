@@ -711,7 +711,8 @@ DislocationSolver<dim>::output_vtk() const
   const FiniteElement<dim> &fe = dh.get_fe();
 
   std::stringstream ss;
-  ss << "result-" << dim << "d-order" << fe.degree << "-t" << t << ".vtk";
+  ss << "result-dislocation-" << dim << "d-order" << fe.degree << "-t" << t
+     << ".vtk";
   const std::string file_name = ss.str();
   std::cout << "Saving to '" << file_name << "'";
 
@@ -868,7 +869,7 @@ DislocationSolver<dim>::output_probes() const
   Timer timer;
 
   std::stringstream ss;
-  ss << "probes-" << dim << "d.txt";
+  ss << "probes-dislocation-" << dim << "d.txt";
   const std::string file_name = ss.str();
 
   std::cout << "Saving values at probe points to '" << file_name << "'";

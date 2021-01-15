@@ -667,7 +667,7 @@ StressSolver<dim>::output_vtk() const
   Timer timer;
 
   std::stringstream ss;
-  ss << "result-" << dim << "d-order" << fe.degree << ".vtk";
+  ss << "result-stress-" << dim << "d-order" << fe.degree << ".vtk";
   const std::string file_name = ss.str();
   std::cout << "Saving to '" << file_name << "'";
 

@@ -667,7 +667,8 @@ TemperatureSolver<dim>::output_vtk() const
   const double t = get_time();
 
   std::stringstream ss;
-  ss << "result-" << dim << "d-order" << fe.degree << "-t" << t << ".vtk";
+  ss << "result-temperature-" << dim << "d-order" << fe.degree << "-t" << t
+     << ".vtk";
   const std::string file_name = ss.str();
   std::cout << "Saving to '" << file_name << "'";
 
@@ -753,7 +754,7 @@ TemperatureSolver<dim>::output_probes() const
   Timer timer;
 
   std::stringstream ss;
-  ss << "probes-" << dim << "d.txt";
+  ss << "probes-temperature-" << dim << "d.txt";
   const std::string file_name = ss.str();
 
   std::cout << "Saving values at probe points to '" << file_name << "'";
