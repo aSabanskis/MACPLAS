@@ -147,10 +147,10 @@ public:
   void
   add_probe(const Point<dim> &p);
 
-  /** Save results to disk
+  /** Save results to disk as .vtk
    */
   void
-  output_results() const;
+  output_vtk() const;
 
   /** Save mesh to disk
    */
@@ -657,7 +657,7 @@ DislocationSolver<dim>::add_probe(const Point<dim> &p)
 
 template <int dim>
 void
-DislocationSolver<dim>::output_results() const
+DislocationSolver<dim>::output_vtk() const
 {
   Timer timer;
 

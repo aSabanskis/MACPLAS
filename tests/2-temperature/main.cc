@@ -38,11 +38,12 @@ Problem<dim>::run()
   while (true)
     {
       const bool keep_going = solver.solve();
-      // solver.output_results();
 
       if (!keep_going)
         break;
     };
+
+  solver.output_vtk();
 }
 
 template <int dim>

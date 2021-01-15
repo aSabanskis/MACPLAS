@@ -127,10 +127,10 @@ public:
           const unsigned int component,
           const double       val);
 
-  /** Save results to disk
+  /** Save results to disk as .vtk
    */
   void
-  output_results() const;
+  output_vtk() const;
 
   /** Save mesh to disk
    */
@@ -632,7 +632,7 @@ StressSolver<dim>::get_dof_handler() const
 
 template <int dim>
 void
-StressSolver<dim>::output_results() const
+StressSolver<dim>::output_vtk() const
 {
   Timer timer;
 

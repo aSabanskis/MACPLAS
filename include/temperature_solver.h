@@ -155,10 +155,10 @@ public:
   void
   add_probe(const Point<dim> &p);
 
-  /** Save results to disk
+  /** Save results to disk as .vtk
    */
   void
-  output_results() const;
+  output_vtk() const;
 
   /** Save mesh to disk
    */
@@ -633,7 +633,7 @@ TemperatureSolver<dim>::add_probe(const Point<dim> &p)
 
 template <int dim>
 void
-TemperatureSolver<dim>::output_results() const
+TemperatureSolver<dim>::output_vtk() const
 {
   Timer timer;
 

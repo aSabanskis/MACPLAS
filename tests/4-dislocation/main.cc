@@ -75,7 +75,7 @@ Problem<dim>::run()
         break;
     };
 
-  solver.output_results();
+  solver.output_vtk();
 }
 
 template <int dim>
@@ -106,7 +106,7 @@ Problem<dim>::initialize()
 
   // initialize stresses and output probes at zero time
   solver.solve(true);
-  solver.output_results();
+  solver.output_vtk();
 }
 
 int

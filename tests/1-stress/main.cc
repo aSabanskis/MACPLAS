@@ -49,7 +49,7 @@ Problem<dim>::run()
   initialize();
 
   solver.solve();
-  solver.output_results();
+  solver.output_vtk();
 
   // write results on x axis
   std::stringstream ss;

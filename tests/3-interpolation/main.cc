@@ -40,7 +40,7 @@ Problem<dim>::run()
   make_grid();
   initialize();
   // do not calculate
-  solver.output_results();
+  solver.output_vtk();
 }
 
 template <int dim>
