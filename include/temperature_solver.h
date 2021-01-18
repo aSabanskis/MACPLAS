@@ -301,6 +301,10 @@ private:
    */
   std::vector<Point<dim>> probes;
 
+  /** Flag for writing header of the probes file
+   */
+  bool probes_header_written;
+
 
   /**  Parameter handler
    */
@@ -323,6 +327,7 @@ template <int dim>
 TemperatureSolver<dim>::TemperatureSolver(const unsigned int order)
   : fe(order)
   , dh(triangulation)
+  , probes_header_written(false)
   , current_time(0)
   , current_time_step(0)
 {
@@ -475,8 +480,12 @@ template <int dim>
 bool
 TemperatureSolver<dim>::solve()
 {
-  if (get_time() == 0)
-    output_probes();
+  if (!probes_header_written)
+    {
+      output_probes();
+      // set here to keep const-ness of output_probes
+      probes_header_written = true;
+    }
 
   advance_time();
   const double dt    = get_time_step();
@@ -761,7 +770,7 @@ TemperatureSolver<dim>::output_probes() const
 
   const double t = get_time();
 
-  if (t == 0)
+  if (!probes_header_written)
     {
       // write header at the first time step
       std::ofstream output(file_name);

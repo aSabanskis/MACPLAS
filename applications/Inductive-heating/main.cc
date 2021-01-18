@@ -176,6 +176,10 @@ Problem<dim>::initialize()
 
   // normalize for future use
   q0 *= 1e-6 * std::sqrt(prm.get_double("Reference electrical conductivity"));
+
+  Point<dim> p;
+  p[dim - 1] = 0.267;
+  temperature_solver.add_probe(p);
 }
 
 template <int dim>
