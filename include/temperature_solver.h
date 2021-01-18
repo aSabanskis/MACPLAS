@@ -442,8 +442,6 @@ TemperatureSolver<dim>::initialize_parameters()
 {
   std::cout << "Intializing parameters";
 
-  deallog.depth_console(2);
-
   // no built-in function exists, parse manually
   std::string              lambda_raw = prm.get("Thermal conductivity");
   std::vector<std::string> lambda_split =

@@ -477,8 +477,6 @@ StressSolver<dim>::initialize_parameters()
 {
   std::cout << "Intializing parameters";
 
-  deallog.depth_console(2);
-
   const std::string m_E_expression = prm.get("Young's modulus");
   m_E.initialize("T", m_E_expression, typename FunctionParser<1>::ConstMap());
 

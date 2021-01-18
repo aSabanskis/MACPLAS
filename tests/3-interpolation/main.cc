@@ -117,6 +117,9 @@ Problem<dim>::initialize()
 int
 main()
 {
+  deallog.attach(std::cout);
+  deallog.depth_console(2);
+
   Problem<3> p3d(2);
   p3d.run();
 
