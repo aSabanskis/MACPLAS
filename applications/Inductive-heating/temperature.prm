@@ -1,6 +1,6 @@
 set Density                   = 2329
-set Linear solver iterations  = 1000
-set Linear solver tolerance   = 1e-8
+set Linear solver iterations  = 200
+set Linear solver tolerance   = 1e-7
 set Linear solver type        = minres
 set Max Newton iterations     = 1
 set Max absolute change       = 1e-1
