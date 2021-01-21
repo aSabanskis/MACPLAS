@@ -741,6 +741,7 @@ TemperatureSolver<dim>::output_mesh() const
   std::cout << "Saving to '" << file_name << "'";
 
   std::ofstream output(file_name);
+  output << std::setprecision(16);
 
   GridOut grid_out;
   grid_out.set_flags(GridOutFlags::Msh(true));
