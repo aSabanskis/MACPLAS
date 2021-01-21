@@ -80,6 +80,12 @@ public:
   const BlockVector<double> &
   get_displacement() const;
 
+  /** Get displacement \f$\mathbf{u}\f$, m.
+   * Calls \c StressSolver::get_displacement
+   */
+  BlockVector<double> &
+  get_displacement();
+
   /** Get stress \f$\sigma_{ij}\f$, Pa.
    * Calls \c StressSolver::get_stress
    */
@@ -152,6 +158,11 @@ public:
    */
   void
   add_probe(const Point<dim> &p);
+
+  /** Read raw results from disk
+   */
+  void
+  load_data();
 
   /** Save raw results to disk
    */
@@ -578,6 +589,13 @@ DislocationSolver<dim>::get_displacement() const
 }
 
 template <int dim>
+BlockVector<double> &
+DislocationSolver<dim>::get_displacement()
+{
+  return stress_solver.get_displacement();
+}
+
+template <int dim>
 const BlockVector<double> &
 DislocationSolver<dim>::get_stress() const
 {
@@ -678,6 +696,23 @@ void
 DislocationSolver<dim>::add_probe(const Point<dim> &p)
 {
   probes.push_back(p);
+}
+
+template <int dim>
+void
+DislocationSolver<dim>::load_data()
+{
+  Timer timer;
+
+  const std::string s = output_name_suffix();
+
+  read_data(get_temperature(), "temperature" + s);
+  read_data(get_dislocation_density(), "dislocation_density" + s);
+  read_data(get_displacement(), "displacement" + s);
+  read_data(get_strain_c(), "strain_c" + s);
+  // skip calculated quantities (stresses)
+
+  std::cout << " " << format_time(timer) << "\n";
 }
 
 template <int dim>

@@ -155,6 +155,11 @@ public:
   void
   add_probe(const Point<dim> &p);
 
+  /** Read raw results from disk
+   */
+  void
+  load_data();
+
   /** Save raw results to disk
    */
   void
@@ -653,6 +658,17 @@ void
 TemperatureSolver<dim>::add_probe(const Point<dim> &p)
 {
   probes.push_back(p);
+}
+
+template <int dim>
+void
+TemperatureSolver<dim>::load_data()
+{
+  Timer timer;
+
+  read_data(get_temperature(), "temperature" + output_name_suffix());
+
+  std::cout << " " << format_time(timer) << "\n";
 }
 
 template <int dim>

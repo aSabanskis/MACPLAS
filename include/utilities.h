@@ -47,6 +47,14 @@ template <typename T>
 inline void
 write_data(const T &data, const std::string &file_name);
 
+/** Load data (\c Vector, \c BlockVector) from disk.
+ *
+ * Internally calls \c block_read
+ */
+template <typename T>
+inline void
+read_data(T &data, const std::string &file_name);
+
 /** Get point on a line segment which is closest to the given point \f$p\f$
  */
 template <int dim>
@@ -367,6 +375,22 @@ write_data(const T &data, const std::string &file_name)
       std::cout << "Saving to '" << file_name << "'\n";
       std::ofstream f(file_name);
       data.block_write(f);
+    }
+  catch (std::exception &e)
+    {
+      std::cout << e.what() << "\n";
+    }
+}
+
+template <typename T>
+void
+read_data(T &data, const std::string &file_name)
+{
+  try
+    {
+      std::cout << "Reading from '" << file_name << "'\n";
+      std::ifstream f(file_name);
+      data.block_read(f);
     }
   catch (std::exception &e)
     {

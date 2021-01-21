@@ -30,6 +30,9 @@ private:
   void
   calculate_temperature(void);
 
+  void
+  calculate_dislocation(void);
+
   TemperatureSolver<dim> temperature_solver;
   DislocationSolver<dim> dislocation_solver;
 
@@ -80,6 +83,11 @@ Problem<dim>::Problem(unsigned int order)
                     Patterns::Double(0, 1),
                     "Emissivity (dimensionless)");
 
+  prm.declare_entry("Load saved results",
+                    "false",
+                    Patterns::Bool(),
+                    "Skip calculation of temperature and stress fields");
+
   try
     {
       prm.parse_input("problem.prm");
@@ -104,24 +112,21 @@ Problem<dim>::run()
   make_grid();
   initialize();
 
-  temperature_solver.output_mesh();
-
   calculate_temperature();
-
-  // initialize dislocations and stresses
-  dislocation_solver.initialize();
-  dislocation_solver.get_temperature() = temperature_solver.get_temperature();
-  dislocation_solver.solve(true);
-  dislocation_solver.output_data();
-  dislocation_solver.output_vtk();
+  calculate_dislocation();
 }
 
 template <int dim>
 void
 Problem<dim>::calculate_temperature(void)
 {
-  double max_dT;
+  if (prm.get_bool("Load saved results"))
+    {
+      temperature_solver.load_data();
+      return;
+    }
 
+  double max_dT;
   do
     {
       Vector<double> temperature = temperature_solver.get_temperature();
@@ -138,6 +143,38 @@ Problem<dim>::calculate_temperature(void)
 
   temperature_solver.output_data();
   temperature_solver.output_vtk();
+}
+
+template <int dim>
+void
+Problem<dim>::calculate_dislocation(void)
+{
+  // initialize dislocations and stresses
+  dislocation_solver.initialize();
+  dislocation_solver.get_temperature() = temperature_solver.get_temperature();
+
+  if (prm.get_bool("Load saved results"))
+    {
+      dislocation_solver.load_data();
+    }
+  else
+    {
+      dislocation_solver.output_data();
+      dislocation_solver.output_vtk();
+    }
+
+  dislocation_solver.solve(true);
+
+  while (true)
+    {
+      const bool keep_going = dislocation_solver.solve();
+
+      if (!keep_going)
+        break;
+    };
+
+  dislocation_solver.output_data();
+  dislocation_solver.output_vtk();
 }
 
 template <int dim>
@@ -160,6 +197,18 @@ Problem<dim>::initialize()
 {
   temperature_solver.initialize(); // sets T=0
 
+  temperature_solver.output_mesh();
+
+  Point<dim> p;
+  p[dim - 1] = 0.267;
+  temperature_solver.add_probe(p);
+  dislocation_solver.add_probe(p);
+
+  if (prm.get_bool("Load saved results"))
+    {
+      return;
+    }
+
   Vector<double> &temperature = temperature_solver.get_temperature();
   temperature.add(prm.get_double("Initial temperature"));
 
@@ -178,10 +227,6 @@ Problem<dim>::initialize()
 
   // normalize for future use
   q0 *= 1e-6 * std::sqrt(prm.get_double("Reference electrical conductivity"));
-
-  Point<dim> p;
-  p[dim - 1] = 0.267;
-  temperature_solver.add_probe(p);
 }
 
 template <int dim>

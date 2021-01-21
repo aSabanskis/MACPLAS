@@ -78,6 +78,11 @@ public:
   const BlockVector<double> &
   get_displacement() const;
 
+  /** Get displacement \f$\mathbf{u}\f$, m
+   */
+  BlockVector<double> &
+  get_displacement();
+
   /** Get stress \f$\sigma_{ij}\f$, Pa
    */
   const BlockVector<double> &
@@ -126,6 +131,11 @@ public:
   set_bc1(const unsigned int id,
           const unsigned int component,
           const double       val);
+
+  /** Read raw results from disk
+   */
+  void
+  load_data();
 
   /** Save raw results to disk
    */
@@ -557,6 +567,13 @@ StressSolver<dim>::get_displacement() const
 }
 
 template <int dim>
+BlockVector<double> &
+StressSolver<dim>::get_displacement()
+{
+  return displacement;
+}
+
+template <int dim>
 const BlockVector<double> &
 StressSolver<dim>::get_stress() const
 {
@@ -643,6 +660,22 @@ const DoFHandler<dim> &
 StressSolver<dim>::get_dof_handler() const
 {
   return dh_temp;
+}
+
+template <int dim>
+void
+StressSolver<dim>::load_data()
+{
+  Timer timer;
+
+  const std::string s = output_name_suffix();
+
+  read_data(get_temperature(), "temperature" + s);
+  read_data(get_displacement(), "displacement" + s);
+  read_data(get_strain_c(), "strain_c" + s);
+  // skip calculated quantities (stresses)
+
+  std::cout << " " << format_time(timer) << "\n";
 }
 
 template <int dim>
