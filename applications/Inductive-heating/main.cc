@@ -104,6 +104,8 @@ Problem<dim>::run()
   make_grid();
   initialize();
 
+  temperature_solver.output_mesh();
+
   calculate_temperature();
 
   // initialize dislocations and stresses

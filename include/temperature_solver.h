@@ -245,6 +245,13 @@ private:
   void
   output_probes() const;
 
+  /** Helper method for creating output file name
+   *
+   * @returns \c "-<dim>d-order<order>-t<time>"
+   */
+  std::string
+  output_name_suffix() const;
+
   /** Mesh
    */
   Triangulation<dim> triangulation;
@@ -654,13 +661,7 @@ TemperatureSolver<dim>::output_data() const
 {
   Timer timer;
 
-  const double t = get_time();
-
-  std::stringstream ss;
-  ss << "-" << dim << "d-order" << fe.degree << "-t" << t;
-  const std::string s = ss.str();
-
-  write_data(get_temperature(), "temperature" + s);
+  write_data(get_temperature(), "temperature" + output_name_suffix());
 
   std::cout << " " << format_time(timer) << "\n";
 }
@@ -671,12 +672,8 @@ TemperatureSolver<dim>::output_vtk() const
 {
   Timer timer;
 
-  const double t = get_time();
-
-  std::stringstream ss;
-  ss << "result-temperature-" << dim << "d-order" << fe.degree << "-t" << t
-     << ".vtk";
-  const std::string file_name = ss.str();
+  const std::string file_name =
+    "result-temperature" + output_name_suffix() + ".vtk";
   std::cout << "Saving to '" << file_name << "'";
 
   DataOut<dim> data_out;
@@ -740,9 +737,7 @@ TemperatureSolver<dim>::output_mesh() const
 {
   Timer timer;
 
-  std::stringstream ss;
-  ss << "mesh-" << dim << "d-order" << fe.degree << ".msh";
-  const std::string file_name = ss.str();
+  const std::string file_name = "mesh" + output_name_suffix() + ".msh";
   std::cout << "Saving to '" << file_name << "'";
 
   std::ofstream output(file_name);
@@ -752,6 +747,15 @@ TemperatureSolver<dim>::output_mesh() const
   grid_out.write_msh(triangulation, output);
 
   std::cout << " " << format_time(timer) << "\n";
+}
+
+template <int dim>
+std::string
+TemperatureSolver<dim>::output_name_suffix() const
+{
+  std::stringstream ss;
+  ss << "-" << dim << "d-order" << fe.degree << "-t" << get_time();
+  return ss.str();
 }
 
 template <int dim>

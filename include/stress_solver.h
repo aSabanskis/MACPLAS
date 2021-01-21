@@ -274,6 +274,13 @@ private:
              const std::vector<Tensor<1, dim>> &grad_displacement,
              Tensor<1, n_components> &          strain) const;
 
+  /** Helper method for creating output file name
+   *
+   * @returns \c "-<dim>d-order<order>"
+   */
+  std::string
+  output_name_suffix() const;
+
   /** Mesh
    */
   Triangulation<dim> triangulation;
@@ -644,9 +651,7 @@ StressSolver<dim>::output_data() const
 {
   Timer timer;
 
-  std::stringstream ss;
-  ss << "-" << dim << "d-order" << fe.degree;
-  const std::string s = ss.str();
+  const std::string s = output_name_suffix();
 
   write_data(get_temperature(), "temperature" + s);
   write_data(get_displacement(), "displacement" + s);
@@ -664,9 +669,7 @@ StressSolver<dim>::output_vtk() const
 {
   Timer timer;
 
-  std::stringstream ss;
-  ss << "result-stress-" << dim << "d-order" << fe.degree << ".vtk";
-  const std::string file_name = ss.str();
+  const std::string file_name = "result-stress" + output_name_suffix() + ".vtk";
   std::cout << "Saving to '" << file_name << "'";
 
   DataOut<dim> data_out;
@@ -738,9 +741,7 @@ StressSolver<dim>::output_mesh() const
 {
   Timer timer;
 
-  std::stringstream ss;
-  ss << "mesh-" << dim << "d-order" << fe.degree << ".msh";
-  const std::string file_name = ss.str();
+  const std::string file_name = "mesh" + output_name_suffix() + ".msh";
   std::cout << "Saving to '" << file_name << "'";
 
   std::ofstream output(file_name);
@@ -1287,6 +1288,15 @@ StressSolver<dim>::get_strain(
       strain[4] = grad_displacement[2][0] + grad_displacement[0][2];
       strain[5] = grad_displacement[1][0] + grad_displacement[0][1];
     }
+}
+
+template <int dim>
+std::string
+StressSolver<dim>::output_name_suffix() const
+{
+  std::stringstream ss;
+  ss << "-" << dim << "d-order" << fe.degree;
+  return ss.str();
 }
 
 #endif
