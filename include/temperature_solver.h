@@ -789,7 +789,8 @@ TemperatureSolver<dim>::output_probes() const
 
   const unsigned int N = probes.size();
 
-  const double t = get_time();
+  const double t  = get_time();
+  const double dt = get_time_step();
 
   if (!probes_header_written)
     {
@@ -800,6 +801,7 @@ TemperatureSolver<dim>::output_probes() const
         output << "# probe " << i << ":\t" << probes[i] << "\n";
 
       output << "t[s]"
+             << "\tdt[s]"
              << "\tT_min[K]"
              << "\tT_max[K]";
       for (unsigned int i = 0; i < N; ++i)
@@ -820,7 +822,7 @@ TemperatureSolver<dim>::output_probes() const
   const int precision = prm.get_integer("Output precision");
   output << std::setprecision(precision);
 
-  output << t << '\t' << limits.first << '\t' << limits.second;
+  output << t << '\t' << dt << '\t' << limits.first << '\t' << limits.second;
   for (const auto &v : values)
     output << '\t' << v;
   output << "\n";

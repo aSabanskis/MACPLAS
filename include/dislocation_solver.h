@@ -999,7 +999,8 @@ DislocationSolver<dim>::output_probes() const
 
   const unsigned int N = probes.size();
 
-  const double t = get_time();
+  const double t  = get_time();
+  const double dt = get_time_step();
 
   const BlockVector<double> &s   = get_stress();
   const BlockVector<double> &S   = get_stress_deviator();
@@ -1014,6 +1015,7 @@ DislocationSolver<dim>::output_probes() const
         output << "# probe " << i << ":\t" << probes[i] << "\n";
 
       output << "t[s]"
+             << "\tdt[s]"
              << "\tT_min[K]"
              << "\tT_max[K]"
              << "\tN_m_min[m^-2]"
@@ -1111,7 +1113,7 @@ DislocationSolver<dim>::output_probes() const
   const auto limits_tau     = minmax(tau_eff(N_m, J_2, T));
   const auto limits_J_2     = minmax(J_2);
 
-  output << t;
+  output << t << '\t' << dt;
   output << '\t' << limits_T.first << '\t' << limits_T.second;
   output << '\t' << limits_N_m.first << '\t' << limits_N_m.second;
   output << '\t' << limits_dot_N_m.first << '\t' << limits_dot_N_m.second;
