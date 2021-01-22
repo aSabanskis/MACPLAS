@@ -16,5 +16,5 @@ set key opaque box reverse Left width 1
 set output 'result-probes.pdf'
 
 p \
-for [i=0:5] f u 1:(column(i+2)) w l ti 'T_'.i,\
+for [i=0:5] f u 1:'T_'.i.'[K]' w l ti 'T_'.i,\
 for [i=1:5] T_1d(0.1*i, x) w l lt -1 dt 2 noti

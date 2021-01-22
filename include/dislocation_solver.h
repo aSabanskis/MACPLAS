@@ -1013,7 +1013,26 @@ DislocationSolver<dim>::output_probes() const
       for (unsigned int i = 0; i < N; ++i)
         output << "# probe " << i << ":\t" << probes[i] << "\n";
 
-      output << "t[s]";
+      output << "t[s]"
+             << "\tT_min[K]"
+             << "\tT_max[K]"
+             << "\tN_m_min[m^-2]"
+             << "\tN_m_max[m^-2]"
+             << "\tdot_N_m_min[m^-2s^-1]"
+             << "\tdot_N_m_max[m^-2s^-1]"
+             << "\tv_min[ms^-1]"
+             << "\tv_max[ms^-1]"
+             << "\tstress_min[Pa]"
+             << "\tstress_max[Pa]"
+             << "\tstrain_c_min[-]"
+             << "\tstrain_c_max[-]"
+             << "\tdot_strain_c_min[s^-1]"
+             << "\tdot_strain_c_max[s^-1]"
+             << "\ttau_eff_min[Pa]"
+             << "\ttau_eff_max[Pa]"
+             << "\tJ_2_min[Pa^2]"
+             << "\tJ_2_max[Pa^2]";
+
       for (unsigned int i = 0; i < N; ++i)
         {
           output << "\tT_" << i << "[K]"
@@ -1072,13 +1091,37 @@ DislocationSolver<dim>::output_probes() const
     values_dot_e_c[i] =
       derivative_strain(values_N_m, values_J_2, values_T, values_S[i]);
 
+  BlockVector<double> dot_e_c(e_c.n_blocks());
+  for (unsigned int i = 0; i < e_c.n_blocks(); ++i)
+    dot_e_c.block(i) = derivative_strain(N_m, J_2, T, S.block(i));
+
   // header is already written, append values at the current time step
   std::ofstream output(file_name, std::ios::app);
 
   const int precision = prm.get_integer("Output precision");
   output << std::setprecision(precision);
 
+  const auto limits_T       = minmax(T);
+  const auto limits_N_m     = minmax(N_m);
+  const auto limits_dot_N_m = minmax(derivative_N_m(N_m, J_2, T));
+  const auto limits_v       = minmax(dislocation_velocity(N_m, J_2, T));
+  const auto limits_s       = minmax(s);
+  const auto limits_e_c     = minmax(e_c);
+  const auto limits_dot_e_c = minmax(dot_e_c);
+  const auto limits_tau     = minmax(tau_eff(N_m, J_2, T));
+  const auto limits_J_2     = minmax(J_2);
+
   output << t;
+  output << '\t' << limits_T.first << '\t' << limits_T.second;
+  output << '\t' << limits_N_m.first << '\t' << limits_N_m.second;
+  output << '\t' << limits_dot_N_m.first << '\t' << limits_dot_N_m.second;
+  output << '\t' << limits_v.first << '\t' << limits_v.second;
+  output << '\t' << limits_s.first << '\t' << limits_s.second;
+  output << '\t' << limits_e_c.first << '\t' << limits_e_c.second;
+  output << '\t' << limits_dot_e_c.first << '\t' << limits_dot_e_c.second;
+  output << '\t' << limits_tau.first << '\t' << limits_tau.second;
+  output << '\t' << limits_J_2.first << '\t' << limits_J_2.second;
+
   for (unsigned int i = 0; i < N; ++i)
     {
       output << '\t' << values_T[i] << '\t' << values_N_m[i] << '\t'

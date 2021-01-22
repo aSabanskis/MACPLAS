@@ -24,6 +24,18 @@ using namespace dealii;
 inline double
 sqr(const double x);
 
+/** Just like \c std::minmax, for \c Vector argument
+ */
+template <class T>
+inline std::pair<T, T>
+minmax(const Vector<T> &x);
+
+/** Just like \c std::minmax, for \c BlockVector argument
+ */
+template <class T>
+inline std::pair<T, T>
+minmax(const BlockVector<T> &x);
+
 /** Integrate analytically \f$\dot{x} = a + b (x-x_0)\f$
  */
 inline double
@@ -343,6 +355,30 @@ double
 sqr(const double x)
 {
   return x * x;
+}
+
+template <class T>
+std::pair<T, T>
+minmax(const Vector<T> &x)
+{
+  const auto mm = std::minmax_element(x.begin(), x.end());
+  return std::make_pair(*mm.first, *mm.second);
+}
+
+template <class T>
+std::pair<T, T>
+minmax(const BlockVector<T> &x)
+{
+  std::vector<T> data;
+
+  for (unsigned int i = 0; i < x.n_blocks(); ++i)
+    {
+      const auto mm = std::minmax_element(x.block(i).begin(), x.block(i).end());
+      data.push_back(*mm.first);
+      data.push_back(*mm.second);
+    }
+  const auto mm = std::minmax_element(data.begin(), data.end());
+  return std::make_pair(*mm.first, *mm.second);
 }
 
 double

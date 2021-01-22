@@ -799,7 +799,9 @@ TemperatureSolver<dim>::output_probes() const
       for (unsigned int i = 0; i < N; ++i)
         output << "# probe " << i << ":\t" << probes[i] << "\n";
 
-      output << "t[s]";
+      output << "t[s]"
+             << "\tT_min[K]"
+             << "\tT_max[K]";
       for (unsigned int i = 0; i < N; ++i)
         output << "\tT_" << i << "[K]";
       output << "\n";
@@ -810,13 +812,15 @@ TemperatureSolver<dim>::output_probes() const
   std::vector<double> values(N);
   ff.value_list(probes, values);
 
+  const auto limits = minmax(temperature);
+
   // header is already written, append values at the current time step
   std::ofstream output(file_name, std::ios::app);
 
   const int precision = prm.get_integer("Output precision");
   output << std::setprecision(precision);
 
-  output << t;
+  output << t << '\t' << limits.first << '\t' << limits.second;
   for (const auto &v : values)
     output << '\t' << v;
   output << "\n";
