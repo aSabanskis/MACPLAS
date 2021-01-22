@@ -533,7 +533,7 @@ DislocationSolver<dim>::solve(const double stress_only)
 
   output_probes();
 
-  if (dt > 0 && t >= t_max)
+  if (dt > 0 && t + 1e-4 * dt >= t_max)
     return false;
 
   return dt > 0;
