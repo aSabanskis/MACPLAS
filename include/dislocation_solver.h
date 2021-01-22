@@ -201,7 +201,8 @@ private:
   limit_time_step();
 
   /** Time stepping: adjust time step according to user-specified settings.
-   * Considers max v*dt, calls \c DislocationSolver::limit_time_step.
+   * Considers max v*dt, dstrain_c and relative dN_m, calls
+   * \c DislocationSolver::limit_time_step.
    */
   void
   update_time_step();
@@ -501,6 +502,18 @@ DislocationSolver<dim>::DislocationSolver(const unsigned int order)
                     "0",
                     Patterns::Double(0),
                     "Maximum v*dt for adaptive time-stepping (0 - disabled)");
+
+  prm.declare_entry(
+    "Max dstrain_c",
+    "0",
+    Patterns::Double(0),
+    "Maximum creep strain change for adaptive time-stepping (0 - disabled)");
+
+  prm.declare_entry(
+    "Max relative dN_m",
+    "0",
+    Patterns::Double(0),
+    "Maximum relative dislocation density change for adaptive time-stepping (0 - disabled)");
 
   prm.declare_entry("Max time",
                     "10",
@@ -954,27 +967,75 @@ template <int dim>
 void
 DislocationSolver<dim>::update_time_step()
 {
-  const double v_dt_max = prm.get_double("Max v*dt");
+  const double v_dt_max      = prm.get_double("Max v*dt");
+  const double dstrain_c_max = prm.get_double("Max dstrain_c");
+  const double dN_m_rel_max  = prm.get_double("Max relative dN_m");
 
-  if (v_dt_max <= 0)
+  const Vector<double> &     T   = get_temperature();
+  const Vector<double> &     N_m = get_dislocation_density();
+  const Vector<double> &     J_2 = get_stress_J_2();
+  const BlockVector<double> &S   = get_stress_deviator();
+
+  if (v_dt_max > 0)
     {
-      limit_time_step();
-      return;
+      const Vector<double> v = dislocation_velocity(N_m, J_2, T);
+
+      const double v_max = v.linfty_norm();
+
+      if (v_max > 0)
+        {
+          get_time_step() = v_dt_max / v_max;
+          std::cout << "Adjusted dt=" << get_time_step()
+                    << " s (before limiting), "
+                    << "v_max=" << v_max << " m/s\n";
+        }
     }
 
-  const Vector<double> v = dislocation_velocity(get_dislocation_density(),
-                                                get_stress_J_2(),
-                                                get_temperature());
-
-  const double v_max = v.linfty_norm();
-
-  if (v_max > 0)
+  if (dstrain_c_max > 0)
     {
-      get_time_step() = v_dt_max / v_max;
-      std::cout << "Adjusted dt=" << get_time_step() << " s (before limiting), "
-                << "v_max=" << v_max << " m/s\n";
-      limit_time_step();
+      for (unsigned int i = 0; i < S.n_blocks(); ++i)
+        {
+          const Vector<double> dot_e_c =
+            derivative_strain(N_m, J_2, T, S.block(i));
+
+          const double dot_strain_c = dot_e_c.linfty_norm();
+
+          if (dot_strain_c > 0)
+            {
+              get_time_step() =
+                std::min(get_time_step(), dstrain_c_max / dot_strain_c);
+              std::cout << "Adjusted dt=" << get_time_step()
+                        << " s (before limiting), "
+                        << "dot_strain_c_" << i << "_max=" << dot_strain_c
+                        << " 1/s\n";
+            }
+        }
     }
+
+  if (dN_m_rel_max > 0)
+    {
+      Vector<double> dn = derivative_N_m(N_m, J_2, T);
+      for (unsigned int i = 0; i < dn.size(); ++i)
+        {
+          if (N_m[i] > 0)
+            dn[i] /= N_m[i];
+          else
+            dn[i] = 0;
+        }
+
+      const double dot_N_m_rel = dn.linfty_norm();
+
+      if (dot_N_m_rel > 0)
+        {
+          get_time_step() =
+            std::min(get_time_step(), dN_m_rel_max / dot_N_m_rel);
+          std::cout << "Adjusted dt=" << get_time_step()
+                    << " s (before limiting), "
+                    << "dot_N_m_rel_max=" << dot_N_m_rel << " 1/s\n";
+        }
+    }
+
+  limit_time_step();
 }
 
 template <int dim>

@@ -1,12 +1,14 @@
 set Burgers vector              = 3.8e-10
-set Initial dislocation density = 1e9
+set Initial dislocation density = 1e6
 set Material constant K         = 3.1e-4
 set Material constant k_0       = 8.6e-4
 set Material constant l         = 1.0
 set Material constant p         = 1.1
 set Max time                    = 300
-set Max time step               = 20
-set Max v*dt                    = 1e-4
+set Max time step               = 10
+set Max dstrain_c               = 2e-5
+set Max relative dN_m           = 0.4
+set Max v*dt                    = 2e-4
 set Min time step               = 0.2
 set Output precision            = 8
 set Peierls potential           = 2.17
