@@ -134,12 +134,12 @@ public:
   double &
   get_time();
 
-  /** Time step \f$\Delta t\f$, s
+  /** Current time step \f$\Delta t\f$, s
    */
   double
   get_time_step() const;
 
-  /** Time step \f$\Delta t\f$, s
+  /** Current time step \f$\Delta t\f$, s
    */
   double &
   get_time_step();
@@ -184,6 +184,27 @@ private:
    */
   void
   initialize_parameters();
+
+  /** Minimum time step \f$\Delta t_\min\f$, s
+   */
+  double
+  get_time_step_min() const;
+
+  /** Maximum time step \f$\Delta t_\max\f$, s
+   */
+  double
+  get_time_step_max() const;
+
+  /** Time stepping: limit time step according to min and max dt
+   */
+  void
+  limit_time_step();
+
+  /** Time stepping: adjust time step according to user-specified settings.
+   * Considers max v*dt, calls \c DislocationSolver::limit_time_step.
+   */
+  void
+  update_time_step();
 
   /** Time stepping: advance time \f$t \to t + \Delta t\f$
    */
@@ -466,6 +487,21 @@ DislocationSolver<dim>::DislocationSolver(const unsigned int order)
                     Patterns::Double(0),
                     "Time step in seconds");
 
+  prm.declare_entry("Min time step",
+                    "0",
+                    Patterns::Double(0),
+                    "Minimum time step in seconds (optional, 0 - disabled)");
+
+  prm.declare_entry("Max time step",
+                    "0",
+                    Patterns::Double(0),
+                    "Maximum time step in seconds (optional, 0 - disabled)");
+
+  prm.declare_entry("Max v*dt",
+                    "0",
+                    Patterns::Double(0),
+                    "Maximum v*dt for adaptive time-stepping (0 - disabled)");
+
   prm.declare_entry("Max time",
                     "10",
                     Patterns::Double(),
@@ -505,6 +541,7 @@ DislocationSolver<dim>::solve(const double stress_only)
     {
       // calculate stresses and nothing more
       stress_solver.solve();
+      update_time_step();
       output_probes();
       return true;
     }
@@ -885,9 +922,66 @@ DislocationSolver<dim>::initialize_parameters()
 }
 
 template <int dim>
+double
+DislocationSolver<dim>::get_time_step_min() const
+{
+  return prm.get_double("Min time step");
+}
+
+template <int dim>
+double
+DislocationSolver<dim>::get_time_step_max() const
+{
+  return prm.get_double("Max time step");
+}
+
+template <int dim>
+void
+DislocationSolver<dim>::limit_time_step()
+{
+  double &dt = get_time_step();
+
+  const double dt_min = get_time_step_min();
+  if (dt_min > 0 && dt < dt_min)
+    dt = dt_min;
+
+  const double dt_max = get_time_step_max();
+  if (dt_max > 0 && dt > dt_max)
+    dt = dt_max;
+}
+
+template <int dim>
+void
+DislocationSolver<dim>::update_time_step()
+{
+  const double v_dt_max = prm.get_double("Max v*dt");
+
+  if (v_dt_max <= 0)
+    {
+      limit_time_step();
+      return;
+    }
+
+  const Vector<double> v = dislocation_velocity(get_dislocation_density(),
+                                                get_stress_J_2(),
+                                                get_temperature());
+
+  const double v_max = v.linfty_norm();
+
+  if (v_max > 0)
+    {
+      get_time_step() = v_dt_max / v_max;
+      std::cout << "Adjusted dt=" << get_time_step() << " s (before limiting), "
+                << "v_max=" << v_max << " m/s\n";
+      limit_time_step();
+    }
+}
+
+template <int dim>
 void
 DislocationSolver<dim>::advance_time()
 {
+  update_time_step();
   get_time() += get_time_step();
 }
 
