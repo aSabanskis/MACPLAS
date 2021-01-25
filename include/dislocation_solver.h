@@ -1031,7 +1031,7 @@ DislocationSolver<dim>::update_time_step()
             std::min(get_time_step(), dN_m_rel_max / dot_N_m_rel);
           std::cout << "Adjusted dt=" << get_time_step()
                     << " s (before limiting), "
-                    << "dot_N_m_rel_max=" << dot_N_m_rel << " 1/s\n";
+                    << "dot_N_m_rel_max=" << dot_N_m_rel << "\n";
         }
     }
 
