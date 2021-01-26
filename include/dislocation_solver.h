@@ -1036,6 +1036,10 @@ DislocationSolver<dim>::update_time_step()
     }
 
   limit_time_step();
+
+  // stop exactly at max time
+  if (get_time() + (1 + 1e-4) * get_time_step() >= get_max_time())
+    get_time_step() = get_max_time() - get_time();
 }
 
 template <int dim>
