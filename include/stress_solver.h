@@ -100,12 +100,12 @@ public:
   const Vector<double> &
   get_stress_J_2() const;
 
-  /** Get creep strain \f$\varepsilon^c_{ij}\f$, -
+  /** Get creep strain \f$\varepsilon^c_{ij}\f$, dimensionless
    */
   const BlockVector<double> &
   get_strain_c() const;
 
-  /** Get creep strain \f$\varepsilon^c_{ij}\f$, -
+  /** Get creep strain \f$\varepsilon^c_{ij}\f$, dimensionless
    */
   BlockVector<double> &
   get_strain_c();
@@ -142,12 +142,12 @@ public:
   void
   output_data() const;
 
-  /** Save results to disk as .vtk
+  /** Save results to disk in \c vtk format
    */
   void
   output_vtk() const;
 
-  /** Save mesh to disk
+  /** Save mesh to disk in \c msh format
    */
   void
   output_mesh() const;
@@ -327,7 +327,7 @@ private:
    */
   BlockVector<double> stress_deviator;
 
-  /** Creep strain \f$\varepsilon^c_{ij}\f$, -
+  /** Creep strain \f$\varepsilon^c_{ij}\f$, dimensionless
    */
   BlockVector<double> strain_c;
 
@@ -374,7 +374,7 @@ private:
    */
   FunctionParser<1> m_alpha;
 
-  /** Poisson's ratio \f$\nu\f$, -
+  /** Poisson's ratio \f$\nu\f$, dimensionless
    */
   double m_nu;
 

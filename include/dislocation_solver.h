@@ -36,10 +36,9 @@ public:
    */
   DislocationSolver(const unsigned int order = 2);
 
-  /** Calculate the dislocation density and creep strain.
-   *  Advance one time step.
-   *
-   * If \c stress_only is enabled, only the stress is calculated.
+  /** Advance time and calculate the dislocation density and creep strain.
+   * Calls \c DislocationSolver::advance_time unless \c stress_only is enabled,
+   * then only the stress is calculated.
    */
   bool
   solve(const double stress_only = false);
@@ -104,12 +103,12 @@ public:
   const Vector<double> &
   get_stress_J_2() const;
 
-  /** Get creep strain \f$\varepsilon^c_{ij}\f$, -
+  /** Get creep strain \f$\varepsilon^c_{ij}\f$, dimensionless
    */
   const BlockVector<double> &
   get_strain_c() const;
 
-  /** Get creep strain \f$\varepsilon^c_{ij}\f$, -
+  /** Get creep strain \f$\varepsilon^c_{ij}\f$, dimensionless
    */
   BlockVector<double> &
   get_strain_c();
@@ -169,12 +168,12 @@ public:
   void
   output_data() const;
 
-  /** Save results to disk as .vtk
+  /** Save results to disk in \c vtk format
    */
   void
   output_vtk() const;
 
-  /** Save mesh to disk
+  /** Save mesh to disk in \c msh format
    */
   void
   output_mesh() const;
@@ -195,14 +194,14 @@ private:
   double
   get_time_step_max() const;
 
-  /** Time stepping: limit time step according to min and max dt
+  /** Time stepping: limit time step according to minimum and maximum values
    */
   void
   limit_time_step();
 
   /** Time stepping: adjust time step according to user-specified settings.
-   * Considers max v*dt, dstrain_c and relative dN_m, calls
-   * \c DislocationSolver::limit_time_step.
+   * Considers maximum \f$v \Delta t\f$, \f$\Delta \varepsilon^c\f$ and relative
+   * \f$\Delta N_m\f$, calls \c DislocationSolver::limit_time_step.
    */
   void
   update_time_step();
@@ -212,7 +211,8 @@ private:
   void
   advance_time();
 
-  /** Write current values of fields at probe points to disk
+  /** Write current values of fields at probe points to disk.
+   * File name \c "probes-dislocation-<dim>d.txt"
    */
   void
   output_probes() const;
@@ -233,7 +233,7 @@ private:
   calc_D(const double T) const;
 
   /** Calculate the effective stress \f$\tau_\mathrm{eff} =
-   * \left\langle \sqrt{J_2} - D \sqrt{N_m} \right\rangle\f$
+   * \left\langle S \sqrt{J_2} - D \sqrt{N_m} \right\rangle\f$
    */
   double
   tau_eff(const double N_m, const double J_2, const double T) const;
@@ -408,19 +408,19 @@ private:
    */
   double m_k_0;
 
-  /** Material constant \f$l\f$, -
+  /** Material constant \f$l\f$, dimensionless
    */
   double m_l;
 
-  /** Material constant \f$p\f$, -
+  /** Material constant \f$p\f$, dimensionless
    */
   double m_p;
 
-  /** Average Schmid factor \f$S\f$, -
+  /** Average Schmid factor \f$S\f$, dimensionless
    */
   double m_S;
 
-  /** Average Taylor factor \f$F\f$, -
+  /** Average Taylor factor \f$F\f$, dimensionless
    */
   double m_F;
 
@@ -448,6 +448,8 @@ DislocationSolver<dim>::DislocationSolver(const unsigned int order)
 #endif
                ")\n";
 
+  const std::string info_T = " (accepts temperature function)";
+
   // Physical parameters from https://doi.org/10.1016/j.jcrysgro.2016.05.027
   prm.declare_entry("Burgers vector",
                     "3.8e-10",
@@ -457,12 +459,12 @@ DislocationSolver<dim>::DislocationSolver(const unsigned int order)
   prm.declare_entry("Peierls potential",
                     "2.17",
                     Patterns::Anything(),
-                    "Peierls potential in eV");
+                    "Peierls potential in eV" + info_T);
 
   prm.declare_entry("Strain hardening factor",
                     "4.3",
                     Patterns::Anything(),
-                    "Strain hardening factor in N/m");
+                    "Strain hardening factor in N/m" + info_T);
 
   prm.declare_entry("Material constant K",
                     "3.1e-4",

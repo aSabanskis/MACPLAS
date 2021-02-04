@@ -50,7 +50,7 @@ struct heat_flux_data
    */
   Vector<double> q_in;
 
-  /** Temperature-dependent emissivity \f$\varepsilon(T)\f$, -
+  /** Temperature-dependent emissivity \f$\varepsilon(T)\f$, dimensionless
    */
   std::function<double(double)> emissivity;
 
@@ -165,12 +165,12 @@ public:
   void
   output_data() const;
 
-  /** Save results to disk as .vtk
+  /** Save results to disk in \c vtk format
    */
   void
   output_vtk() const;
 
-  /** Save mesh to disk
+  /** Save mesh to disk in \c msh format
    */
   void
   output_mesh() const;
@@ -235,7 +235,7 @@ private:
   copy_local_to_global(const AssemblyCopyData &copy_data);
 
 
-  /** Time stepping: advance time
+  /** Time stepping: advance time \f$t \to t + \Delta t\f$
    */
   void
   advance_time();
@@ -245,7 +245,8 @@ private:
   void
   solve_system();
 
-  /** Write temperature at probe points to disk
+  /** Write temperature at probe points to disk.
+   * File name \c "probes-temperature-<dim>d.txt"
    */
   void
   output_probes() const;
