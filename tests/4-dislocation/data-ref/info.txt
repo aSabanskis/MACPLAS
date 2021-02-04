@@ -1,0 +1,1 @@
+Calculations of compression tests from https://doi.org/10.1016/j.jcrysgro.2016.06.007

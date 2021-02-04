@@ -20,7 +20,7 @@ for T in 1000 1100 1200 1300 1400 1500 1600; do
             fi
 
             ./macplas-test-4 >"results/log-$id"
-            mv probes-3d.txt "results/probes-$id.txt"
+            mv probes-dislocation-3d.txt "results/probes-$id.txt"
         done
     done
 done

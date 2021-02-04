@@ -1,0 +1,13 @@
+set Linear solver iterations      = 5000
+set Linear solver tolerance       = 1e-8
+set Linear solver type            = minres
+set Log convergence final         = false
+set Log convergence full          = false
+set Number of threads             = 0
+set Output precision              = 8
+set Poisson's ratio               = 0
+set Preconditioner relaxation     = 1.0
+set Preconditioner type           = jacobi
+set Reference temperature         = 1685
+set Thermal expansion coefficient = 0
+set Young's modulus               = 1.56e11

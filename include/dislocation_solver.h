@@ -277,7 +277,7 @@ private:
   derivative2_N_m_N_m(const double N_m, const double J_2, const double T) const;
 
   /** Calculate the creep strain rate \f$\dot{\varepsilon^c_{ij}} =
-   * \frac{b v N_m}{2\sqrt{J_2}} S_{ij}\f$
+   * \frac{b v N_m}{2 F \sqrt{J_2}} S_{ij}\f$
    */
   double
   derivative_strain(const double N_m,
@@ -416,6 +416,14 @@ private:
    */
   double m_p;
 
+  /** Average Schmid factor \f$S\f$, -
+   */
+  double m_S;
+
+  /** Average Taylor factor \f$F\f$, -
+   */
+  double m_F;
+
   /** Boltzmann constant \f$k_B\f$, eV/K
    */
   static constexpr double m_k_B = 8.617e-5;
@@ -475,6 +483,16 @@ DislocationSolver<dim>::DislocationSolver(const unsigned int order)
                     "1.1",
                     Patterns::Double(0),
                     "Material constant p (dimensionless)");
+
+  prm.declare_entry("Average Schmid factor",
+                    "1.0",
+                    Patterns::Double(0),
+                    "Average Schmid factor S (dimensionless)");
+
+  prm.declare_entry("Average Taylor factor",
+                    "1.0",
+                    Patterns::Double(0),
+                    "Average Taylor factor F (dimensionless)");
 
 
   prm.declare_entry("Initial dislocation density",
@@ -916,6 +934,8 @@ DislocationSolver<dim>::initialize_parameters()
   m_k_0 = prm.get_double("Material constant k_0");
   m_l   = prm.get_double("Material constant l");
   m_p   = prm.get_double("Material constant p");
+  m_S   = prm.get_double("Average Schmid factor");
+  m_F   = prm.get_double("Average Taylor factor");
 
   time_scheme = prm.get("Time scheme");
 
@@ -930,6 +950,8 @@ DislocationSolver<dim>::initialize_parameters()
             << "k_0=" << m_k_0 << "\n"
             << "l=" << m_l << "\n"
             << "p=" << m_p << "\n"
+            << "S=" << m_S << "\n"
+            << "F=" << m_F << "\n"
             << "k_B=" << m_k_B << "\n"
             << "time_scheme=" << time_scheme << "\n";
 }
@@ -1242,7 +1264,7 @@ DislocationSolver<dim>::tau_eff(const double N_m,
                                 const double J_2,
                                 const double T) const
 {
-  return std::max(std::sqrt(J_2) - calc_D(T) * std::sqrt(N_m), 0.0);
+  return std::max(m_S * std::sqrt(J_2) - calc_D(T) * std::sqrt(N_m), 0.0);
 }
 
 template <int dim>
@@ -1348,7 +1370,7 @@ DislocationSolver<dim>::derivative_strain(const double N_m,
   const double tau = tau_eff(N_m, J_2, T);
 
   return m_b * m_k_0 * N_m * std::pow(tau, m_p) *
-         std::exp(-calc_Q(T) / (m_k_B * T)) * S / (2 * std::sqrt(J_2));
+         std::exp(-calc_Q(T) / (m_k_B * T)) * S / (2 * m_F * std::sqrt(J_2));
 }
 
 template <int dim>
