@@ -518,6 +518,12 @@ DislocationSolver<dim>::DislocationSolver(const unsigned int order)
                     Patterns::Double(0),
                     "Maximum time step in seconds (optional, 0 - disabled)");
 
+  prm.declare_entry(
+    "Max relative time step increase",
+    "0",
+    Patterns::Double(0),
+    "Maximum relative time step increase (optional, 0 - disabled)");
+
   prm.declare_entry("Max v*dt",
                     "0",
                     Patterns::Double(0),
@@ -991,14 +997,19 @@ template <int dim>
 void
 DislocationSolver<dim>::update_time_step()
 {
+  double &     dt            = get_time_step();
+  const double dt_prev       = dt;
   const double v_dt_max      = prm.get_double("Max v*dt");
   const double dstrain_c_max = prm.get_double("Max dstrain_c");
   const double dN_m_rel_max  = prm.get_double("Max relative dN_m");
+  const double dt_rel_max = prm.get_double("Max relative time step increase");
 
   const Vector<double> &     T   = get_temperature();
   const Vector<double> &     N_m = get_dislocation_density();
   const Vector<double> &     J_2 = get_stress_J_2();
   const BlockVector<double> &S   = get_stress_deviator();
+
+  std::vector<double> time_steps;
 
   if (v_dt_max > 0)
     {
@@ -1008,9 +1019,9 @@ DislocationSolver<dim>::update_time_step()
 
       if (v_max > 0)
         {
-          get_time_step() = v_dt_max / v_max;
-          std::cout << "Adjusted dt=" << get_time_step()
-                    << " s (before limiting), "
+          const double dt = v_dt_max / v_max;
+          time_steps.push_back(dt);
+          std::cout << "dt=" << dt << " s, "
                     << "v_max=" << v_max << " m/s\n";
         }
     }
@@ -1026,10 +1037,9 @@ DislocationSolver<dim>::update_time_step()
 
           if (dot_strain_c > 0)
             {
-              get_time_step() =
-                std::min(get_time_step(), dstrain_c_max / dot_strain_c);
-              std::cout << "Adjusted dt=" << get_time_step()
-                        << " s (before limiting), "
+              const double dt = dstrain_c_max / dot_strain_c;
+              time_steps.push_back(dt);
+              std::cout << "dt=" << dt << " s, "
                         << "dot_strain_c_" << i << "_max=" << dot_strain_c
                         << " 1/s\n";
             }
@@ -1051,19 +1061,30 @@ DislocationSolver<dim>::update_time_step()
 
       if (dot_N_m_rel > 0)
         {
-          get_time_step() =
-            std::min(get_time_step(), dN_m_rel_max / dot_N_m_rel);
-          std::cout << "Adjusted dt=" << get_time_step()
-                    << " s (before limiting), "
+          const double dt = dN_m_rel_max / dot_N_m_rel;
+          time_steps.push_back(dt);
+          std::cout << "dt=" << dt << " s, "
                     << "dot_N_m_rel_max=" << dot_N_m_rel << "\n";
         }
+    }
+
+  if (!time_steps.empty())
+    dt = *std::min_element(time_steps.begin(), time_steps.end());
+
+  if (dt_rel_max > 0)
+    {
+      const double dt_change = dt - dt_prev;
+
+      // limit the time step increase
+      if (dt_change > dt_prev * dt_rel_max)
+        dt = dt_prev + dt_prev * dt_rel_max;
     }
 
   limit_time_step();
 
   // stop exactly at max time
-  if (get_time() + (1 + 1e-4) * get_time_step() >= get_max_time())
-    get_time_step() = get_max_time() - get_time();
+  if (get_time() + (1 + 1e-4) * dt >= get_max_time())
+    dt = get_max_time() - get_time();
 }
 
 template <int dim>
