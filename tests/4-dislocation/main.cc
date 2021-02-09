@@ -2,6 +2,8 @@
 
 #include <deal.II/grid/grid_generator.h>
 
+#include <cmath>
+
 #include "../../include/dislocation_solver.h"
 
 using namespace dealii;
@@ -41,6 +43,11 @@ Problem<dim>::Problem(const unsigned int order)
                     Patterns::Double(),
                     "Strain rate in s^-1");
 
+  prm.declare_entry("Max strain",
+                    "0",
+                    Patterns::Double(0),
+                    "Maximum strain (dimensionless, 0 - disabled)");
+
   prm.declare_entry("L", "0.020", Patterns::Double(0), "Cube size in m");
 
   try
@@ -63,10 +70,16 @@ Problem<dim>::run()
   make_grid();
   initialize();
 
+  const double max_strain = prm.get_double("Max strain");
+
   while (true)
     {
-      const double t  = solver.get_time() + solver.get_time_step();
-      const double dx = prm.get_double("L") * prm.get_double("Strain rate") * t;
+      const double t      = solver.get_time() + solver.get_time_step();
+      const double strain = prm.get_double("Strain rate") * t;
+      const double dx =
+        prm.get_double("L") * (max_strain > 0 && std::abs(strain) < max_strain ?
+                                 strain :
+                                 std::copysign(max_strain, strain));
       solver.get_stress_solver().set_bc1(1, 0, -dx); // compression
 
       const bool keep_going = solver.solve();
