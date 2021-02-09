@@ -46,6 +46,10 @@ latex
 *.dat
 *[1-3]d-order*
 *.[ct]sv
+*.7z
+*.gz
+*.tar
+*.tgz
 *.zip
 *.png
 *.mp4

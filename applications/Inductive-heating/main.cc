@@ -138,8 +138,7 @@ Problem<dim>::calculate_temperature(void)
       max_dT = temperature.linfty_norm();
 
       std::cout << "max_dT=" << max_dT << " K\n";
-    }
-  while (max_dT > prm.get_double("Max temperature change"));
+  } while (max_dT > prm.get_double("Max temperature change"));
 
   temperature_solver.output_data();
   temperature_solver.output_vtk();

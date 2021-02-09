@@ -4,3 +4,4 @@ set Inductor current                  = 100
 set Initial temperature               = 1000
 set Max temperature change            = 1e-1
 set Reference electrical conductivity = 5e4
+set Load saved results                = false
