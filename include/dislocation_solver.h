@@ -543,8 +543,8 @@ DislocationSolver<dim>::DislocationSolver(const unsigned int order)
 
   prm.declare_entry("Max time",
                     "10",
-                    Patterns::Double(),
-                    "Max time in seconds");
+                    Patterns::Double(0),
+                    "Maximum time in seconds");
 
   prm.declare_entry("Time scheme",
                     "Euler",

@@ -35,7 +35,7 @@ Problem<dim>::Problem(const unsigned int order)
 {
   prm.declare_entry("Initial temperature",
                     "1000",
-                    Patterns::Double(),
+                    Patterns::Double(0),
                     "Initial temperature in K");
 
   prm.declare_entry("Strain rate",

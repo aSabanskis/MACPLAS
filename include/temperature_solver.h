@@ -356,12 +356,12 @@ TemperatureSolver<dim>::TemperatureSolver(const unsigned int order)
   prm.declare_entry("Max absolute change",
                     "1e-3",
                     Patterns::Double(0),
-                    "Max magnitute of Newton update");
+                    "Maximum magnitute of Newton update");
 
   prm.declare_entry("Max Newton iterations",
                     "6",
                     Patterns::Integer(0),
-                    "Max number of Newton iterations (0 - unlimited)");
+                    "Maximum number of Newton iterations (0 - unlimited)");
 
   prm.declare_entry("Time step",
                     "1",
@@ -371,7 +371,7 @@ TemperatureSolver<dim>::TemperatureSolver(const unsigned int order)
   prm.declare_entry("Max time",
                     "10",
                     Patterns::Double(0),
-                    "Max time in seconds");
+                    "Maximum time in seconds");
 
   prm.declare_entry("Linear solver type",
                     "minres",
@@ -382,12 +382,12 @@ TemperatureSolver<dim>::TemperatureSolver(const unsigned int order)
   prm.declare_entry("Linear solver iterations",
                     "1000",
                     Patterns::Integer(0),
-                    "Max number of iterations of linear solver");
+                    "Maximum number of iterations of linear solver");
 
   prm.declare_entry("Linear solver tolerance",
                     "1e-8",
                     Patterns::Double(0),
-                    "Tolerance (max residual norm) of linear solver");
+                    "Tolerance (maximum residual norm) of linear solver");
 
   prm.declare_entry("Preconditioner type",
                     "jacobi",
@@ -413,7 +413,7 @@ TemperatureSolver<dim>::TemperatureSolver(const unsigned int order)
   prm.declare_entry("Number of threads",
                     "0",
                     Patterns::Integer(0),
-                    "Maximum number of threads to be used (0 - default)");
+                    "Maximum number of threads to be used (0 - autodetect)");
 
   prm.declare_entry(
     "Output precision",

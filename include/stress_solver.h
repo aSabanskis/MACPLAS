@@ -424,7 +424,7 @@ StressSolver<dim>::StressSolver(const unsigned int order)
 
   prm.declare_entry("Reference temperature",
                     "1685",
-                    Patterns::Double(),
+                    Patterns::Double(0),
                     "Reference temperature in K");
 
   prm.declare_entry("Linear solver type",
@@ -436,12 +436,12 @@ StressSolver<dim>::StressSolver(const unsigned int order)
   prm.declare_entry("Linear solver iterations",
                     "1000",
                     Patterns::Integer(0),
-                    "Max number of iterations of linear solver");
+                    "Maximum number of iterations of linear solver");
 
   prm.declare_entry("Linear solver tolerance",
                     "1e-8",
                     Patterns::Double(0),
-                    "Tolerance (max residual norm) of linear solver");
+                    "Tolerance (maximum residual norm) of linear solver");
 
   prm.declare_entry("Preconditioner type",
                     "jacobi",
@@ -466,7 +466,7 @@ StressSolver<dim>::StressSolver(const unsigned int order)
   prm.declare_entry("Number of threads",
                     "0",
                     Patterns::Integer(0),
-                    "Maximum number of threads to be used (0 - default)");
+                    "Maximum number of threads to be used (0 - autodetect)");
 
   prm.declare_entry("Output precision",
                     "8",

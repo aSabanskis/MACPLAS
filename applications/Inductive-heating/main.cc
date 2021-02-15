@@ -61,7 +61,7 @@ Problem<dim>::Problem(unsigned int order)
   prm.declare_entry("Max temperature change",
                     "0.1",
                     Patterns::Double(0),
-                    "Initial temperature in K");
+                    "Maximum temperature change in K");
 
   prm.declare_entry("Inductor current",
                     "100",
