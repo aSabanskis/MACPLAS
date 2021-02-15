@@ -8,6 +8,6 @@
 # Versions below 6 are not supported.
 formatter=clang-format
 
-find include tests \
+find include tests applications \
 -regextype egrep -regex ".*\.(cc|h)" -print0 | \
 xargs -0 -n 1 -I {} bash -c "echo {}; $formatter -i {}"
