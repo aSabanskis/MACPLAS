@@ -609,6 +609,8 @@ DislocationSolver<dim>::solve(const double stress_only)
 
   output_probes();
 
+  update_time_step();
+
   if (dt > 0 && t + 1e-4 * dt >= t_max)
     return false;
 
@@ -1091,7 +1093,6 @@ template <int dim>
 void
 DislocationSolver<dim>::advance_time()
 {
-  update_time_step();
   get_time() += get_time_step();
 }
 
