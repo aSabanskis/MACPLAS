@@ -77,9 +77,10 @@ Problem<dim>::run()
       const double t      = solver.get_time() + solver.get_time_step();
       const double strain = prm.get_double("Strain rate") * t;
       const double dx =
-        prm.get_double("L") * (max_strain > 0 && std::abs(strain) < max_strain ?
-                                 strain :
-                                 std::copysign(max_strain, strain));
+        prm.get_double("L") *
+        (max_strain <= 0 ?
+           strain :
+           std::copysign(std::min(std::abs(strain), max_strain), strain));
       solver.get_stress_solver().set_bc1(1, 0, -dx); // compression
 
       const bool keep_going = solver.solve();
