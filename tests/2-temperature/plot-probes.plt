@@ -9,7 +9,7 @@ T_1d(x, t) = 1000 * (1 - erf(x/sqrt(4*a*t)))
 
 f = 'probes-temperature-1d.txt'
 
-set terminal pdfcairo
+set terminal pdfcairo rounded
 set grid
 set key opaque box reverse Left width 1
 

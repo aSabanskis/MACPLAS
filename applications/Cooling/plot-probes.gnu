@@ -1,6 +1,6 @@
 #!/usr/bin/env gnuplot
 
-set term pdfcairo size 15cm,10cm font ',10'
+set term pdfcairo rounded size 15cm,10cm font ',10'
 
 set grid
 set key bottom left Left reverse

@@ -22,7 +22,7 @@ stress_r(r) = 2*alpha*E/(1-nu) * ( (r**3-r_a**3)/((r_b**3-r_a**3)*r**3) * (Tr2dr
 stress_theta(r) = 2*alpha*E/(1-nu) * ( (2*r**3 + r_a**3)/(2*(r_b**3-r_a**3)*r**3) * (Tr2dr(r_b)-Tr2dr(r_a))  +  (Tr2dr(r)-Tr2dr(r_a))/(2*r**3)  -  T(r)/2 )
 stress_r_theta(r) = 0
 
-set terminal pdfcairo
+set terminal pdfcairo rounded
 set grid
 set xrange [r_a:r_b]
 set yrange [-1e8:3e8]
