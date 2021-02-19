@@ -9,8 +9,6 @@ set key top left Left reverse width -2
 dir = "results-calibration"
 array T[3] = [1173, 1373, 1573]
 
-case = "Linearized_N_m"
-dt = 0.1
 set datafile separator '\t'
 
 set output dir.'/probes-compare.pdf'
@@ -20,10 +18,10 @@ col='N_m_0[m^-2]'
 col_ref='N'
 set title col noenh
 p \
-for[k=1:|T|] sprintf('%s/probes-T%g_%s_dt%g.txt', dir, T[k], case, dt) \
+for[k=1:|T|] sprintf('%s/probes-T%g.txt', dir, T[k]) \
 u 1:(abs(column(col))) w l ti sprintf('T = %g K', T[k]), \
 for[k=1:|T|] sprintf('data-ref/calibration_%g.tsv', T[k]) \
-u 1:(column(col_ref)) w l lt k dt 2 ti sprintf('T = %g K (Dadzis2016)', T[k])
+u 1:(column(col_ref)) w l lc black dt k+1 ti sprintf('T = %g K (Dadzis2016)', T[k])
 
 unset key
 col='dot_N_m_0[m^-2s^-1]'
@@ -53,5 +51,10 @@ rep
 
 col='tau_eff_0[Pa]'
 col_ref='taueff'
+set title col
+rep
+
+col='dt[s]'
+col_ref=''
 set title col
 rep

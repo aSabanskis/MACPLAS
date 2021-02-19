@@ -12,7 +12,6 @@ arr_Q=(2.08  2.21 2.3)
 arr_D=(38.8518 34.6948 29.8847)
 
 cp data-ref/*.prm .
-sed -i "s/set Max time.*/set Max time = 1000/g" dislocation.prm
 
 for i in "${!arr_T[@]}"; do
     T=${arr_T[$i]}
@@ -26,24 +25,16 @@ for i in "${!arr_T[@]}"; do
     sed -i "s/set Peierls potential.*/set Peierls potential = $Q/g" dislocation.prm
     sed -i "s/set Strain hardening factor.*/set Strain hardening factor = $D/g" dislocation.prm
 
-    for s in "Linearized N_m"; do
-        sed -i "s/set Time scheme.*/set Time scheme = $s/g" dislocation.prm
-        for t in 0.1; do
-            sed -i "s/set Time step.*/set Time step = $t/g" dislocation.prm
+    id="T$T"
+    echo "$id"
 
-            id="T$T $s dt$t"
-            id="${id// /_}"
-            echo "$id"
+    if [[ -f "$r/probes-$id.txt" ]]; then
+        echo "$id" exists, skipping
+        continue
+    fi
 
-            if [[ -f "$r/probes-$id.txt" ]]; then
-                echo "$id" exists, skipping
-                continue
-            fi
-
-            ./macplas-test-4 >"$r/log-$id"
-            mv probes-dislocation-3d.txt "$r/probes-$id.txt"
-        done
-    done
+    ./macplas-test-4 >"$r/log-$id"
+    mv probes-dislocation-3d.txt "$r/probes-$id.txt"
 done
 
 ./plot-probes-calibration.gnu

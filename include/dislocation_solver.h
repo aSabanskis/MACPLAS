@@ -1073,6 +1073,11 @@ DislocationSolver<dim>::update_time_step()
 
   if (!time_steps.empty())
     dt = *std::min_element(time_steps.begin(), time_steps.end());
+  else if (dt_rel_max > 0 && get_time() > 0)
+    {
+      // the time step can be increased
+      dt *= 1 + dt_rel_max;
+    }
 
   if (dt_rel_max > 0)
     {
