@@ -82,12 +82,14 @@ Problem<dim>::run()
     {
       const double t      = solver.get_time() + solver.get_time_step();
       const double strain = prm.get_double("Strain rate") * t;
-      const double dx =
-        prm.get_double("L") *
-        (max_strain <= 0 ?
-           strain :
-           std::copysign(std::min(std::abs(strain), max_strain), strain));
+      const double strain_total =
+        max_strain <= 0 ?
+          strain :
+          std::copysign(std::min(std::abs(strain), max_strain), strain);
+      const double dx = prm.get_double("L") * strain_total;
+
       solver.get_stress_solver().set_bc1(1, 0, -dx); // compression
+      solver.add_output("strain_total[-]", strain_total);
 
       const bool keep_going = solver.solve();
 
@@ -108,6 +110,8 @@ Problem<dim>::make_grid()
 
   // a single probe point at the origin
   solver.add_probe(Point<dim>());
+
+  solver.add_output("strain_total[-]");
 }
 
 template <int dim>

@@ -161,6 +161,11 @@ public:
   void
   add_probe(const Point<dim> &p);
 
+  /** Add user-defined output value
+   */
+  void
+  add_output(const std::string &name, const double value = 0);
+
   /** Read raw results from disk
    */
   void
@@ -373,6 +378,10 @@ private:
   /** Locations of probe points
    */
   std::vector<Point<dim>> probes;
+
+  /** User-defined output values
+   */
+  std::map<std::string, double> additional_output;
 
   /** Parameter handler
    */
@@ -788,6 +797,13 @@ DislocationSolver<dim>::add_probe(const Point<dim> &p)
 
 template <int dim>
 void
+DislocationSolver<dim>::add_output(const std::string &name, const double value)
+{
+  additional_output[name] = value;
+}
+
+template <int dim>
+void
 DislocationSolver<dim>::load_data()
 {
   Timer timer;
@@ -1142,8 +1158,12 @@ DislocationSolver<dim>::output_probes() const
         output << "# probe " << i << ":\t" << probes[i] << "\n";
 
       output << "t[s]"
-             << "\tdt[s]"
-             << "\tT_min[K]"
+             << "\tdt[s]";
+
+      for (const auto &it : additional_output)
+        output << "\t" << it.first;
+
+      output << "\tT_min[K]"
              << "\tT_max[K]"
              << "\tN_m_min[m^-2]"
              << "\tN_m_max[m^-2]"
@@ -1241,6 +1261,10 @@ DislocationSolver<dim>::output_probes() const
   const auto limits_J_2     = minmax(J_2);
 
   output << t << '\t' << dt;
+
+  for (const auto &it : additional_output)
+    output << "\t" << it.second;
+
   output << '\t' << limits_T.first << '\t' << limits_T.second;
   output << '\t' << limits_N_m.first << '\t' << limits_N_m.second;
   output << '\t' << limits_dot_N_m.first << '\t' << limits_dot_N_m.second;
