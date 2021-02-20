@@ -45,8 +45,11 @@ public:
    * Initializes the solver parameters from \c stress.prm.
    * If it doesn't exist, the default parameter values are written to
    * \c stress-default.prm.
+   * Default values are used and written to \c stress.prm if
+   * \c use_default_prm parameter is specified.
    */
-  StressSolver(const unsigned int order = 2);
+  StressSolver(const unsigned int order           = 2,
+               const bool         use_default_prm = false);
 
   /** Calculate the stresses
    */
@@ -387,7 +390,8 @@ private:
 // IMPLEMENTATION
 
 template <int dim>
-StressSolver<dim>::StressSolver(const unsigned int order)
+StressSolver<dim>::StressSolver(const unsigned int order,
+                                const bool         use_default_prm)
   : fe_temp(order)
   , dh_temp(triangulation)
   , fe(FE_Q<dim>(order), dim)
@@ -473,17 +477,23 @@ StressSolver<dim>::StressSolver(const unsigned int order)
                     Patterns::Integer(1),
                     "Precision of double variables for output of field data");
 
-  try
+  if (use_default_prm)
     {
-      prm.parse_input("stress.prm");
-    }
-  catch (std::exception &e)
-    {
-      std::cout << e.what() << "\n";
-
-      std::ofstream of("stress-default.prm");
+      std::ofstream of("stress.prm");
       prm.print_parameters(of, ParameterHandler::Text);
     }
+  else
+    try
+      {
+        prm.parse_input("stress.prm");
+      }
+    catch (std::exception &e)
+      {
+        std::cout << e.what() << "\n";
+
+        std::ofstream of("stress-default.prm");
+        prm.print_parameters(of, ParameterHandler::Text);
+      }
 
   initialize_parameters();
 }

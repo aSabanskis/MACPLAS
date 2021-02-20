@@ -70,8 +70,11 @@ public:
    * Initializes the solver parameters from \c temperature.prm.
    * If it doesn't exist, the default parameter values are written to
    * \c temperature-default.prm.
+   * Default values are used and written to \c temperature.prm if
+   * \c use_default_prm parameter is specified.
    */
-  TemperatureSolver(const unsigned int order = 2);
+  TemperatureSolver(const unsigned int order           = 2,
+                    const bool         use_default_prm = false);
 
   /** Calculate the temperature field.
    * @returns \c true if the final time has been reached
@@ -337,7 +340,8 @@ private:
 // IMPLEMENTATION
 
 template <int dim>
-TemperatureSolver<dim>::TemperatureSolver(const unsigned int order)
+TemperatureSolver<dim>::TemperatureSolver(const unsigned int order,
+                                          const bool         use_default_prm)
   : fe(order)
   , dh(triangulation)
   , probes_header_written(false)
@@ -439,17 +443,23 @@ TemperatureSolver<dim>::TemperatureSolver(const unsigned int order)
     Patterns::List(Patterns::Double(), 1),
     "Comma-separated polynomial coefficients (temperature function) in W/m/K^0, W/m/K^1 etc.");
 
-  try
+  if (use_default_prm)
     {
-      prm.parse_input("temperature.prm");
-    }
-  catch (std::exception &e)
-    {
-      std::cout << e.what() << "\n";
-
-      std::ofstream of("temperature-default.prm");
+      std::ofstream of("temperature.prm");
       prm.print_parameters(of, ParameterHandler::Text);
     }
+  else
+    try
+      {
+        prm.parse_input("temperature.prm");
+      }
+    catch (std::exception &e)
+      {
+        std::cout << e.what() << "\n";
+
+        std::ofstream of("temperature-default.prm");
+        prm.print_parameters(of, ParameterHandler::Text);
+      }
 
   initialize_parameters();
 }

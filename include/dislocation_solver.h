@@ -33,8 +33,11 @@ public:
    * Initialize the solver parameters from \c dislocation.prm.
    * If it doesn't exist, the default parameter values are written to
    * \c dislocation-default.prm.
+   * Default values are used and written to \c dislocation.prm if
+   * \c use_default_prm parameter is specified.
    */
-  DislocationSolver(const unsigned int order = 2);
+  DislocationSolver(const unsigned int order           = 2,
+                    const bool         use_default_prm = false);
 
   /** Advance time and calculate the dislocation density and creep strain.
    * Calls \c DislocationSolver::advance_time unless \c stress_only is enabled,
@@ -433,8 +436,9 @@ private:
 // IMPLEMENTATION
 
 template <int dim>
-DislocationSolver<dim>::DislocationSolver(const unsigned int order)
-  : stress_solver(order)
+DislocationSolver<dim>::DislocationSolver(const unsigned int order,
+                                          const bool         use_default_prm)
+  : stress_solver(order, use_default_prm)
   , current_time(0)
   , current_time_step(0)
 {
@@ -520,7 +524,7 @@ DislocationSolver<dim>::DislocationSolver(const unsigned int order)
 
   prm.declare_entry(
     "Max relative time step increase",
-    "0",
+    "1",
     Patterns::Double(0),
     "Maximum relative time step increase (optional, 0 - disabled)");
 
@@ -557,17 +561,23 @@ DislocationSolver<dim>::DislocationSolver(const unsigned int order)
                     Patterns::Integer(1),
                     "Precision of double variables for output of field data");
 
-  try
+  if (use_default_prm)
     {
-      prm.parse_input("dislocation.prm");
-    }
-  catch (std::exception &e)
-    {
-      std::cout << e.what() << "\n";
-
-      std::ofstream of("dislocation-default.prm");
+      std::ofstream of("dislocation.prm");
       prm.print_parameters(of, ParameterHandler::Text);
     }
+  else
+    try
+      {
+        prm.parse_input("dislocation.prm");
+      }
+    catch (std::exception &e)
+      {
+        std::cout << e.what() << "\n";
+
+        std::ofstream of("dislocation-default.prm");
+        prm.print_parameters(of, ParameterHandler::Text);
+      }
 
   initialize_parameters();
 }

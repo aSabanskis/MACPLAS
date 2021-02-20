@@ -12,7 +12,7 @@ template <int dim>
 class Problem
 {
 public:
-  Problem(const unsigned int order = 1);
+  Problem(const unsigned int order = 1, const bool use_default_prm = false);
 
   void
   run();
@@ -30,8 +30,8 @@ private:
 };
 
 template <int dim>
-Problem<dim>::Problem(const unsigned int order)
-  : solver(order)
+Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
+  : solver(order, use_default_prm)
 {
   prm.declare_entry("Initial temperature",
                     "1000",
@@ -50,17 +50,23 @@ Problem<dim>::Problem(const unsigned int order)
 
   prm.declare_entry("L", "0.020", Patterns::Double(0), "Cube size in m");
 
-  try
+  if (use_default_prm)
     {
-      prm.parse_input("problem.prm");
-    }
-  catch (std::exception &e)
-    {
-      std::cout << e.what() << "\n";
-
-      std::ofstream of("problem-default.prm");
+      std::ofstream of("problem.prm");
       prm.print_parameters(of, ParameterHandler::Text);
     }
+  else
+    try
+      {
+        prm.parse_input("problem.prm");
+      }
+    catch (std::exception &e)
+      {
+        std::cout << e.what() << "\n";
+
+        std::ofstream of("problem-default.prm");
+        prm.print_parameters(of, ParameterHandler::Text);
+      }
 }
 
 template <int dim>
@@ -124,13 +130,22 @@ Problem<dim>::initialize()
 }
 
 int
-main()
+main(int argc, char *argv[])
 {
+  const std::vector<std::string> arguments(argv, argv + argc);
+
+  bool init = false;
+
+  for (unsigned int i = 1; i < arguments.size(); ++i)
+    if (arguments[i] == "init" || arguments[i] == "use_default_prm")
+      init = true;
+
   deallog.attach(std::cout);
   deallog.depth_console(2);
 
-  Problem<3> p3d;
-  p3d.run();
+  Problem<3> p3d(1, init);
+  if (!init)
+    p3d.run();
 
   return 0;
 }
