@@ -135,8 +135,12 @@ Problem<dim>::apply_temperature_bc(void)
   const double t =
     temperature_solver.get_time() + temperature_solver.get_time_step();
 
-  temperature_solver.set_bc1(boundary_id_top, T0 - 2 * t);
-  temperature_solver.set_bc1(boundary_id_bot, T0 - 5 * t);
+  const double h     = 10;
+  const double T_top = T0 - 2 * t;
+  const double T_bot = T0 - 5 * t;
+
+  temperature_solver.set_bc_convective(boundary_id_top, h, T_top);
+  temperature_solver.set_bc_convective(boundary_id_bot, h, T_bot);
 }
 
 int

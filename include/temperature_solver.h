@@ -59,6 +59,19 @@ struct heat_flux_data
   std::function<double(double)> emissivity_deriv;
 };
 
+/** Data structure for convective cooling BC (Newton's law of cooling)
+ */
+struct convective_cooling_data
+{
+  /** Heat transfer coefficient, W m<sup>-2</sup> K<sup>-1</sup>
+   */
+  double h;
+
+  /** Reference temperature, K
+   */
+  double T_ref;
+};
+
 
 /** Class for calculation of the time-dependent temperature field
  */
@@ -152,6 +165,12 @@ public:
                    const Vector<double> &        q_in,
                    std::function<double(double)> emissivity,
                    std::function<double(double)> emissivity_deriv);
+
+  /** Set convective cooling boundary condition
+   * \f$q = h (T - T_\mathrm{ref})\f$
+   */
+  void
+  set_bc_convective(const unsigned int id, const double h, const double T_ref);
 
   /** Add probe point
    */
@@ -311,6 +330,10 @@ private:
   /** Data for thermal radiation and incoming heat flux density BC
    */
   std::map<unsigned int, heat_flux_data> bc_rad_mixed_data;
+
+  /** Data for convective cooling BC
+   */
+  std::map<unsigned int, convective_cooling_data> bc_convective_data;
 
 
   /** Locations of probe points
@@ -666,6 +689,16 @@ TemperatureSolver<dim>::set_bc_rad_mixed(
 
 template <int dim>
 void
+TemperatureSolver<dim>::set_bc_convective(const unsigned int id,
+                                          const double       h,
+                                          const double       T_ref)
+{
+  bc_convective_data[id].h     = h;
+  bc_convective_data[id].T_ref = T_ref;
+}
+
+template <int dim>
+void
 TemperatureSolver<dim>::add_probe(const Point<dim> &p)
 {
   probes.push_back(p);
@@ -744,6 +777,30 @@ TemperatureSolver<dim>::output_vtk() const
                                "q_in_" + std::to_string(data.first));
       data_out.add_data_vector(q, "q_rad_" + std::to_string(data.first));
       data_out.add_data_vector(e, "emissivity_" + std::to_string(data.first));
+    }
+
+  std::map<unsigned int, Vector<double>> q_conv;
+  for (const auto &data : bc_convective_data)
+    {
+      Vector<double> &q = q_conv[data.first];
+
+      q.reinit(temperature);
+
+      std::vector<bool> boundary_dofs(temperature.size(), false);
+      DoFTools::extract_boundary_dofs(dh,
+                                      ComponentMask(),
+                                      boundary_dofs,
+                                      {static_cast<types::boundary_id>(
+                                        data.first)});
+
+      for (unsigned int i = 0; i < temperature.size(); ++i)
+        {
+          if (!boundary_dofs[i])
+            continue;
+          q[i] = data.second.h * (temperature[i] - data.second.T_ref);
+        }
+
+      data_out.add_data_vector(q, "q_conv_" + std::to_string(data.first));
     }
 
   data_out.build_patches(fe.degree);
@@ -1065,6 +1122,44 @@ TemperatureSolver<dim>::local_assemble_system(
                        std::pow(T_face_q[q], 4)) *
                     fe_face_values.shape_value(i, q) *
                     fe_face_values.shape_value(j, q) * fe_face_values.JxW(q);
+                }
+              cell_rhs(i) -= net_heat_flux * fe_face_values.shape_value(i, q) *
+                             fe_face_values.JxW(q);
+            }
+        }
+    }
+
+  for (unsigned int face_number = 0;
+       face_number < GeometryInfo<dim>::faces_per_cell;
+       ++face_number)
+    {
+      if (!cell->face(face_number)->at_boundary())
+        continue;
+
+      auto it = bc_convective_data.find(cell->face(face_number)->boundary_id());
+      if (it == bc_convective_data.end())
+        continue;
+
+      const double h     = it->second.h;
+      const double T_ref = it->second.T_ref;
+
+      std::vector<double> &T_face_q = scratch_data.T_face_q;
+
+      fe_face_values.reinit(cell, face_number);
+
+      fe_face_values.get_function_values(temperature, T_face_q);
+
+      for (unsigned int q = 0; q < n_face_q_points; ++q)
+        {
+          const double net_heat_flux = h * (T_face_q[q] - T_ref);
+
+          for (unsigned int i = 0; i < dofs_per_cell; ++i)
+            {
+              for (unsigned int j = 0; j < dofs_per_cell; ++j)
+                {
+                  cell_matrix(i, j) += h * fe_face_values.shape_value(i, q) *
+                                       fe_face_values.shape_value(j, q) *
+                                       fe_face_values.JxW(q);
                 }
               cell_rhs(i) -= net_heat_flux * fe_face_values.shape_value(i, q) *
                              fe_face_values.JxW(q);
