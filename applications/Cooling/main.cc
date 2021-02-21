@@ -1,8 +1,9 @@
+#include <deal.II/base/function_parser.h>
+
 #include <deal.II/grid/grid_generator.h>
 
 #include "../../include/dislocation_solver.h"
 #include "../../include/temperature_solver.h"
-
 using namespace dealii;
 
 template <int dim>
@@ -28,10 +29,10 @@ private:
   TemperatureSolver<dim> temperature_solver;
   DislocationSolver<dim> dislocation_solver;
 
-  constexpr static double T0 = 1685;
-
   constexpr static unsigned int boundary_id_top = 5;
   constexpr static unsigned int boundary_id_bot = 4;
+
+  FunctionParser<1> m_T_top, m_T_bot;
 
   ParameterHandler prm;
 };
@@ -42,9 +43,29 @@ Problem<dim>::Problem(unsigned int order)
   , dislocation_solver(order)
 {
   prm.declare_entry("Initial temperature",
-                    std::to_string(T0),
+                    "1685",
                     Patterns::Double(0),
                     "Initial temperature in K");
+
+  prm.declare_entry("Top heat transfer coefficient",
+                    "10",
+                    Patterns::Double(0),
+                    "Top heat transfer coefficient in W/m^2/K");
+
+  prm.declare_entry("Bottom heat transfer coefficient",
+                    "10",
+                    Patterns::Double(0),
+                    "Bottom heat transfer coefficient in W/m^2/K");
+
+  prm.declare_entry("Top reference temperature",
+                    "1685 - 2 * t",
+                    Patterns::Anything(),
+                    "Top reference temperature in K (time function)");
+
+  prm.declare_entry("Bottom reference temperature",
+                    "1685 - 5 * t",
+                    Patterns::Anything(),
+                    "Bottom reference temperature in K (time function)");
 
   try
     {
@@ -57,6 +78,14 @@ Problem<dim>::Problem(unsigned int order)
       std::ofstream of("problem-default.prm");
       prm.print_parameters(of, ParameterHandler::Text);
     }
+
+  m_T_top.initialize("t",
+                     prm.get("Top reference temperature"),
+                     typename FunctionParser<1>::ConstMap());
+
+  m_T_bot.initialize("t",
+                     prm.get("Bottom reference temperature"),
+                     typename FunctionParser<1>::ConstMap());
 }
 
 template <int dim>
@@ -135,12 +164,16 @@ Problem<dim>::apply_temperature_bc(void)
   const double t =
     temperature_solver.get_time() + temperature_solver.get_time_step();
 
-  const double h     = 10;
-  const double T_top = T0 - 2 * t;
-  const double T_bot = T0 - 5 * t;
+  const double h_top = prm.get_double("Top heat transfer coefficient");
+  const double h_bot = prm.get_double("Bottom heat transfer coefficient");
+  const double T_top = m_T_top.value(Point<1>(t));
+  const double T_bot = m_T_bot.value(Point<1>(t));
 
-  temperature_solver.set_bc_convective(boundary_id_top, h, T_top);
-  temperature_solver.set_bc_convective(boundary_id_bot, h, T_bot);
+  temperature_solver.set_bc_convective(boundary_id_top, h_top, T_top);
+  temperature_solver.set_bc_convective(boundary_id_bot, h_bot, T_bot);
+
+  temperature_solver.add_output("T_top[K]", T_top);
+  temperature_solver.add_output("T_bot[K]", T_bot);
 }
 
 int

@@ -177,6 +177,11 @@ public:
   void
   add_probe(const Point<dim> &p);
 
+  /** Add user-defined output value
+   */
+  void
+  add_output(const std::string &name, const double value = 0);
+
   /** Read raw results from disk
    */
   void
@@ -339,6 +344,10 @@ private:
   /** Locations of probe points
    */
   std::vector<Point<dim>> probes;
+
+  /** User-defined output values
+   */
+  std::map<std::string, double> additional_output;
 
   /** Flag for writing header of the probes file
    */
@@ -706,6 +715,13 @@ TemperatureSolver<dim>::add_probe(const Point<dim> &p)
 
 template <int dim>
 void
+TemperatureSolver<dim>::add_output(const std::string &name, const double value)
+{
+  additional_output[name] = value;
+}
+
+template <int dim>
+void
 TemperatureSolver<dim>::load_data()
 {
   Timer timer;
@@ -869,8 +885,12 @@ TemperatureSolver<dim>::output_probes() const
         output << "# probe " << i << ":\t" << probes[i] << "\n";
 
       output << "t[s]"
-             << "\tdt[s]"
-             << "\tT_min[K]"
+             << "\tdt[s]";
+
+      for (const auto &it : additional_output)
+        output << "\t" << it.first;
+
+      output << "\tT_min[K]"
              << "\tT_max[K]";
       for (unsigned int i = 0; i < N; ++i)
         output << "\tT_" << i << "[K]";
@@ -890,7 +910,13 @@ TemperatureSolver<dim>::output_probes() const
   const int precision = prm.get_integer("Output precision");
   output << std::setprecision(precision);
 
-  output << t << '\t' << dt << '\t' << limits.first << '\t' << limits.second;
+  output << t << '\t' << dt;
+
+  for (const auto &it : additional_output)
+    output << "\t" << it.second;
+
+  output << '\t' << limits.first << '\t' << limits.second;
+
   for (const auto &v : values)
     output << '\t' << v;
   output << "\n";
