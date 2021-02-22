@@ -39,7 +39,7 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     "Initial temperature in K");
 
   prm.declare_entry("Strain rate",
-                    "1e-5",
+                    "-1e-5", // compression
                     Patterns::Double(),
                     "Strain rate in s^-1");
 
@@ -88,7 +88,7 @@ Problem<dim>::run()
           std::copysign(std::min(std::abs(strain), max_strain), strain);
       const double dx = prm.get_double("L") * strain_total;
 
-      solver.get_stress_solver().set_bc1(1, 0, -dx); // compression
+      solver.get_stress_solver().set_bc1(1, 0, dx);
       solver.add_output("strain_total[-]", strain_total);
 
       const bool keep_going = solver.solve();
