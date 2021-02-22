@@ -23,8 +23,13 @@ private:
   initialize();
 
   void
-  apply_temperature_bc(void);
+  apply_temperature_bc();
 
+  void
+  solve_temperature_dislocation();
+
+  void
+  solve_temperature();
 
   TemperatureSolver<dim> temperature_solver;
   DislocationSolver<dim> dislocation_solver;
@@ -42,6 +47,11 @@ Problem<dim>::Problem(unsigned int order)
   : temperature_solver(order)
   , dislocation_solver(order)
 {
+  prm.declare_entry("Temperature only",
+                    "false",
+                    Patterns::Bool(),
+                    "Calculate just the temperature field");
+
   prm.declare_entry("Initial temperature",
                     "1685",
                     Patterns::Double(0),
@@ -95,6 +105,16 @@ Problem<dim>::run()
   make_grid();
   initialize();
 
+  if (prm.get_bool("Temperature only"))
+    solve_temperature();
+  else
+    solve_temperature_dislocation();
+}
+
+template <int dim>
+void
+Problem<dim>::solve_temperature_dislocation()
+{
   while (true)
     {
       temperature_solver.get_time_step() = dislocation_solver.get_time_step();
@@ -113,6 +133,22 @@ Problem<dim>::run()
 
   temperature_solver.output_vtk();
   dislocation_solver.output_vtk();
+}
+
+template <int dim>
+void
+Problem<dim>::solve_temperature()
+{
+  while (true)
+    {
+      apply_temperature_bc();
+      const bool keep_going_temp = temperature_solver.solve();
+
+      if (!keep_going_temp)
+        break;
+    };
+
+  temperature_solver.output_vtk();
 }
 
 template <int dim>
@@ -147,13 +183,15 @@ Problem<dim>::initialize()
 
   Vector<double> &temperature = temperature_solver.get_temperature();
   temperature.add(prm.get_double("Initial temperature"));
+  temperature_solver.output_vtk();
+
+  if (prm.get_bool("Temperature only"))
+    return;
 
   // initialize dislocations and stresses
   dislocation_solver.initialize();
   dislocation_solver.get_temperature() = temperature;
   dislocation_solver.solve(true);
-
-  temperature_solver.output_vtk();
   dislocation_solver.output_vtk();
 }
 
