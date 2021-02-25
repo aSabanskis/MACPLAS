@@ -462,18 +462,19 @@ TemperatureSolver<dim>::TemperatureSolver(const unsigned int order,
   prm.declare_entry("Density",
                     "2329",
                     Patterns::Double(0),
-                    "Density in kg/m^3");
+                    "Density rho in kg/m^3");
 
   prm.declare_entry("Specific heat capacity",
                     "1000",
                     Patterns::Double(0),
-                    "Specific heat capacity in J/kg/K");
+                    "Specific heat capacity c_p in J/kg/K");
 
   prm.declare_entry(
     "Thermal conductivity",
     "98.89, -9.41813870776526E-02, 2.88183040644504E-05",
     Patterns::List(Patterns::Double(), 1),
-    "Comma-separated polynomial coefficients (temperature function) in W/m/K^0, W/m/K^1 etc.");
+    "Thermal conductivity lambda (polynomial temperature function)."
+    " Specified as comma-separated coefficients (W/m/K^0, W/m/K^1 etc.)");
 
   if (use_default_prm)
     {

@@ -55,27 +55,27 @@ Problem<dim>::Problem(unsigned int order)
   prm.declare_entry("Initial temperature",
                     "1685",
                     Patterns::Double(0),
-                    "Initial temperature in K");
+                    "Initial temperature T_0 in K");
 
   prm.declare_entry("Top heat transfer coefficient",
                     "10",
                     Patterns::Double(0),
-                    "Top heat transfer coefficient in W/m^2/K");
+                    "Top heat transfer coefficient h_top in W/m^2/K");
 
   prm.declare_entry("Bottom heat transfer coefficient",
                     "10",
                     Patterns::Double(0),
-                    "Bottom heat transfer coefficient in W/m^2/K");
+                    "Bottom heat transfer coefficient h_bot in W/m^2/K");
 
   prm.declare_entry("Top reference temperature",
                     "1685 - 2 * t",
                     Patterns::Anything(),
-                    "Top reference temperature in K (time function)");
+                    "Top reference temperature T_top in K (time function)");
 
   prm.declare_entry("Bottom reference temperature",
                     "1685 - 5 * t",
                     Patterns::Anything(),
-                    "Bottom reference temperature in K (time function)");
+                    "Bottom reference temperature T_bot in K (time function)");
 
   try
     {

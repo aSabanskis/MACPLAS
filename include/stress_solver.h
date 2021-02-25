@@ -408,28 +408,28 @@ StressSolver<dim>::StressSolver(const unsigned int order,
 
   AssertThrow(dim == 2 || dim == 3, ExcNotImplemented());
 
-  const std::string info_T = " (accepts temperature function)";
+  const std::string info_T = " (temperature function)";
 
   // Physical parameters from https://doi.org/10.1016/S0022-0248(01)01322-7
   prm.declare_entry("Young's modulus",
                     "1.56e11",
                     Patterns::Anything(),
-                    "Young's modulus in Pa" + info_T);
+                    "Young's modulus E in Pa" + info_T);
 
   prm.declare_entry("Thermal expansion coefficient",
                     "3.2e-6",
                     Patterns::Anything(),
-                    "Thermal expansion coefficient in 1/K" + info_T);
+                    "Thermal expansion coefficient alpha in 1/K" + info_T);
 
   prm.declare_entry("Poisson's ratio",
                     "0.25",
                     Patterns::Double(0, 0.5),
-                    "Poisson's ratio (dimensionless)");
+                    "Poisson's ratio nu (dimensionless)");
 
   prm.declare_entry("Reference temperature",
                     "1685",
                     Patterns::Double(0),
-                    "Reference temperature in K");
+                    "Reference temperature T_ref in K");
 
   prm.declare_entry("Linear solver type",
                     "minres",

@@ -461,23 +461,24 @@ DislocationSolver<dim>::DislocationSolver(const unsigned int order,
 #endif
                ")\n";
 
-  const std::string info_T = " (accepts temperature function)";
+  const std::string info_T = " (temperature function)";
 
   // Physical parameters from https://doi.org/10.1016/j.jcrysgro.2016.05.027
+  // (Kyushu)
   prm.declare_entry("Burgers vector",
                     "3.8e-10",
                     Patterns::Double(0),
-                    "Magnitude of Burgers vector in m");
+                    "Magnitude of Burgers vector b in m");
 
   prm.declare_entry("Peierls potential",
                     "2.17",
                     Patterns::Anything(),
-                    "Peierls potential in eV" + info_T);
+                    "Peierls potential Q in eV" + info_T);
 
   prm.declare_entry("Strain hardening factor",
                     "4.3",
                     Patterns::Anything(),
-                    "Strain hardening factor in N/m" + info_T);
+                    "Strain hardening factor D in N/m" + info_T);
 
   prm.declare_entry("Material constant K",
                     "3.1e-4",
@@ -513,7 +514,7 @@ DislocationSolver<dim>::DislocationSolver(const unsigned int order,
   prm.declare_entry("Initial dislocation density",
                     "1e6",
                     Patterns::Double(0),
-                    "Initial dislocation density in m^-2");
+                    "Initial dislocation density N_0 in m^-2");
 
 
   prm.declare_entry("Time step",

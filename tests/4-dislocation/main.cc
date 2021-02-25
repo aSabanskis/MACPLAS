@@ -36,19 +36,19 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
   prm.declare_entry("Initial temperature",
                     "1000",
                     Patterns::Double(0),
-                    "Initial temperature in K");
+                    "Initial temperature T_0 in K");
 
   prm.declare_entry("Strain rate",
                     "-1e-5", // compression
                     Patterns::Double(),
-                    "Strain rate in s^-1");
+                    "Strain rate dot_epsilon in s^-1");
 
   prm.declare_entry("Max strain",
                     "0",
                     Patterns::Double(0),
-                    "Maximum strain (dimensionless, 0 - disabled)");
+                    "Maximum strain epsilon_max (dimensionless, 0 - disabled)");
 
-  prm.declare_entry("L", "0.020", Patterns::Double(0), "Cube size in m");
+  prm.declare_entry("L", "0.020", Patterns::Double(0), "Cube size L in m");
 
   if (use_default_prm)
     {

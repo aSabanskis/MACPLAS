@@ -56,7 +56,7 @@ Problem<dim>::Problem(unsigned int order)
   prm.declare_entry("Initial temperature",
                     "1000",
                     Patterns::Double(0),
-                    "Initial temperature in K");
+                    "Initial temperature T_0 in K");
 
   prm.declare_entry("Max temperature change",
                     "0.1",
@@ -66,22 +66,24 @@ Problem<dim>::Problem(unsigned int order)
   prm.declare_entry("Inductor current",
                     "100",
                     Patterns::Double(0),
-                    "Effective inductor current in A");
+                    "Effective inductor current I in A");
 
-  prm.declare_entry("Reference electrical conductivity",
-                    "5e4",
-                    Patterns::Double(0),
-                    "Reference electrical conductivity (qEM.vtu) in S/m");
+  prm.declare_entry(
+    "Reference electrical conductivity",
+    "5e4",
+    Patterns::Double(0),
+    "Reference electrical conductivity sigma_ref (qEM.vtu) in S/m");
 
-  prm.declare_entry("Electrical conductivity",
-                    "100*10^(4.247-2924.0/T)",
-                    Patterns::Anything(),
-                    "Electrical conductivity in S/m");
+  prm.declare_entry(
+    "Electrical conductivity",
+    "100*10^(4.247-2924.0/T)",
+    Patterns::Anything(),
+    "Electrical conductivity sigma in S/m (temperature function)");
 
   prm.declare_entry("Emissivity",
                     "0.57",
                     Patterns::Double(0, 1),
-                    "Emissivity (dimensionless)");
+                    "Emissivity epsilon (dimensionless)");
 
   prm.declare_entry("Load saved results",
                     "false",
