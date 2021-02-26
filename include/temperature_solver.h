@@ -157,6 +157,16 @@ public:
                       std::vector<Point<dim>> &points,
                       std::vector<bool> &      boundary_dofs) const;
 
+  /** Get coordinates of DOFs
+   */
+  void
+  get_support_points(std::vector<Point<dim>> &points) const;
+
+  /** Get degrees of freedom for temperature
+   */
+  const DoFHandler<dim> &
+  get_dof_handler() const;
+
   /** Set first-type boundary condition
    */
   void
@@ -681,15 +691,28 @@ TemperatureSolver<dim>::get_boundary_points(
   std::vector<Point<dim>> &points,
   std::vector<bool> &      boundary_dofs) const
 {
-  const unsigned int n_dofs = dh.n_dofs();
-  points.resize(n_dofs);
-  boundary_dofs.resize(n_dofs);
-
-  DoFTools::map_dofs_to_support_points(MappingQ1<dim>(), dh, points);
+  get_support_points(points);
+  boundary_dofs.resize(dh.n_dofs());
   DoFTools::extract_boundary_dofs(dh,
                                   ComponentMask(),
                                   boundary_dofs,
                                   {static_cast<types::boundary_id>(id)});
+}
+
+template <int dim>
+void
+TemperatureSolver<dim>::get_support_points(
+  std::vector<Point<dim>> &points) const
+{
+  points.resize(dh.n_dofs());
+  DoFTools::map_dofs_to_support_points(MappingQ1<dim>(), dh, points);
+}
+
+template <int dim>
+const DoFHandler<dim> &
+TemperatureSolver<dim>::get_dof_handler() const
+{
+  return dh;
 }
 
 template <int dim>
