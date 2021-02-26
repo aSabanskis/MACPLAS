@@ -1238,13 +1238,14 @@ TemperatureSolver<dim>::solve_system()
     }
   else
     {
-      std::cout << "\n";
-
       const int solver_iterations = prm.get_integer("Linear solver iterations");
       const double solver_tolerance = prm.get_double("Linear solver tolerance");
 
       const bool log_history = prm.get_bool("Log convergence full");
       const bool log_result  = prm.get_bool("Log convergence final");
+
+      if (log_history || log_result)
+        std::cout << "\n";
 
       IterationNumberControl control(solver_iterations,
                                      solver_tolerance,
