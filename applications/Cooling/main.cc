@@ -52,6 +52,12 @@ Problem<dim>::Problem(unsigned int order)
                     Patterns::Bool(),
                     "Calculate just the temperature field");
 
+  prm.declare_entry(
+    "Output frequency",
+    "0",
+    Patterns::Integer(0),
+    "Number of time steps between result output (0 - disabled)");
+
   prm.declare_entry("Initial temperature",
                     "1685",
                     Patterns::Double(0),
@@ -115,7 +121,9 @@ template <int dim>
 void
 Problem<dim>::solve_temperature_dislocation()
 {
-  while (true)
+  const int n_output = prm.get_integer("Output frequency");
+
+  for (unsigned int i = 1;; ++i)
     {
       temperature_solver.get_time_step() = dislocation_solver.get_time_step();
 
@@ -129,6 +137,12 @@ Problem<dim>::solve_temperature_dislocation()
 
       if (!keep_going_temp || !keep_going_disl)
         break;
+
+      if (n_output > 0 && i % n_output == 0)
+        {
+          temperature_solver.output_vtk();
+          dislocation_solver.output_vtk();
+        }
     };
 
   temperature_solver.output_vtk();
@@ -139,13 +153,20 @@ template <int dim>
 void
 Problem<dim>::solve_temperature()
 {
-  while (true)
+  const int n_output = prm.get_integer("Output frequency");
+
+  for (unsigned int i = 1;; ++i)
     {
       apply_temperature_bc();
       const bool keep_going_temp = temperature_solver.solve();
 
       if (!keep_going_temp)
         break;
+
+      if (n_output > 0 && i % n_output == 0)
+        {
+          temperature_solver.output_vtk();
+        }
     };
 
   temperature_solver.output_vtk();
