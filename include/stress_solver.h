@@ -51,6 +51,11 @@ public:
   StressSolver(const unsigned int order           = 2,
                const bool         use_default_prm = false);
 
+  /** Solver name
+   */
+  std::string
+  solver_name() const;
+
   /** Calculate the stresses
    */
   void
@@ -502,7 +507,7 @@ template <int dim>
 void
 StressSolver<dim>::initialize_parameters()
 {
-  std::cout << "Intializing parameters";
+  std::cout << solver_name() << "  Intializing parameters";
 
   const std::string m_E_expression = prm.get("Young's modulus");
   m_E.initialize("T", m_E_expression, typename FunctionParser<1>::ConstMap());
@@ -529,6 +534,13 @@ StressSolver<dim>::initialize_parameters()
 
   std::cout << "n_cores=" << MultithreadInfo::n_cores() << "\n"
             << "n_threads=" << MultithreadInfo::n_threads() << "\n";
+}
+
+template <int dim>
+std::string
+StressSolver<dim>::solver_name() const
+{
+  return "MACPLAS:Stress";
 }
 
 template <int dim>
@@ -624,7 +636,7 @@ StressSolver<dim>::initialize()
 {
   Timer timer;
 
-  std::cout << "Initializing finite element solution";
+  std::cout << solver_name() << "  Initializing finite element solution";
 
   dh_temp.distribute_dofs(fe_temp);
   dh.distribute_dofs(fe);
@@ -639,8 +651,10 @@ StressSolver<dim>::initialize()
 
   std::cout << " " << format_time(timer) << "\n";
 
-  std::cout << "Number of active cells: " << triangulation.n_active_cells()
+  std::cout << solver_name() << "  "
+            << "Number of active cells: " << triangulation.n_active_cells()
             << "\n"
+            << solver_name() << "  "
             << "Number of degrees of freedom for temperature: " << n_dofs_temp
             << "\n";
 }
@@ -713,7 +727,7 @@ StressSolver<dim>::output_vtk() const
   Timer timer;
 
   const std::string file_name = "result-stress" + output_name_suffix() + ".vtk";
-  std::cout << "Saving to '" << file_name << "'";
+  std::cout << solver_name() << "  Saving to '" << file_name << "'";
 
   DataOut<dim> data_out;
 
@@ -785,7 +799,7 @@ StressSolver<dim>::output_mesh() const
   Timer timer;
 
   const std::string file_name = "mesh" + output_name_suffix() + ".msh";
-  std::cout << "Saving to '" << file_name << "'";
+  std::cout << solver_name() << "  Saving to '" << file_name << "'";
 
   std::ofstream output(file_name);
   output << std::setprecision(16);
@@ -859,7 +873,7 @@ StressSolver<dim>::assemble_system()
 {
   Timer timer;
 
-  std::cout << "Assembling system";
+  std::cout << solver_name() << "  Assembling system";
 
   const QGauss<dim> quadrature(fe.degree + 1);
 
@@ -999,7 +1013,7 @@ StressSolver<dim>::solve_system()
 {
   Timer timer;
 
-  std::cout << "Solving system";
+  std::cout << solver_name() << "  Solving system";
 
   const std::string solver_type = prm.get("Linear solver type");
 
@@ -1095,7 +1109,7 @@ StressSolver<dim>::calculate_stress()
 {
   Timer timer;
 
-  std::cout << "Postprocessing results";
+  std::cout << solver_name() << "  Postprocessing results";
 
   const QGauss<dim> quadrature(fe.degree + 1);
 

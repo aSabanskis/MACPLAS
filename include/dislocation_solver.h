@@ -39,6 +39,11 @@ public:
   DislocationSolver(const unsigned int order           = 2,
                     const bool         use_default_prm = false);
 
+  /** Solver name
+   */
+  std::string
+  solver_name() const;
+
   /** Advance time and calculate the dislocation density and creep strain.
    * Calls \c DislocationSolver::advance_time unless \c stress_only is enabled,
    * then only the stress is calculated.
@@ -593,6 +598,13 @@ DislocationSolver<dim>::DislocationSolver(const unsigned int order,
 }
 
 template <int dim>
+std::string
+DislocationSolver<dim>::solver_name() const
+{
+  return "MACPLAS:Dislocation";
+}
+
+template <int dim>
 bool
 DislocationSolver<dim>::solve(const double stress_only)
 {
@@ -610,7 +622,7 @@ DislocationSolver<dim>::solve(const double stress_only)
   const double t     = get_time();
   const double t_max = get_max_time();
 
-  std::cout << "Time " << t << " s\n";
+  std::cout << solver_name() << "  Time " << t << " s\n";
 
 
   if (time_scheme == "Euler")
@@ -850,7 +862,7 @@ DislocationSolver<dim>::output_vtk() const
 
   const std::string file_name =
     "result-dislocation" + output_name_suffix() + ".vtk";
-  std::cout << "Saving to '" << file_name << "'";
+  std::cout << solver_name() << "  Saving to '" << file_name << "'";
 
   DataOut<dim> data_out;
 
@@ -942,7 +954,7 @@ DislocationSolver<dim>::output_mesh() const
   Timer timer;
 
   const std::string file_name = "mesh" + output_name_suffix() + ".msh";
-  std::cout << "Saving to '" << file_name << "'";
+  std::cout << solver_name() << "  Saving to '" << file_name << "'";
 
   std::ofstream output(file_name);
   output << std::setprecision(16);
@@ -958,7 +970,7 @@ template <int dim>
 void
 DislocationSolver<dim>::initialize_parameters()
 {
-  std::cout << "Intializing parameters";
+  std::cout << solver_name() << "  Intializing parameters";
 
   const std::string m_Q_expression = prm.get("Peierls potential");
   m_Q.initialize("T", m_Q_expression, typename FunctionParser<1>::ConstMap());
@@ -1139,7 +1151,8 @@ DislocationSolver<dim>::output_probes() const
   ss << "probes-dislocation-" << dim << "d.txt";
   const std::string file_name = ss.str();
 
-  std::cout << "Saving values at probe points to '" << file_name << "'";
+  std::cout << solver_name() << "  "
+            << "Saving values at probe points to '" << file_name << "'";
 
   const unsigned int N = probes.size();
 
@@ -1714,7 +1727,8 @@ DislocationSolver<dim>::integrate_implicit()
     {
       // k=0: initial approximation (forward Euler)
 
-      std::cout << "Fixed point iteration " << k << " of " << n_iterations
+      std::cout << solver_name() << "  "
+                << "Fixed point iteration " << k << " of " << n_iterations
                 << "\n";
 
       for (unsigned int i = 0; i < N; ++i)

@@ -89,6 +89,11 @@ public:
   TemperatureSolver(const unsigned int order           = 2,
                     const bool         use_default_prm = false);
 
+  /** Solver name
+   */
+  std::string
+  solver_name() const;
+
   /** Calculate the temperature field.
    * @returns \c true if the final time has been reached
    */
@@ -501,7 +506,7 @@ template <int dim>
 void
 TemperatureSolver<dim>::initialize_parameters()
 {
-  std::cout << "Intializing parameters";
+  std::cout << solver_name() << "  Intializing parameters";
 
   // no built-in function exists, parse manually
   std::string              lambda_raw = prm.get("Thermal conductivity");
@@ -533,6 +538,13 @@ TemperatureSolver<dim>::initialize_parameters()
 }
 
 template <int dim>
+std::string
+TemperatureSolver<dim>::solver_name() const
+{
+  return "MACPLAS:Temperature";
+}
+
+template <int dim>
 bool
 TemperatureSolver<dim>::solve()
 {
@@ -561,7 +573,8 @@ TemperatureSolver<dim>::solve()
 
       // Check convergence
       const double max_abs_dT = temperature_update.linfty_norm();
-      std::cout << "Time " << t << " s"
+      std::cout << solver_name() << "  "
+                << "Time " << t << " s"
                 << "  Newton iteration " << i << "  max T change " << max_abs_dT
                 << " K\n";
       if (max_abs_dT < prm.get_double("Max absolute change"))
@@ -653,8 +666,10 @@ TemperatureSolver<dim>::initialize()
   temperature.reinit(n_dofs);
   temperature_update.reinit(n_dofs);
 
-  std::cout << "Number of active cells: " << triangulation.n_active_cells()
+  std::cout << solver_name() << "  "
+            << "Number of active cells: " << triangulation.n_active_cells()
             << "\n"
+            << solver_name() << "  "
             << "Number of degrees of freedom for temperature: " << n_dofs
             << "\n";
 }
@@ -751,7 +766,7 @@ TemperatureSolver<dim>::output_vtk() const
 
   const std::string file_name =
     "result-temperature" + output_name_suffix() + ".vtk";
-  std::cout << "Saving to '" << file_name << "'";
+  std::cout << solver_name() << "  Saving to '" << file_name << "'";
 
   DataOut<dim> data_out;
 
@@ -839,7 +854,7 @@ TemperatureSolver<dim>::output_mesh() const
   Timer timer;
 
   const std::string file_name = "mesh" + output_name_suffix() + ".msh";
-  std::cout << "Saving to '" << file_name << "'";
+  std::cout << solver_name() << "  Saving to '" << file_name << "'";
 
   std::ofstream output(file_name);
   output << std::setprecision(16);
@@ -870,7 +885,8 @@ TemperatureSolver<dim>::output_probes() const
   ss << "probes-temperature-" << dim << "d.txt";
   const std::string file_name = ss.str();
 
-  std::cout << "Saving values at probe points to '" << file_name << "'";
+  std::cout << solver_name() << "  "
+            << "Saving values at probe points to '" << file_name << "'";
 
   const unsigned int N = probes.size();
 
@@ -995,7 +1011,7 @@ TemperatureSolver<dim>::assemble_system()
 {
   Timer timer;
 
-  std::cout << "Assembling system";
+  std::cout << solver_name() << "  Assembling system";
 
   const QGauss<dim> &    quadrature(fe.degree + 1 + lambda.degree() / 2);
   const QGauss<dim - 1> &face_quadrature(fe.degree + 1 + lambda.degree() / 2);
@@ -1224,7 +1240,7 @@ TemperatureSolver<dim>::solve_system()
 {
   Timer timer;
 
-  std::cout << "Solving system";
+  std::cout << solver_name() << "  Solving system";
 
   const std::string solver_type = prm.get("Linear solver type");
 
