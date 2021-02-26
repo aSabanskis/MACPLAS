@@ -1001,8 +1001,11 @@ TemperatureSolver<dim>::AssemblyScratchData::AssemblyScratchData(
   const FiniteElement<dim> &fe)
   : fe_values(fe,
               quadrature,
-              update_values | update_gradients | update_JxW_values)
-  , fe_face_values(fe, face_quadrature, update_values | update_JxW_values)
+              update_quadrature_points | update_values | update_gradients |
+                update_JxW_values)
+  , fe_face_values(fe,
+                   face_quadrature,
+                   update_quadrature_points | update_values | update_JxW_values)
   , lambda_data(2)
   , T_q(quadrature.size())
   , T_prev_q(quadrature.size())
@@ -1122,6 +1125,10 @@ TemperatureSolver<dim>::local_assemble_system(
       const double lambda_q       = lambda_data[0];
       const double lambda_deriv_q = lambda_data[1];
 
+      const double weight =
+        dim == 2 ? fe_values.JxW(q) * fe_values.quadrature_point(q)[0] :
+                   fe_values.JxW(q);
+
       for (unsigned int i = 0; i < dofs_per_cell; ++i)
         {
           const double &        phi_i      = fe_values.shape_value(i, q);
@@ -1140,12 +1147,11 @@ TemperatureSolver<dim>::local_assemble_system(
               // Newthon's method
               cell_matrix(i, j) +=
                 (lambda_q * (grad_phi_j * grad_phi_i) + tmp2_i * phi_j) *
-                fe_values.JxW(q);
+                weight;
             }
 
           cell_rhs(i) -=
-            (lambda_q * tmp_grad_i + tmp_i * (T_q[q] - T_prev_q[q])) *
-            fe_values.JxW(q);
+            (lambda_q * tmp_grad_i + tmp_i * (T_q[q] - T_prev_q[q])) * weight;
         }
     }
 
@@ -1176,6 +1182,11 @@ TemperatureSolver<dim>::local_assemble_system(
                                          std::pow(T_face_q[q], 4) -
                                        heat_flux_in_face_q[q];
 
+          const double weight =
+            dim == 2 ?
+              fe_face_values.JxW(q) * fe_face_values.quadrature_point(q)[0] :
+              fe_face_values.JxW(q);
+
           for (unsigned int i = 0; i < dofs_per_cell; ++i)
             {
               for (unsigned int j = 0; j < dofs_per_cell; ++j)
@@ -1187,10 +1198,10 @@ TemperatureSolver<dim>::local_assemble_system(
                      it->second.emissivity_deriv(T_face_q[q]) *
                        std::pow(T_face_q[q], 4)) *
                     fe_face_values.shape_value(i, q) *
-                    fe_face_values.shape_value(j, q) * fe_face_values.JxW(q);
+                    fe_face_values.shape_value(j, q) * weight;
                 }
-              cell_rhs(i) -= net_heat_flux * fe_face_values.shape_value(i, q) *
-                             fe_face_values.JxW(q);
+              cell_rhs(i) -=
+                net_heat_flux * fe_face_values.shape_value(i, q) * weight;
             }
         }
     }
@@ -1219,16 +1230,21 @@ TemperatureSolver<dim>::local_assemble_system(
         {
           const double net_heat_flux = h * (T_face_q[q] - T_ref);
 
+          const double weight =
+            dim == 2 ?
+              fe_face_values.JxW(q) * fe_face_values.quadrature_point(q)[0] :
+              fe_face_values.JxW(q);
+
           for (unsigned int i = 0; i < dofs_per_cell; ++i)
             {
               for (unsigned int j = 0; j < dofs_per_cell; ++j)
                 {
                   cell_matrix(i, j) += h * fe_face_values.shape_value(i, q) *
                                        fe_face_values.shape_value(j, q) *
-                                       fe_face_values.JxW(q);
+                                       weight;
                 }
-              cell_rhs(i) -= net_heat_flux * fe_face_values.shape_value(i, q) *
-                             fe_face_values.JxW(q);
+              cell_rhs(i) -=
+                net_heat_flux * fe_face_values.shape_value(i, q) * weight;
             }
         }
     }

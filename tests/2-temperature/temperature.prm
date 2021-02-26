@@ -12,3 +12,5 @@ set Preconditioner type       = jacobi
 set Specific heat capacity    = 1000
 set Thermal conductivity      = 200
 set Time step                 = 1
+set Log convergence full      = false
+set Log convergence final     = false
