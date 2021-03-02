@@ -10,7 +10,7 @@ template <int dim>
 class Problem
 {
 public:
-  Problem(unsigned int order = 2);
+  Problem(unsigned int order = 2, const bool use_default_prm = false);
 
   void
   run();
@@ -43,9 +43,9 @@ private:
 };
 
 template <int dim>
-Problem<dim>::Problem(unsigned int order)
-  : temperature_solver(order)
-  , dislocation_solver(order)
+Problem<dim>::Problem(unsigned int order, const bool use_default_prm)
+  : temperature_solver(order, use_default_prm)
+  , dislocation_solver(order, use_default_prm)
 {
   prm.declare_entry("Temperature only",
                     "false",
@@ -83,17 +83,23 @@ Problem<dim>::Problem(unsigned int order)
                     Patterns::Anything(),
                     "Bottom reference temperature T_bot in K (time function)");
 
-  try
+  if (use_default_prm)
     {
-      prm.parse_input("problem.prm");
-    }
-  catch (std::exception &e)
-    {
-      std::cout << e.what() << "\n";
-
-      std::ofstream of("problem-default.prm");
+      std::ofstream of("problem.prm");
       prm.print_parameters(of, ParameterHandler::Text);
     }
+  else
+    try
+      {
+        prm.parse_input("problem.prm");
+      }
+    catch (std::exception &e)
+      {
+        std::cout << e.what() << "\n";
+
+        std::ofstream of("problem-default.prm");
+        prm.print_parameters(of, ParameterHandler::Text);
+      }
 
   m_T_top.initialize("t",
                      prm.get("Top reference temperature"),
@@ -236,13 +242,22 @@ Problem<dim>::apply_temperature_bc(void)
 }
 
 int
-main()
+main(int argc, char *argv[])
 {
+  const std::vector<std::string> arguments(argv, argv + argc);
+
+  bool init = false;
+
+  for (unsigned int i = 1; i < arguments.size(); ++i)
+    if (arguments[i] == "init" || arguments[i] == "use_default_prm")
+      init = true;
+
   deallog.attach(std::cout);
   deallog.depth_console(2);
 
-  Problem<3> p3d(2);
-  p3d.run();
+  Problem<3> p3d(2, init);
+  if (!init)
+    p3d.run();
 
   return 0;
 }
