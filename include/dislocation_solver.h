@@ -443,7 +443,7 @@ private:
 
   /** Boltzmann constant \f$k_B\f$, eV/K
    */
-  static constexpr double m_k_B = 8.617e-5;
+  double m_k_B;
 };
 
 
@@ -514,6 +514,11 @@ DislocationSolver<dim>::DislocationSolver(const unsigned int order,
                     "1.0",
                     Patterns::Double(0),
                     "Average Taylor factor F (dimensionless)");
+
+  prm.declare_entry("Boltzmann constant",
+                    "8.617e-5",
+                    Patterns::Double(0),
+                    "Boltzmann constant in eV/K");
 
 
   prm.declare_entry("Initial dislocation density",
@@ -985,6 +990,7 @@ DislocationSolver<dim>::initialize_parameters()
   m_p   = prm.get_double("Material constant p");
   m_S   = prm.get_double("Average Schmid factor");
   m_F   = prm.get_double("Average Taylor factor");
+  m_k_B = prm.get_double("Boltzmann constant");
 
   time_scheme = prm.get("Time scheme");
 
