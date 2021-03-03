@@ -21,12 +21,13 @@ sed -Ei "s/(set Max time *= *).*/\1$tmax/" temperature.prm
 sed -Ei "s/(set Max time *= *).*/\1$tmax/" dislocation.prm
 sed -Ei "s/(set Initial dislocation density *= *).*/\1 1e7/" dislocation.prm
 sed -Ei "s/(set Time scheme *= *).*/\1 Linearized N_m/" dislocation.prm
-sed -Ei "s/(set Time step *= *).*/\1 0.1/" dislocation.prm
-sed -Ei "s/(set Max time step *= *).*/\1 60/" dislocation.prm
-sed -Ei "s/(set Min time step *= *).*/\1 0.1/" dislocation.prm
+sed -Ei "s/(set Time step *= *).*/\1 1/" dislocation.prm
+sed -Ei "s/(set Max time step *= *).*/\1 100/" dislocation.prm
+sed -Ei "s/(set Min time step *= *).*/\1 1/" dislocation.prm
 sed -Ei "s/(set Max relative time step increase *= *).*/\1 0.1/" dislocation.prm
 sed -Ei "s/(set Max dstrain_c *= *).*/\1 1e-6/" dislocation.prm
 sed -Ei "s/(set Max relative dN_m *= *).*/\1 0.1/" dislocation.prm
+sed -Ei "s/(set Max v*dt *= *).*/\1 5e-4/" dislocation.prm
 sed -Ei "s/(set Output frequency *= *).*/\1 1000/" problem.prm
 
 # http://dx.doi.org/10.1016/j.jcrysgro.2016.06.007
