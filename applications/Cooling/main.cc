@@ -224,7 +224,7 @@ Problem<dim>::initialize()
 
 template <int dim>
 void
-Problem<dim>::apply_temperature_bc(void)
+Problem<dim>::apply_temperature_bc()
 {
   const double t =
     temperature_solver.get_time() + temperature_solver.get_time_step();

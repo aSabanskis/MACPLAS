@@ -25,13 +25,13 @@ private:
   initialize();
 
   void
-  apply_q_em(void);
+  apply_q_em();
 
   void
-  calculate_temperature(void);
+  calculate_temperature();
 
   void
-  calculate_dislocation(void);
+  calculate_dislocation();
 
   TemperatureSolver<dim> temperature_solver;
   DislocationSolver<dim> dislocation_solver;
@@ -120,7 +120,7 @@ Problem<dim>::run()
 
 template <int dim>
 void
-Problem<dim>::calculate_temperature(void)
+Problem<dim>::calculate_temperature()
 {
   if (prm.get_bool("Load saved results"))
     {
@@ -148,7 +148,7 @@ Problem<dim>::calculate_temperature(void)
 
 template <int dim>
 void
-Problem<dim>::calculate_dislocation(void)
+Problem<dim>::calculate_dislocation()
 {
   // initialize dislocations and stresses
   dislocation_solver.initialize();
@@ -232,7 +232,7 @@ Problem<dim>::initialize()
 
 template <int dim>
 void
-Problem<dim>::apply_q_em(void)
+Problem<dim>::apply_q_em()
 {
   const Vector<double> &temperature = temperature_solver.get_temperature();
 
