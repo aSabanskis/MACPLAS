@@ -934,6 +934,8 @@ TemperatureSolver<dim>::output_probes() const
              << "\tT_max[K]";
       for (unsigned int i = 0; i < N; ++i)
         output << "\tT_" << i << "[K]";
+      for (unsigned int i = 0; i < N; ++i)
+        output << "\tlambda_" << i << "[Wm^-1K^-1]";
       output << "\n";
     }
 
@@ -959,6 +961,8 @@ TemperatureSolver<dim>::output_probes() const
 
   for (const auto &v : values)
     output << '\t' << v;
+  for (const auto &v : values)
+    output << '\t' << lambda.value(v);
   output << "\n";
 
   std::cout << " " << format_time(timer) << "\n";
