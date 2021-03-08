@@ -10,7 +10,7 @@ fi
 
 ./macplas-cooling init
 
-tmax=198000  # 55 h
+tmax=196200  # 54.5 h
 nthreads=0
 
 sed -Ei "s/(set Number of threads *= *).*/\1$nthreads/" stress.prm
@@ -22,22 +22,24 @@ sed -Ei "s/(set Max time *= *).*/\1$tmax/" dislocation.prm
 sed -Ei "s/(set Initial dislocation density *= *).*/\1 1e7/" dislocation.prm
 sed -Ei "s/(set Time scheme *= *).*/\1 Linearized N_m/" dislocation.prm
 sed -Ei "s/(set Time step *= *).*/\1 1/" dislocation.prm
-sed -Ei "s/(set Max time step *= *).*/\1 100/" dislocation.prm
+sed -Ei "s/(set Max time step *= *).*/\1 120/" dislocation.prm
 sed -Ei "s/(set Min time step *= *).*/\1 1/" dislocation.prm
 sed -Ei "s/(set Max relative time step increase *= *).*/\1 0.1/" dislocation.prm
 sed -Ei "s/(set Max dstrain_c *= *).*/\1 1e-6/" dislocation.prm
 sed -Ei "s/(set Max relative dN_m *= *).*/\1 0.1/" dislocation.prm
 sed -Ei "s/(set Max v*dt *= *).*/\1 5e-4/" dislocation.prm
-sed -Ei "s/(set Output frequency *= *).*/\1 1000/" problem.prm
+sed -Ei "s/(set Output frequency *= *).*/\1 60/" problem.prm
 
 # http://dx.doi.org/10.1016/j.jcrysgro.2016.06.007
 sed -Ei "s/(set Thermal conductivity *= *).*/\1 217.873, -0.398349, 0.000276322, -6.48418e-08/" temperature.prm
 
 sed -Ei "s/(set Bottom heat transfer coefficient *= *).*/\1 2000/" problem.prm
 sed -Ei "s/(set Top heat transfer coefficient *= *).*/\1 2000/" problem.prm
-sed -Ei "s|(set Bottom reference temperature *= *).*|\1 t/3600<10 ? 1685-t/3600*200/10 : t/3600<47 ? 1485-(t/3600-10)*812/37 : 673-(t/3600-47)*400/8|" problem.prm
-sed -Ei "s|(set Top reference temperature *= *).*|\1 t/3600<10 ? 1685-t/3600*12/10 : t/3600<40 ? 1673-(t/3600-10)*660/30 : t/3600<47 ? 1013-(t/3600-40)*340/7 : 673-(t/3600-47)*400/8|" problem.prm
+sed -Ei "s|(set Bottom reference temperature *= *).*|\1 t/3600<10 ? 1683-t/3600*5/10 : t/3600<40 ? 1678-(t/3600-10)*662/30 : t/3600<47 ? 1015-(t/3600-40)*329/7 : 686-(t/3600-47)*383/7.5|" problem.prm
+sed -Ei "s|(set Top reference temperature *= *).*|\1 t/3600<10 ? 1683-t/3600*203/10 : t/3600<40 ? 1480-(t/3600-10)*647/30 : t/3600<47.2054 ? 833-(t/3600-40)*153/7 : 686-(t/3600-47)*383/7.5|" problem.prm
+sed -Ei "s|(set Initial temperature *= *).*|\1 1683|" problem.prm
 
+sed -Ei "s/(set Reference temperature *= *).*/\1 1683/" stress.prm
 sed -Ei "s/(set Young's modulus *= *).*/\1 1.7e11-2.771e4*T^2/" stress.prm
 sed -Ei "s/(set Thermal expansion coefficient *= *).*/\1 3.725e-6*(1-exp(-5.88e-3*(T-124)))+5.548e-10*T/" stress.prm
 
