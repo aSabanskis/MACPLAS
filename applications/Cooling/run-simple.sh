@@ -19,11 +19,11 @@ sed -Ei "s/(set Log convergence final *= *).*/\1 false/" stress.prm
 sed -Ei "s/(set Log convergence final *= *).*/\1 false/" temperature.prm
 sed -Ei "s/(set Max time *= *).*/\1$tmax/" temperature.prm
 sed -Ei "s/(set Max time *= *).*/\1$tmax/" dislocation.prm
-sed -Ei "s/(set Initial dislocation density *= *).*/\1 1e7/" dislocation.prm
+sed -Ei "s/(set Initial dislocation density *= *).*/\1 0/" dislocation.prm
 sed -Ei "s/(set Time scheme *= *).*/\1 Linearized N_m/" dislocation.prm
-sed -Ei "s/(set Time step *= *).*/\1 1/" dislocation.prm
+sed -Ei "s/(set Time step *= *).*/\1 120/" dislocation.prm
 sed -Ei "s/(set Max time step *= *).*/\1 120/" dislocation.prm
-sed -Ei "s/(set Min time step *= *).*/\1 1/" dislocation.prm
+
 sed -Ei "s/(set Max relative time step increase *= *).*/\1 0.1/" dislocation.prm
 sed -Ei "s/(set Max dstrain_c *= *).*/\1 1e-6/" dislocation.prm
 sed -Ei "s/(set Max relative dN_m *= *).*/\1 0.1/" dislocation.prm
@@ -35,8 +35,8 @@ sed -Ei "s/(set Thermal conductivity *= *).*/\1 217.873, -0.398349, 0.000276322,
 
 sed -Ei "s/(set Bottom heat transfer coefficient *= *).*/\1 2000/" problem.prm
 sed -Ei "s/(set Top heat transfer coefficient *= *).*/\1 2000/" problem.prm
-sed -Ei "s|(set Bottom reference temperature *= *).*|\1 t/3600<10 ? 1683-t/3600*5/10 : t/3600<40 ? 1678-(t/3600-10)*662/30 : t/3600<47 ? 1015-(t/3600-40)*329/7 : 686-(t/3600-47)*383/7.5|" problem.prm
-sed -Ei "s|(set Top reference temperature *= *).*|\1 t/3600<10 ? 1683-t/3600*203/10 : t/3600<40 ? 1480-(t/3600-10)*647/30 : t/3600<47.2054 ? 833-(t/3600-40)*153/7 : 686-(t/3600-47)*383/7.5|" problem.prm
+sed -Ei "s|(set Top reference temperature *= *).*|\1 t/3600<10 ? 1683-t/3600*5/10 : t/3600<40 ? 1678-(t/3600-10)*662/30 : t/3600<47 ? 1015-(t/3600-40)*329/7 : 686-(t/3600-47)*383/7.5|" problem.prm
+sed -Ei "s|(set Bottom reference temperature *= *).*|\1 t/3600<10 ? 1683-t/3600*203/10 : t/3600<40 ? 1480-(t/3600-10)*647/30 : t/3600<47.2054 ? 833-(t/3600-40)*153/7 : 686-(t/3600-47)*383/7.5|" problem.prm
 sed -Ei "s|(set Initial temperature *= *).*|\1 1683|" problem.prm
 
 sed -Ei "s/(set Reference temperature *= *).*/\1 1683/" stress.prm
@@ -50,6 +50,22 @@ sed -Ei "s/(set Material constant k_0 *= *).*/\1 8.58e-4/" dislocation.prm
 sed -Ei "s|(set Peierls potential *= *).*|\1 2.185+0.1*atan((T-1347.5)/100)|" dislocation.prm
 sed -Ei "s/(set Strain hardening factor *= *).*/\1 2.0*0.4*(1.7e11-2.771e4*T^2)*3.83e-10/" dislocation.prm
 
-./macplas-cooling
+r=1-elastic
+mkdir -p $r
 
+./macplas-cooling > $r/log
 ./plot-probes-minmax.gnu
+cp *.prm *.vtk probes* $r
+rm probes-dislocation-3d.txt
+
+
+r=2-plastic
+mkdir -p $r
+
+sed -Ei "s/(set Initial dislocation density *= *).*/\1 1e7/" dislocation.prm
+sed -Ei "s/(set Time step *= *).*/\1 10/" dislocation.prm
+sed -Ei "s/(set Min time step *= *).*/\1 10/" dislocation.prm
+
+./macplas-cooling > $r/log
+./plot-probes-minmax.gnu
+cp *.prm *.vtk probes* $r
