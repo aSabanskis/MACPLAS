@@ -293,6 +293,12 @@ private:
   void
   output_probes() const;
 
+  /** Calculate the temperature-dependent product of density and specific heat
+   * capacity \f$\rho c_p\f$, J m<sup>-3</sup> K<sup>-1</sup>
+   */
+  double
+  calc_rho_c_p(const double T) const;
+
   /** Helper method for creating output file name
    *
    * @returns \c "-<dim>d-order<order>-t<time>"
@@ -337,6 +343,15 @@ private:
    */
   Vector<double> temperature_update;
 
+
+  /** Density (temperature function) \f$\rho\f$, kg m<sup>-3</sup>
+   */
+  FunctionParser<1> m_rho;
+
+  /** Specific heat capacity (temperature function) \f$c_p\f$,
+   * J kg<sup>-1</sup> K<sup>-1</sup>
+   */
+  FunctionParser<1> m_c_p;
 
   /** Thermal conductivity \f$\lambda(T)\f$, W m<sup>-1</sup> K<sup>-1</sup>
    */
@@ -473,16 +488,18 @@ TemperatureSolver<dim>::TemperatureSolver(const unsigned int order,
     "Precision of double variables for output of field and probe data");
 
 
+  const std::string info_T = " (temperature function)";
+
   // Physical parameters from https://doi.org/10.1016/S0022-0248(03)01253-3
   prm.declare_entry("Density",
                     "2329",
-                    Patterns::Double(0),
-                    "Density rho in kg/m^3");
+                    Patterns::Anything(),
+                    "Density rho in kg/m^3" + info_T);
 
   prm.declare_entry("Specific heat capacity",
                     "1000",
-                    Patterns::Double(0),
-                    "Specific heat capacity c_p in J/kg/K");
+                    Patterns::Anything(),
+                    "Specific heat capacity c_p in J/kg/K" + info_T);
 
   prm.declare_entry(
     "Thermal conductivity",
@@ -518,6 +535,16 @@ TemperatureSolver<dim>::initialize_parameters()
 {
   std::cout << solver_name() << "  Intializing parameters";
 
+  const std::string m_rho_expression = prm.get("Density");
+  m_rho.initialize("T",
+                   m_rho_expression,
+                   typename FunctionParser<1>::ConstMap());
+
+  const std::string m_c_p_expression = prm.get("Specific heat capacity");
+  m_c_p.initialize("T",
+                   m_c_p_expression,
+                   typename FunctionParser<1>::ConstMap());
+
   // no built-in function exists, parse manually
   std::string              lambda_raw = prm.get("Thermal conductivity");
   std::vector<std::string> lambda_split =
@@ -535,9 +562,8 @@ TemperatureSolver<dim>::initialize_parameters()
 
   std::cout << "  done\n";
 
-  // some of the parameters are only fetched when needed
-  std::cout << "rho=" << prm.get_double("Density") << "\n"
-            << "c_p=" << prm.get_double("Specific heat capacity") << "\n";
+  std::cout << "rho=" << m_rho_expression << "\n"
+            << "c_p=" << m_c_p_expression << "\n";
 
   const int precision = prm.get_integer("Output precision");
   std::cout << "lambda=" << std::setprecision(precision);
@@ -797,11 +823,18 @@ TemperatureSolver<dim>::output_vtk() const
   data_out.add_data_vector(temperature, "T");
   data_out.add_data_vector(temperature_update, "dT");
 
-  Vector<double> l(temperature.size());
-  for (unsigned int i = 0; i < l.size(); ++i)
+  Vector<double> rho(temperature.size()), c_p(temperature.size()),
+    l(temperature.size());
+  for (unsigned int i = 0; i < temperature.size(); ++i)
     {
+      const Point<1> x(temperature[i]);
+      rho[i] = m_rho.value(x);
+      c_p[i] = m_c_p.value(x);
+
       l[i] = lambda.value(temperature[i]);
     }
+  data_out.add_data_vector(rho, "rho");
+  data_out.add_data_vector(c_p, "c_p");
   data_out.add_data_vector(l, "lambda");
 
   std::map<unsigned int, Vector<double>> q_rad, emissivity;
@@ -890,6 +923,14 @@ TemperatureSolver<dim>::output_mesh() const
 }
 
 template <int dim>
+double
+TemperatureSolver<dim>::calc_rho_c_p(const double T) const
+{
+  const Point<1> x(T);
+  return m_rho.value(x) * m_c_p.value(x);
+}
+
+template <int dim>
 std::string
 TemperatureSolver<dim>::output_name_suffix() const
 {
@@ -935,6 +976,10 @@ TemperatureSolver<dim>::output_probes() const
       for (unsigned int i = 0; i < N; ++i)
         output << "\tT_" << i << "[K]";
       for (unsigned int i = 0; i < N; ++i)
+        output << "\trho_" << i << "[kgm^-3]";
+      for (unsigned int i = 0; i < N; ++i)
+        output << "\tc_p_" << i << "[Jkg^-1K^-1]";
+      for (unsigned int i = 0; i < N; ++i)
         output << "\tlambda_" << i << "[Wm^-1K^-1]";
       output << "\n";
     }
@@ -961,6 +1006,10 @@ TemperatureSolver<dim>::output_probes() const
 
   for (const auto &v : values)
     output << '\t' << v;
+  for (const auto &v : values)
+    output << '\t' << m_rho.value(Point<1>(v));
+  for (const auto &v : values)
+    output << '\t' << m_c_p.value(Point<1>(v));
   for (const auto &v : values)
     output << '\t' << lambda.value(v);
   output << "\n";
@@ -1085,9 +1134,6 @@ TemperatureSolver<dim>::local_assemble_system(
   // precalculate constant parameters
   const double dt     = get_time_step();
   const double inv_dt = dt == 0 ? 0 : 1 / dt;
-  const double rho    = prm.get_double("Density");
-  const double c_p    = prm.get_double("Specific heat capacity");
-  const double tmp    = inv_dt * rho * c_p;
 
   FEValues<dim> &            fe_values       = scratch_data.fe_values;
   FEFaceValues<dim> &        fe_face_values  = scratch_data.fe_face_values;
@@ -1125,6 +1171,8 @@ TemperatureSolver<dim>::local_assemble_system(
 
   for (unsigned int q = 0; q < n_q_points; ++q)
     {
+      const double tmp = inv_dt * calc_rho_c_p(T_q[q]);
+
       lambda.value(T_q[q], lambda_data);
       const double lambda_q       = lambda_data[0];
       const double lambda_deriv_q = lambda_data[1];
