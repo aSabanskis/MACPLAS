@@ -12,7 +12,7 @@ template <int dim>
 class Problem
 {
 public:
-  Problem(unsigned int order = 2);
+  Problem(unsigned int order = 2, const bool use_default_prm = false);
 
   void
   run();
@@ -28,10 +28,16 @@ private:
   apply_q_em();
 
   void
-  calculate_temperature();
+  solve_steady_temperature();
 
   void
-  calculate_dislocation();
+  solve_dislocation();
+
+  void
+  solve_temperature_dislocation();
+
+  void
+  solve_temperature();
 
   TemperatureSolver<dim> temperature_solver;
   DislocationSolver<dim> dislocation_solver;
@@ -41,15 +47,17 @@ private:
 
   constexpr static unsigned int boundary_id = 0;
 
+  FunctionParser<1> inductor_current;
+
   ParameterHandler prm;
 
   FunctionParser<1> electrical_conductivity;
 };
 
 template <int dim>
-Problem<dim>::Problem(unsigned int order)
-  : temperature_solver(order)
-  , dislocation_solver(order)
+Problem<dim>::Problem(unsigned int order, const bool use_default_prm)
+  : temperature_solver(order, use_default_prm)
+  , dislocation_solver(order, use_default_prm)
 {
   // Physical parameters from https://doi.org/10.1016/j.jcrysgro.2020.125842
 
@@ -65,8 +73,8 @@ Problem<dim>::Problem(unsigned int order)
 
   prm.declare_entry("Inductor current",
                     "100",
-                    Patterns::Double(0),
-                    "Effective inductor current I in A");
+                    Patterns::Anything(),
+                    "Effective inductor current I in A (time function)");
 
   prm.declare_entry(
     "Reference electrical conductivity",
@@ -90,17 +98,38 @@ Problem<dim>::Problem(unsigned int order)
                     Patterns::Bool(),
                     "Skip calculation of temperature and stress fields");
 
-  try
-    {
-      prm.parse_input("problem.prm");
-    }
-  catch (std::exception &e)
-    {
-      std::cout << e.what() << "\n";
+  prm.declare_entry("Temperature only",
+                    "false",
+                    Patterns::Bool(),
+                    "Calculate just the temperature field");
 
-      std::ofstream of("problem-default.prm");
+  prm.declare_entry(
+    "Output frequency",
+    "0",
+    Patterns::Integer(0),
+    "Number of time steps between result output (0 - disabled)");
+
+  if (use_default_prm)
+    {
+      std::ofstream of("problem.prm");
       prm.print_parameters(of, ParameterHandler::Text);
     }
+  else
+    try
+      {
+        prm.parse_input("problem.prm");
+      }
+    catch (std::exception &e)
+      {
+        std::cout << e.what() << "\n";
+
+        std::ofstream of("problem-default.prm");
+        prm.print_parameters(of, ParameterHandler::Text);
+      }
+
+  inductor_current.initialize("t",
+                              prm.get("Inductor current"),
+                              typename FunctionParser<1>::ConstMap());
 
   electrical_conductivity.initialize("T",
                                      prm.get("Electrical conductivity"),
@@ -114,13 +143,31 @@ Problem<dim>::run()
   make_grid();
   initialize();
 
-  calculate_temperature();
-  calculate_dislocation();
+  if (prm.get_bool("Temperature only"))
+    {
+      if (temperature_solver.get_time_step() == 0)
+        {
+          solve_steady_temperature();
+        }
+      else
+        {
+          solve_temperature();
+        }
+    }
+  else if (temperature_solver.get_time_step() == 0)
+    {
+      solve_steady_temperature();
+      solve_dislocation();
+    }
+  else
+    {
+      solve_temperature_dislocation();
+    }
 }
 
 template <int dim>
 void
-Problem<dim>::calculate_temperature()
+Problem<dim>::solve_steady_temperature()
 {
   if (prm.get_bool("Load saved results"))
     {
@@ -148,7 +195,7 @@ Problem<dim>::calculate_temperature()
 
 template <int dim>
 void
-Problem<dim>::calculate_dislocation()
+Problem<dim>::solve_dislocation()
 {
   // initialize dislocations and stresses
   dislocation_solver.initialize();
@@ -176,6 +223,65 @@ Problem<dim>::calculate_dislocation()
 
   dislocation_solver.output_data();
   dislocation_solver.output_vtk();
+}
+
+template <int dim>
+void
+Problem<dim>::solve_temperature_dislocation()
+{
+  // initialize dislocations and stresses
+  dislocation_solver.initialize();
+  dislocation_solver.get_temperature() = temperature_solver.get_temperature();
+
+  const int n_output = prm.get_integer("Output frequency");
+
+  for (unsigned int i = 1;; ++i)
+    {
+      temperature_solver.get_time_step() = dislocation_solver.get_time_step();
+
+      apply_q_em();
+      const bool keep_going_temp = temperature_solver.solve();
+
+      dislocation_solver.get_temperature() =
+        temperature_solver.get_temperature();
+
+      const bool keep_going_disl = dislocation_solver.solve();
+
+      if (!keep_going_temp || !keep_going_disl)
+        break;
+
+      if (n_output > 0 && i % n_output == 0)
+        {
+          temperature_solver.output_vtk();
+          dislocation_solver.output_vtk();
+        }
+    };
+
+  temperature_solver.output_vtk();
+  dislocation_solver.output_vtk();
+}
+
+template <int dim>
+void
+Problem<dim>::solve_temperature()
+{
+  const int n_output = prm.get_integer("Output frequency");
+
+  for (unsigned int i = 1;; ++i)
+    {
+      apply_q_em();
+      const bool keep_going_temp = temperature_solver.solve();
+
+      if (!keep_going_temp)
+        break;
+
+      if (n_output > 0 && i % n_output == 0)
+        {
+          temperature_solver.output_vtk();
+        }
+    };
+
+  temperature_solver.output_vtk();
 }
 
 template <int dim>
@@ -234,16 +340,22 @@ template <int dim>
 void
 Problem<dim>::apply_q_em()
 {
+  const double t =
+    temperature_solver.get_time() + temperature_solver.get_time_step();
+
   const Vector<double> &temperature = temperature_solver.get_temperature();
 
   Vector<double> q = q0;
 
+  const double I = inductor_current.value(Point<1>(t));
+  temperature_solver.add_output("I[A]", I);
+
   // apply the current and temperature-dependent electrical conductivity
-  const double i2 = sqr(prm.get_double("Inductor current"));
+  const double I2 = sqr(I);
   for (unsigned int i = 0; i < q.size(); ++i)
     {
       const double s = electrical_conductivity.value(Point<1>(temperature[i]));
-      q[i] *= i2 / std::sqrt(s);
+      q[i] *= I2 / std::sqrt(s);
     }
 
   const double e = prm.get_double("Emissivity");
@@ -258,13 +370,22 @@ Problem<dim>::apply_q_em()
 }
 
 int
-main()
+main(int argc, char *argv[])
 {
+  const std::vector<std::string> arguments(argv, argv + argc);
+
+  bool init = false;
+
+  for (unsigned int i = 1; i < arguments.size(); ++i)
+    if (arguments[i] == "init" || arguments[i] == "use_default_prm")
+      init = true;
+
   deallog.attach(std::cout);
   deallog.depth_console(2);
 
-  Problem<3> p3d(2);
-  p3d.run();
+  Problem<3> p3d(2, init);
+  if (!init)
+    p3d.run();
 
   return 0;
 }
