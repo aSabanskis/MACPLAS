@@ -28,6 +28,9 @@ private:
   apply_q_em();
 
   void
+  interpolate_q_em();
+
+  void
   solve_steady_temperature();
 
   void
@@ -41,6 +44,10 @@ private:
 
   TemperatureSolver<dim> temperature_solver;
   DislocationSolver<dim> dislocation_solver;
+
+  // external Joulean heat flux density data
+  SurfaceInterpolator2D q2d;
+  SurfaceInterpolator3D q3d;
 
   // normalized Joulean heat flux density
   Vector<double> q0;
@@ -80,7 +87,7 @@ Problem<dim>::Problem(unsigned int order, const bool use_default_prm)
     "Reference electrical conductivity",
     "5e4",
     Patterns::Double(0),
-    "Reference electrical conductivity sigma_ref (qEM.vtu) in S/m");
+    "Reference electrical conductivity sigma_ref (qEM data file) in S/m");
 
   prm.declare_entry(
     "Electrical conductivity",
@@ -292,7 +299,7 @@ Problem<dim>::make_grid()
 
   GridIn<dim> gi;
   gi.attach_triangulation(triangulation);
-  std::ifstream f("mesh.msh");
+  std::ifstream f("mesh-" + std::to_string(dim) + "d.msh");
   gi.read_msh(f);
 
   dislocation_solver.get_mesh().copy_triangulation(triangulation);
@@ -319,18 +326,7 @@ Problem<dim>::initialize()
   Vector<double> &temperature = temperature_solver.get_temperature();
   temperature.add(prm.get_double("Initial temperature"));
 
-  std::vector<Point<dim>> points;
-  std::vector<bool>       boundary_dofs;
-  temperature_solver.get_boundary_points(boundary_id, points, boundary_dofs);
-
-  SurfaceInterpolator3D surf;
-  surf.read_vtu("qEM.vtu");
-  surf.convert(SurfaceInterpolator3D::CellField,
-               "QEM",
-               SurfaceInterpolator3D::PointField,
-               "q");
-  surf.interpolate(
-    SurfaceInterpolator3D::PointField, "q", points, boundary_dofs, q0);
+  interpolate_q_em();
 
   // normalize for future use
   q0 *= 1e-6 * std::sqrt(prm.get_double("Reference electrical conductivity"));
@@ -369,23 +365,70 @@ Problem<dim>::apply_q_em()
                                       emissivity_deriv);
 }
 
+template <>
+void
+Problem<3>::interpolate_q_em()
+{
+  std::vector<Point<3>> points;
+  std::vector<bool>     boundary_dofs;
+  temperature_solver.get_boundary_points(boundary_id, points, boundary_dofs);
+
+  q3d.read_vtu("qEM-3d.vtu");
+  q3d.convert(SurfaceInterpolator3D::CellField,
+              "QEM",
+              SurfaceInterpolator3D::PointField,
+              "q");
+  q3d.interpolate(
+    SurfaceInterpolator3D::PointField, "q", points, boundary_dofs, q0);
+}
+
+template <>
+void
+Problem<2>::interpolate_q_em()
+{
+  std::vector<Point<2>> points;
+  std::vector<bool>     boundary_dofs;
+  temperature_solver.get_boundary_points(boundary_id, points, boundary_dofs);
+
+  q2d.read_txt("qEM-2d.txt");
+  q2d.interpolate("QEM", points, boundary_dofs, q0);
+}
+
 int
 main(int argc, char *argv[])
 {
   const std::vector<std::string> arguments(argv, argv + argc);
 
-  bool init = false;
+  bool init      = false;
+  int  dimension = 3;
 
   for (unsigned int i = 1; i < arguments.size(); ++i)
-    if (arguments[i] == "init" || arguments[i] == "use_default_prm")
-      init = true;
+    {
+      if (arguments[i] == "init" || arguments[i] == "use_default_prm")
+        init = true;
+      if (arguments[i] == "2d" || arguments[i] == "2D")
+        dimension = 2;
+    }
 
   deallog.attach(std::cout);
   deallog.depth_console(2);
 
-  Problem<3> p3d(2, init);
-  if (!init)
-    p3d.run();
+  if (dimension == 3)
+    {
+      Problem<3> p3d(2, init);
+      if (!init)
+        p3d.run();
+    }
+  else if (dimension == 2)
+    {
+      Problem<2> p2d(2, init);
+      if (!init)
+        p2d.run();
+    }
+  else
+    {
+      throw ExcNotImplemented();
+    }
 
   return 0;
 }
