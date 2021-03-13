@@ -28,7 +28,7 @@ private:
   apply_q_em();
 
   void
-  interpolate_q_em();
+  interpolate_q_em(const double z);
 
   void
   solve_steady_temperature();
@@ -54,6 +54,7 @@ private:
 
   constexpr static unsigned int boundary_id = 0;
 
+  FunctionParser<1> inductor_position;
   FunctionParser<1> inductor_current;
 
   ParameterHandler prm;
@@ -77,6 +78,11 @@ Problem<dim>::Problem(unsigned int order, const bool use_default_prm)
                     "0.1",
                     Patterns::Double(0),
                     "Maximum temperature change in K");
+
+  prm.declare_entry("Inductor position",
+                    "0",
+                    Patterns::Anything(),
+                    "Vertical inductor shift in m (time function)");
 
   prm.declare_entry("Inductor current",
                     "100",
@@ -133,6 +139,10 @@ Problem<dim>::Problem(unsigned int order, const bool use_default_prm)
         std::ofstream of("problem-default.prm");
         prm.print_parameters(of, ParameterHandler::Text);
       }
+
+  inductor_position.initialize("t",
+                               prm.get("Inductor position"),
+                               typename FunctionParser<1>::ConstMap());
 
   inductor_current.initialize("t",
                               prm.get("Inductor current"),
@@ -318,18 +328,16 @@ Problem<dim>::initialize()
   temperature_solver.add_probe(p);
   dislocation_solver.add_probe(p);
 
-  if (prm.get_bool("Load saved results"))
-    {
-      return;
-    }
-
   Vector<double> &temperature = temperature_solver.get_temperature();
   temperature.add(prm.get_double("Initial temperature"));
 
-  interpolate_q_em();
+  interpolate_q_em(inductor_position.value(Point<1>(0)));
 
-  // normalize for future use
-  q0 *= 1e-6 * std::sqrt(prm.get_double("Reference electrical conductivity"));
+  if (prm.get_bool("Load saved results"))
+    {
+      temperature_solver.load_data();
+      return;
+    }
 }
 
 template <int dim>
@@ -340,6 +348,11 @@ Problem<dim>::apply_q_em()
     temperature_solver.get_time() + temperature_solver.get_time_step();
 
   const Vector<double> &temperature = temperature_solver.get_temperature();
+
+  const double z = inductor_position.value(Point<1>(t));
+  temperature_solver.add_output("z[m]", z);
+
+  interpolate_q_em(z);
 
   Vector<double> q = q0;
 
@@ -367,11 +380,14 @@ Problem<dim>::apply_q_em()
 
 template <>
 void
-Problem<3>::interpolate_q_em()
+Problem<3>::interpolate_q_em(const double z)
 {
   std::vector<Point<3>> points;
   std::vector<bool>     boundary_dofs;
   temperature_solver.get_boundary_points(boundary_id, points, boundary_dofs);
+
+  for (auto &p : points)
+    p[2] -= z;
 
   q3d.read_vtu("qEM-3d.vtu");
   q3d.convert(SurfaceInterpolator3D::CellField,
@@ -380,18 +396,27 @@ Problem<3>::interpolate_q_em()
               "q");
   q3d.interpolate(
     SurfaceInterpolator3D::PointField, "q", points, boundary_dofs, q0);
+
+  // normalize for future use
+  q0 *= 1e-6 * std::sqrt(prm.get_double("Reference electrical conductivity"));
 }
 
 template <>
 void
-Problem<2>::interpolate_q_em()
+Problem<2>::interpolate_q_em(const double z)
 {
   std::vector<Point<2>> points;
   std::vector<bool>     boundary_dofs;
   temperature_solver.get_boundary_points(boundary_id, points, boundary_dofs);
 
+  for (auto &p : points)
+    p[1] -= z;
+
   q2d.read_txt("qEM-2d.txt");
   q2d.interpolate("QEM", points, boundary_dofs, q0);
+
+  // normalize for future use
+  q0 *= 1e-6 * std::sqrt(prm.get_double("Reference electrical conductivity"));
 }
 
 int
