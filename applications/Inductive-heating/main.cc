@@ -250,6 +250,8 @@ Problem<dim>::solve_temperature_dislocation()
   dislocation_solver.initialize();
   dislocation_solver.get_temperature() = temperature_solver.get_temperature();
 
+  dislocation_solver.solve(true);
+
   const int n_output = prm.get_integer("Output frequency");
 
   for (unsigned int i = 1;; ++i)
@@ -324,9 +326,12 @@ Problem<dim>::initialize()
   temperature_solver.output_mesh();
 
   Point<dim> p;
-  p[dim - 1] = 0.267;
-  temperature_solver.add_probe(p);
-  dislocation_solver.add_probe(p);
+  for (int i = 0; i <= 2; ++i)
+    {
+      p[dim - 1] = 0.067 + 0.2 * i;
+      temperature_solver.add_probe(p);
+      dislocation_solver.add_probe(p);
+    }
 
   Vector<double> &temperature = temperature_solver.get_temperature();
   temperature.add(prm.get_double("Initial temperature"));

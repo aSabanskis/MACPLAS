@@ -1,6 +1,6 @@
 set Linear solver iterations      = 10000
 set Linear solver tolerance       = 1e-7
-set Linear solver type            = minres
+set Linear solver type            = UMFPACK # minres
 set Number of threads             = 0
 set Output precision              = 8
 set Poisson's ratio               = 0.25
