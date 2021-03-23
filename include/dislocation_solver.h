@@ -994,8 +994,7 @@ DislocationSolver<dim>::initialize_parameters()
 
   time_scheme = prm.get("Time scheme");
 
-  const double dt_min = get_time_step_min();
-  get_time_step()     = dt_min <= 0 ? prm.get_double("Time step") : dt_min;
+  get_time_step() = prm.get_double("Time step");
 
   std::cout << "  done\n";
 
