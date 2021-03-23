@@ -1,0 +1,1 @@
+Calculations of cooling process of a Gen5 Si ingot from https://doi.org/10.1016/j.jcrysgro.2016.06.007

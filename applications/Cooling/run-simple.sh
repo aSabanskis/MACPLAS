@@ -42,6 +42,7 @@ sed -Ei "s|(set Bottom reference temperature *= *).*|\1 t<36000 ? 1683-t*210/360
 sed -Ei "s|(set Initial temperature *= *).*|\1 1683|" problem.prm
 
 sed -Ei "s/(set Reference temperature *= *).*/\1 1683/" stress.prm
+sed -Ei "s/(set Poisson's ratio *= *).*/\1 0.25/" stress.prm
 sed -Ei "s/(set Young's modulus *= *).*/\1 1.7e11-2.771e4*T^2/" stress.prm
 sed -Ei "s/(set Thermal expansion coefficient *= *).*/\1 3.4795e-06*(1-exp(-0.00326426*(T+57.2677)))+3.69166e-10*T/" stress.prm
 
@@ -55,7 +56,7 @@ sed -Ei "s/(set Strain hardening factor *= *).*/\1 2.0*0.4*(1.7e11-2.771e4*T^2)*
 r=1-elastic
 mkdir -p $r
 
-rm *.vtk
+rm -f *.vtk
 ./macplas-cooling > $r/log
 ./plot-probes-minmax.gnu
 cp *.prm *.vtk probes* $r
@@ -69,7 +70,10 @@ sed -Ei "s/(set Initial dislocation density *= *).*/\1 1e7/" dislocation.prm
 sed -Ei "s/(set Time step *= *).*/\1 10/" dislocation.prm
 sed -Ei "s/(set Min time step *= *).*/\1 10/" dislocation.prm
 
-rm *.vtk
+rm -f *.vtk
 ./macplas-cooling > $r/log
 ./plot-probes-minmax.gnu
 cp *.prm *.vtk probes* $r
+
+
+./plot-probes-compare.gnu
