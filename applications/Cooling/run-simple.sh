@@ -2,6 +2,22 @@
 
 set -e # exit script on error
 
+calculate () {
+    r=$1
+    echo Calculating $r
+
+    if [[ ! -f $r/probes-dislocation-3d.txt ]]
+    then
+        mkdir -p $r
+        ./macplas-cooling > $r/log
+        ./plot-probes-minmax.gnu
+        cp -- *.prm *.vtk $r
+        mv probes* $r
+    else
+        echo $r/probes-dislocation-3d.txt exists, remove to rerun.
+    fi
+}
+
 if [[ -f probes-dislocation-3d.txt ]]
 then
     echo probes-dislocation-3d.txt exists, remove to rerun.
@@ -22,6 +38,7 @@ sed -Ei "s/(set Max time *= *).*/\1$tmax/" dislocation.prm
 sed -Ei "s/(set Initial dislocation density *= *).*/\1 0/" dislocation.prm
 sed -Ei "s/(set Time scheme *= *).*/\1 Linearized N_m/" dislocation.prm
 sed -Ei "s/(set Time step *= *).*/\1 120/" dislocation.prm
+sed -Ei "s/(set Time step *= *).*/\1 120/" temperature.prm
 sed -Ei "s/(set Max time step *= *).*/\1 120/" dislocation.prm
 
 sed -Ei "s/(set Max relative time step increase *= *).*/\1 0.1/" dislocation.prm
@@ -29,6 +46,7 @@ sed -Ei "s/(set Max dstrain_c *= *).*/\1 1e-6/" dislocation.prm
 sed -Ei "s/(set Max relative dN_m *= *).*/\1 0.1/" dislocation.prm
 sed -Ei "s/(set Max v*dt *= *).*/\1 5e-4/" dislocation.prm
 sed -Ei "s/(set Output frequency *= *).*/\1 60/" problem.prm
+sed -Ei "s/(set Temperature only *= *).*/\1 false/" problem.prm
 
 # http://dx.doi.org/10.1016/j.jcrysgro.2016.06.007
 sed -Ei "s/(set Density *= *).*/\1 2337.77-0.025044*T-3.75768e-06*T^2/" temperature.prm
@@ -53,27 +71,15 @@ sed -Ei "s/(set Material constant k_0 *= *).*/\1 8.58e-4/" dislocation.prm
 sed -Ei "s|(set Peierls potential *= *).*|\1 2.185+0.1*atan((T-1347.5)/100)|" dislocation.prm
 sed -Ei "s/(set Strain hardening factor *= *).*/\1 2.0*0.4*(1.7e11-2.771e4*T^2)*3.83e-10/" dislocation.prm
 
-r=1-elastic
-mkdir -p $r
+calculate 1-elastic
 
-rm -f *.vtk
-./macplas-cooling > $r/log
-./plot-probes-minmax.gnu
-cp *.prm *.vtk probes* $r
-rm probes-dislocation-3d.txt
-
-
-r=2-plastic
-mkdir -p $r
 
 sed -Ei "s/(set Initial dislocation density *= *).*/\1 1e7/" dislocation.prm
-sed -Ei "s/(set Time step *= *).*/\1 10/" dislocation.prm
+sed -Ei "s/(set Time step *= *).*/\1 30/" dislocation.prm
 sed -Ei "s/(set Min time step *= *).*/\1 10/" dislocation.prm
+sed -Ei "s/(set Max time step *= *).*/\1 60/" dislocation.prm
 
-rm -f *.vtk
-./macplas-cooling > $r/log
-./plot-probes-minmax.gnu
-cp *.prm *.vtk probes* $r
+calculate 2-plastic
 
 
 ./plot-probes-compare.gnu

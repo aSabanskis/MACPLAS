@@ -14,7 +14,7 @@ f2_plast = 'data-ref/PPP43_neu.rpt.tsv'
 set datafile separator '\t'
 
 format_time(t) = t/3600.
-set xrange [0:55]
+set xrange [0:54.5]
 
 # number of probes
 N = 3
