@@ -58,6 +58,36 @@ Problem<dim>::Problem(unsigned int order, const bool use_default_prm)
     Patterns::Integer(0),
     "Number of time steps between result output (0 - disabled)");
 
+  prm.declare_entry("Lx",
+                    "0.84",
+                    Patterns::Double(0),
+                    "Domain size in x direction in m");
+
+  prm.declare_entry("Ly",
+                    "0.84",
+                    Patterns::Double(0),
+                    "Domain size in y direction in m");
+
+  prm.declare_entry("Lz",
+                    "0.40",
+                    Patterns::Double(0),
+                    "Domain size in z direction in m");
+
+  prm.declare_entry("Nx",
+                    "21",
+                    Patterns::Integer(1),
+                    "Number of elements in x direction");
+
+  prm.declare_entry("Ny",
+                    "21",
+                    Patterns::Integer(1),
+                    "Number of elements in y direction");
+
+  prm.declare_entry("Nz",
+                    "10",
+                    Patterns::Integer(1),
+                    "Number of elements in z direction");
+
   prm.declare_entry("Initial temperature",
                     "1685",
                     Patterns::Double(0),
@@ -184,10 +214,18 @@ Problem<dim>::make_grid()
 {
   Triangulation<dim> &triangulation = temperature_solver.get_mesh();
 
-  const Point<dim> p(-0.42, 0.42, -0.20);
+  const double x1 = prm.get_double("Lx") / 2;
+  const double y1 = prm.get_double("Ly") / 2;
+  const double z1 = prm.get_double("Lz") / 2;
+
+  const Point<dim> p(-x1, -y1, -z1);
+
+  const unsigned int Nx = prm.get_integer("Nx");
+  const unsigned int Ny = prm.get_integer("Ny");
+  const unsigned int Nz = prm.get_integer("Nz");
 
   GridGenerator::subdivided_hyper_rectangle(
-    triangulation, {21, 21, 10}, p, -p, true);
+    triangulation, {Nx, Ny, Nz}, p, -p, true);
 
   dislocation_solver.get_mesh().copy_triangulation(triangulation);
 }
@@ -200,10 +238,12 @@ Problem<dim>::initialize()
 
   temperature_solver.output_mesh();
 
+  const double dz = prm.get_double("Lz") / 2;
+
   for (int i = -1; i <= 1; ++i)
     {
       Point<dim> p;
-      p[dim - 1] = 0.2 * i;
+      p[dim - 1] = dz * i;
       temperature_solver.add_probe(p);
       dislocation_solver.add_probe(p);
     }
@@ -248,14 +288,21 @@ main(int argc, char *argv[])
 
   bool init = false;
 
+  unsigned int order = 2;
+
   for (unsigned int i = 1; i < arguments.size(); ++i)
-    if (arguments[i] == "init" || arguments[i] == "use_default_prm")
-      init = true;
+    {
+      if (arguments[i] == "init" || arguments[i] == "use_default_prm")
+        init = true;
+
+      if (arguments[i] == "order" && i + 1 < arguments.size())
+        order = std::stoi(arguments[i + 1]);
+    }
 
   deallog.attach(std::cout);
   deallog.depth_console(2);
 
-  Problem<3> p3d(2, init);
+  Problem<3> p3d(order, init);
   if (!init)
     p3d.run();
 
