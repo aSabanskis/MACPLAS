@@ -8,16 +8,16 @@ set key bottom right Left reverse width -2
 set output 'probes-minmax.pdf'
 set multiplot layout 2,4
 
-f = 'probes-dislocation-3d.txt'
+f = 'probes-dislocation-2d.txt'
 
 col='N_m_0[m^-2]'
 col_min='N_m_min[m^-2]'
 col_max='N_m_max[m^-2]'
 set title col noenh
 p \
-f u 1:col w lp pt 6 ps 0.4 noti, \
-f u 1:col_min w lp pt 6 ps 0.4 noti, \
-f u 1:col_max w lp pt 6 ps 0.4 noti
+f u 1:col w l noti, \
+f u 1:col_min w l noti, \
+f u 1:col_max w l noti
 
 unset key
 col='dot_N_m_0[m^-2s^-1]'

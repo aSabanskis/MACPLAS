@@ -7,3 +7,4 @@ set Max temperature change            = 1e-1
 set Output frequency                  = 30
 set Reference electrical conductivity = 5e4
 set Load saved results                = false
+set Temperature only                  = false
