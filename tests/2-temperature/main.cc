@@ -8,7 +8,7 @@ template <int dim>
 class Problem
 {
 public:
-  Problem(unsigned int order = 2);
+  Problem(unsigned int order = 2, int bc = 0);
 
   void
   run();
@@ -21,11 +21,14 @@ private:
   initialize();
 
   TemperatureSolver<dim> solver;
+
+  int BC;
 };
 
 template <int dim>
-Problem<dim>::Problem(unsigned int order)
+Problem<dim>::Problem(unsigned int order, int bc)
   : solver(order)
+  , BC(bc)
 {}
 
 template <int dim>
@@ -111,16 +114,44 @@ Problem<dim>::initialize()
 {
   solver.initialize(); // sets T=0
 
-  // use natural boundary conditions for 1D benchmark case
-  if (dim == 1)
+  unsigned int boundary_id = 0;
+
+  // essential boundary conditions
+  if (dim == 1 && BC == 1)
     {
-      solver.set_bc1(0, 1000);
+      solver.set_bc1(boundary_id, 1000);
+      return;
+    }
+
+  if (dim == 1 && BC == 2)
+    {
+      std::vector<Point<dim>> points;
+      std::vector<bool>       boundary_dofs;
+
+      solver.get_boundary_points(boundary_id, points, boundary_dofs);
+      Vector<double> q(points.size());
+      for (unsigned int i = 0; i < q.size(); ++i)
+        {
+          if (boundary_dofs[i])
+            q[i] = 3e5;
+        }
+
+      std::function<double(double)> zero = [=](double) { return 0.0; };
+
+      solver.set_bc_rad_mixed(boundary_id, q, zero, zero);
+      return;
+    }
+
+  if (dim == 1 && BC == 3)
+    {
+      solver.set_bc_convective(boundary_id, 2000, 1000);
       return;
     }
 
   // steady-state
   solver.get_time_step() = 0;
 
+  // natural boundary conditions
   if (dim == 2)
     {
       solver.set_bc1(0, 500);
@@ -128,13 +159,14 @@ Problem<dim>::initialize()
       return;
     }
 
+  // BC == 3
+
   // Physical parameters from https://doi.org/10.1016/S0022-0248(03)01253-3
   const double T0 = 1687;
 
   Vector<double> &temperature = solver.get_temperature();
   temperature.add(T0);
 
-  unsigned int boundary_id = 0;
   solver.set_bc1(boundary_id, T0);
 
   std::vector<Point<dim>> points;
@@ -160,16 +192,51 @@ Problem<dim>::initialize()
 }
 
 int
-main()
+main(int argc, char *argv[])
 {
+  const std::vector<std::string> arguments(argv, argv + argc);
+
+  int order     = 2;
+  int dimension = 1;
+  int bc        = 0;
+
+  for (unsigned int i = 1; i < arguments.size(); ++i)
+    {
+      if (arguments[i] == "1d" || arguments[i] == "1D")
+        dimension = 1;
+      if (arguments[i] == "2d" || arguments[i] == "2D")
+        dimension = 2;
+      if (arguments[i] == "3d" || arguments[i] == "3D")
+        dimension = 3;
+
+      if (arguments[i] == "bc1" || arguments[i] == "BC1")
+        bc = 1;
+      if (arguments[i] == "bc2" || arguments[i] == "BC2")
+        bc = 2;
+      if (arguments[i] == "bc3" || arguments[i] == "BC3")
+        bc = 3;
+    }
+
   deallog.attach(std::cout);
   deallog.depth_console(2);
 
-  Problem<1> p;
-  p.run();
+  std::cout << "Problem dimension=" << dimension << ", bc=" << bc << "\n";
 
-  Problem<2> p2;
-  p2.run();
+  if (dimension == 1)
+    {
+      Problem<1> p(order, bc);
+      p.run();
+    }
+  else if (dimension == 2)
+    {
+      Problem<2> p2(order);
+      p2.run();
+    }
+  else if (dimension == 3)
+    {
+      Problem<3> p3(order);
+      p3.run();
+    }
 
   return 0;
 }

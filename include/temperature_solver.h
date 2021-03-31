@@ -2,6 +2,7 @@
 #define macplas_temperature_solver_h
 
 #include <deal.II/base/function.h>
+#include <deal.II/base/function_parser.h>
 #include <deal.II/base/multithread_info.h>
 #include <deal.II/base/parameter_handler.h>
 #include <deal.II/base/polynomial.h>
