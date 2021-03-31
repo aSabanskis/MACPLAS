@@ -42,6 +42,9 @@ private:
   void
   solve_temperature();
 
+  void
+  update_T_max();
+
   TemperatureSolver<dim> temperature_solver;
   DislocationSolver<dim> dislocation_solver;
 
@@ -51,6 +54,9 @@ private:
 
   // normalized Joulean heat flux density
   Vector<double> q0;
+
+  // max temperature during the whole simulation
+  Vector<double> T_max;
 
   constexpr static unsigned int boundary_id = 0;
 
@@ -206,6 +212,8 @@ Problem<dim>::solve_steady_temperature()
       std::cout << "max_dT=" << max_dT << " K\n";
   } while (max_dT > prm.get_double("Max temperature change"));
 
+  update_T_max();
+
   temperature_solver.output_data();
   temperature_solver.output_vtk();
 }
@@ -217,6 +225,8 @@ Problem<dim>::solve_dislocation()
   // initialize dislocations and stresses
   dislocation_solver.initialize();
   dislocation_solver.get_temperature() = temperature_solver.get_temperature();
+
+  update_T_max();
 
   if (prm.get_bool("Load saved results"))
     {
@@ -250,6 +260,8 @@ Problem<dim>::solve_temperature_dislocation()
   dislocation_solver.initialize();
   dislocation_solver.get_temperature() = temperature_solver.get_temperature();
 
+  update_T_max();
+
   dislocation_solver.solve(true);
 
   const int n_output = prm.get_integer("Output frequency");
@@ -263,6 +275,8 @@ Problem<dim>::solve_temperature_dislocation()
 
       dislocation_solver.get_temperature() =
         temperature_solver.get_temperature();
+
+      update_T_max();
 
       const bool keep_going_disl = dislocation_solver.solve();
 
@@ -286,10 +300,14 @@ Problem<dim>::solve_temperature()
 {
   const int n_output = prm.get_integer("Output frequency");
 
+  update_T_max();
+
   for (unsigned int i = 1;; ++i)
     {
       apply_q_em();
       const bool keep_going_temp = temperature_solver.solve();
+
+      update_T_max();
 
       if (!keep_going_temp)
         break;
@@ -422,6 +440,26 @@ Problem<2>::interpolate_q_em(const double z)
 
   // normalize for future use
   q0 *= 1e-6 * std::sqrt(prm.get_double("Reference electrical conductivity"));
+}
+
+template <int dim>
+void
+Problem<dim>::update_T_max()
+{
+  const Vector<double> &T = temperature_solver.get_temperature();
+
+  if (T_max.size() == 0)
+    {
+      std::cout << "Initializing T_max\n";
+      T_max = T;
+    }
+
+  AssertDimension(T_max.size(), T.size());
+
+  for (unsigned int k = 0; k < T_max.size(); ++k)
+    T_max[k] = std::max(T_max[k], T[k]);
+
+  temperature_solver.add_field("T_max", T_max);
 }
 
 int

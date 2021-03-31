@@ -197,6 +197,11 @@ public:
   void
   add_output(const std::string &name, const double value = 0);
 
+  /** Add user-defined field
+   */
+  void
+  add_field(const std::string &name, const Vector<double> &value);
+
   /** Read raw results from disk
    */
   void
@@ -343,6 +348,9 @@ private:
    */
   Vector<double> temperature_update;
 
+  /** User-defined fields
+   */
+  std::map<std::string, Vector<double>> additional_fields;
 
   /** Density (temperature function) \f$\rho\f$, kg m<sup>-3</sup>
    */
@@ -787,6 +795,14 @@ TemperatureSolver<dim>::add_output(const std::string &name, const double value)
 
 template <int dim>
 void
+TemperatureSolver<dim>::add_field(const std::string &   name,
+                                  const Vector<double> &value)
+{
+  additional_fields[name] = value;
+}
+
+template <int dim>
+void
 TemperatureSolver<dim>::load_data()
 {
   Timer timer;
@@ -836,6 +852,12 @@ TemperatureSolver<dim>::output_vtk() const
   data_out.add_data_vector(rho, "rho");
   data_out.add_data_vector(c_p, "c_p");
   data_out.add_data_vector(l, "lambda");
+
+  for (const auto &it : additional_fields)
+    {
+      if (it.second.size() == temperature.size())
+        data_out.add_data_vector(it.second, it.first);
+    }
 
   std::map<unsigned int, Vector<double>> q_rad, emissivity;
   for (const auto &data : bc_rad_mixed_data)
