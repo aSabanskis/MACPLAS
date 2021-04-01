@@ -5,7 +5,6 @@
 #include <deal.II/base/function_parser.h>
 #include <deal.II/base/multithread_info.h>
 #include <deal.II/base/parameter_handler.h>
-#include <deal.II/base/polynomial.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/timer.h>
 #include <deal.II/base/work_stream.h>
@@ -299,6 +298,18 @@ private:
   void
   output_probes() const;
 
+  /** Calculate the temperature-dependent thermal conductivity \f$\lambda(T)\f$,
+   * W m<sup>-1</sup> K<sup>-1</sup>
+   */
+  double
+  calc_lambda(const double T) const;
+
+  /** Calculate the derivative of thermal conductivity \f$d\lambda(T)/dT\f$,
+   * W m<sup>-1</sup> K<sup>-2</sup>
+   */
+  double
+  calc_derivative_lambda(const double T) const;
+
   /** Calculate the temperature-dependent product of density and specific heat
    * capacity \f$\rho c_p\f$, J m<sup>-3</sup> K<sup>-1</sup>
    */
@@ -364,7 +375,12 @@ private:
 
   /** Thermal conductivity \f$\lambda(T)\f$, W m<sup>-1</sup> K<sup>-1</sup>
    */
-  Polynomials::Polynomial<double> lambda;
+  FunctionParser<1> m_lambda;
+
+  /** Derivative of thermal conductivity \f$d\lambda(T)/dT\f$,
+   * W m<sup>-1</sup> K<sup>-2</sup>
+   */
+  FunctionParser<1> m_derivative_lambda;
 
 
   /** Data for first-type BC
@@ -510,12 +526,15 @@ TemperatureSolver<dim>::TemperatureSolver(const unsigned int order,
                     Patterns::Anything(),
                     "Specific heat capacity c_p in J/kg/K" + info_T);
 
-  prm.declare_entry(
-    "Thermal conductivity",
-    "98.89, -9.41813870776526E-02, 2.88183040644504E-05",
-    Patterns::List(Patterns::Double(), 1),
-    "Thermal conductivity lambda (polynomial temperature function)."
-    " Specified as comma-separated coefficients (W/m/K^0, W/m/K^1 etc.)");
+  prm.declare_entry("Thermal conductivity",
+                    "98.89 -9.41813870776526E-02*T +2.88183040644504E-05*T^2",
+                    Patterns::Anything(),
+                    "Thermal conductivity lambda in W/m/K" + info_T);
+
+  prm.declare_entry("Thermal conductivity derivative",
+                    "-9.41813870776526E-02 +2*2.88183040644504E-05*T",
+                    Patterns::Anything(),
+                    "Derivative of thermal conductivity in W/m/K^2" + info_T);
 
   if (use_default_prm)
     {
@@ -554,14 +573,17 @@ TemperatureSolver<dim>::initialize_parameters()
                    m_c_p_expression,
                    typename FunctionParser<1>::ConstMap());
 
-  // no built-in function exists, parse manually
-  std::string              lambda_raw = prm.get("Thermal conductivity");
-  std::vector<std::string> lambda_split =
-    Utilities::split_string_list(lambda_raw);
-  std::vector<double> lambda_coefficients =
-    Utilities::string_to_double(lambda_split);
+  const std::string m_lambda_expression = prm.get("Thermal conductivity");
+  m_lambda.initialize("T",
+                      m_lambda_expression,
+                      typename FunctionParser<1>::ConstMap());
 
-  lambda = Polynomials::Polynomial<double>(lambda_coefficients);
+  const std::string m_derivative_lambda_expression =
+    prm.get("Thermal conductivity derivative");
+  m_derivative_lambda.initialize("T",
+                                 m_derivative_lambda_expression,
+                                 typename FunctionParser<1>::ConstMap());
+
 
   const auto n_threads = prm.get_integer("Number of threads");
   MultithreadInfo::set_thread_limit(n_threads > 0 ? n_threads :
@@ -572,11 +594,9 @@ TemperatureSolver<dim>::initialize_parameters()
   std::cout << "  done\n";
 
   std::cout << "rho=" << m_rho_expression << "\n"
-            << "c_p=" << m_c_p_expression << "\n";
-
-  const int precision = prm.get_integer("Output precision");
-  std::cout << "lambda=" << std::setprecision(precision);
-  lambda.print(std::cout);
+            << "c_p=" << m_c_p_expression << "\n"
+            << "lambda=" << m_lambda_expression << "\n"
+            << "derivative_lambda=" << m_derivative_lambda_expression << "\n";
 
   std::cout << "n_cores=" << MultithreadInfo::n_cores() << "\n"
             << "n_threads=" << MultithreadInfo::n_threads() << "\n";
@@ -841,18 +861,20 @@ TemperatureSolver<dim>::output_vtk() const
   data_out.add_data_vector(temperature_update, "dT");
 
   Vector<double> rho(temperature.size()), c_p(temperature.size()),
-    l(temperature.size());
+    l(temperature.size()), dl_dT(temperature.size());
   for (unsigned int i = 0; i < temperature.size(); ++i)
     {
       const Point<1> x(temperature[i]);
       rho[i] = m_rho.value(x);
       c_p[i] = m_c_p.value(x);
 
-      l[i] = lambda.value(temperature[i]);
+      l[i]     = calc_lambda(temperature[i]);
+      dl_dT[i] = calc_derivative_lambda(temperature[i]);
     }
   data_out.add_data_vector(rho, "rho");
   data_out.add_data_vector(c_p, "c_p");
   data_out.add_data_vector(l, "lambda");
+  data_out.add_data_vector(dl_dT, "derivative_lambda");
 
   for (const auto &it : additional_fields)
     {
@@ -947,6 +969,20 @@ TemperatureSolver<dim>::output_mesh() const
 
 template <int dim>
 double
+TemperatureSolver<dim>::calc_lambda(const double T) const
+{
+  return m_lambda.value(Point<1>(T));
+}
+
+template <int dim>
+double
+TemperatureSolver<dim>::calc_derivative_lambda(const double T) const
+{
+  return m_derivative_lambda.value(Point<1>(T));
+}
+
+template <int dim>
+double
 TemperatureSolver<dim>::calc_rho_c_p(const double T) const
 {
   const Point<1> x(T);
@@ -1004,6 +1040,8 @@ TemperatureSolver<dim>::output_probes() const
         output << "\tc_p_" << i << "[Jkg^-1K^-1]";
       for (unsigned int i = 0; i < N; ++i)
         output << "\tlambda_" << i << "[Wm^-1K^-1]";
+      for (unsigned int i = 0; i < N; ++i)
+        output << "\tderivative_lambda_" << i << "[Wm^-1K^-2]";
       output << "\n";
     }
 
@@ -1034,7 +1072,9 @@ TemperatureSolver<dim>::output_probes() const
   for (const auto &v : values)
     output << '\t' << m_c_p.value(Point<1>(v));
   for (const auto &v : values)
-    output << '\t' << lambda.value(v);
+    output << '\t' << calc_lambda(v);
+  for (const auto &v : values)
+    output << '\t' << calc_derivative_lambda(v);
   output << "\n";
 
   std::cout << " " << format_time(timer) << "\n";
@@ -1115,8 +1155,9 @@ TemperatureSolver<dim>::assemble_system()
 
   std::cout << solver_name() << "  Assembling system";
 
-  const QGauss<dim> &    quadrature(fe.degree + 1 + lambda.degree() / 2);
-  const QGauss<dim - 1> &face_quadrature(fe.degree + 1 + lambda.degree() / 2);
+  // TODO: introduce parameter
+  const QGauss<dim> &    quadrature(fe.degree + 1);
+  const QGauss<dim - 1> &face_quadrature(fe.degree + 1);
 
   system_matrix = 0;
   system_rhs    = 0;
@@ -1196,9 +1237,8 @@ TemperatureSolver<dim>::local_assemble_system(
     {
       const double tmp = inv_dt * calc_rho_c_p(T_q[q]);
 
-      lambda.value(T_q[q], lambda_data);
-      const double lambda_q       = lambda_data[0];
-      const double lambda_deriv_q = lambda_data[1];
+      const double lambda_q       = calc_lambda(T_q[q]);
+      const double lambda_deriv_q = calc_derivative_lambda(T_q[q]);
 
       const double weight =
         dim == 2 ? fe_values.JxW(q) * fe_values.quadrature_point(q)[0] :
