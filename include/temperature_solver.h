@@ -251,7 +251,6 @@ private:
     FEValues<dim>     fe_values;
     FEFaceValues<dim> fe_face_values;
 
-    std::vector<double>         lambda_data;
     std::vector<double>         T_q;
     std::vector<double>         T_prev_q;
     std::vector<Tensor<1, dim>> grad_T_q;
@@ -1122,7 +1121,6 @@ TemperatureSolver<dim>::AssemblyScratchData::AssemblyScratchData(
   , fe_face_values(fe,
                    face_quadrature,
                    update_quadrature_points | update_values | update_JxW_values)
-  , lambda_data(2)
   , T_q(quadrature.size())
   , T_prev_q(quadrature.size())
   , grad_T_q(quadrature.size())
@@ -1139,7 +1137,6 @@ TemperatureSolver<dim>::AssemblyScratchData::AssemblyScratchData(
   , fe_face_values(scratch_data.fe_face_values.get_fe(),
                    scratch_data.fe_face_values.get_quadrature(),
                    scratch_data.fe_face_values.get_update_flags())
-  , lambda_data(scratch_data.lambda_data)
   , T_q(scratch_data.T_q)
   , T_prev_q(scratch_data.T_prev_q)
   , grad_T_q(scratch_data.grad_T_q)
@@ -1156,8 +1153,8 @@ TemperatureSolver<dim>::assemble_system()
   std::cout << solver_name() << "  Assembling system";
 
   // TODO: introduce parameter
-  const QGauss<dim> &    quadrature(fe.degree + 1);
-  const QGauss<dim - 1> &face_quadrature(fe.degree + 1);
+  const QGauss<dim>     quadrature(fe.degree + 1);
+  const QGauss<dim - 1> face_quadrature(fe.degree + 1);
 
   system_matrix = 0;
   system_rhs    = 0;
@@ -1216,10 +1213,9 @@ TemperatureSolver<dim>::local_assemble_system(
   cell_matrix.reinit(dofs_per_cell, dofs_per_cell);
   cell_rhs.reinit(dofs_per_cell);
 
-  std::vector<double> &        lambda_data = scratch_data.lambda_data;
-  std::vector<double> &        T_q         = scratch_data.T_q;
-  std::vector<double> &        T_prev_q    = scratch_data.T_prev_q;
-  std::vector<Tensor<1, dim>> &grad_T_q    = scratch_data.grad_T_q;
+  std::vector<double> &        T_q      = scratch_data.T_q;
+  std::vector<double> &        T_prev_q = scratch_data.T_prev_q;
+  std::vector<Tensor<1, dim>> &grad_T_q = scratch_data.grad_T_q;
 
   std::vector<types::global_dof_index> &local_dof_indices =
     copy_data.local_dof_indices;
