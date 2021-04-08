@@ -113,6 +113,11 @@ Problem<dim>::Problem(unsigned int order, const bool use_default_prm)
                     Patterns::Anything(),
                     "Bottom reference temperature T_bot in K (time function)");
 
+  prm.declare_entry("Probe coordinates z",
+                    "-0.2, 0, 0.2",
+                    Patterns::List(Patterns::Double(), 1),
+                    "Comma-separated vertical coordinates (x=y=0)");
+
   if (use_default_prm)
     {
       std::ofstream of("problem.prm");
@@ -238,12 +243,12 @@ Problem<dim>::initialize()
 
   temperature_solver.output_mesh();
 
-  const double dz = prm.get_double("Lz") / 2;
+  const std::vector<double> Z = split_string(prm.get("Probe coordinates z"));
 
-  for (int i = -1; i <= 1; ++i)
+  for (const double &z : Z)
     {
       Point<dim> p;
-      p[dim - 1] = dz * i;
+      p[dim - 1] = z;
       temperature_solver.add_probe(p);
       dislocation_solver.add_probe(p);
     }

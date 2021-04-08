@@ -24,6 +24,11 @@ using namespace dealii;
 inline double
 sqr(const double x);
 
+/** Convert string to a vector of double
+ */
+inline std::vector<double>
+split_string(const std::string &s, const char delimiter = ',');
+
 /** Just like \c std::minmax, for \c Vector argument
  */
 template <class T>
@@ -355,6 +360,13 @@ double
 sqr(const double x)
 {
   return x * x;
+}
+
+std::vector<double>
+split_string(const std::string &s, const char delimiter)
+{
+  const auto s_split = Utilities::split_string_list(s, delimiter);
+  return Utilities::string_to_double(s_split);
 }
 
 template <class T>
