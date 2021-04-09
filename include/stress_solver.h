@@ -940,7 +940,9 @@ StressSolver<dim>::local_assemble_system(const IteratorPair & cell_pair,
 
   local_dof_indices.resize(dofs_per_cell);
 
-  Tensor<1, n_components> strain_i, strain_j, epsilon_T_q;
+  std::vector<Tensor<1, n_components>> strains_ij(dofs_per_cell);
+
+  Tensor<1, n_components> epsilon_T_q;
 
   const typename DoFHandler<dim>::active_cell_iterator &cell_temp =
     std_cxx11::get<0>(*cell_pair);
@@ -964,6 +966,12 @@ StressSolver<dim>::local_assemble_system(const IteratorPair & cell_pair,
 
       get_strain(T_q[q], epsilon_T_q);
 
+      // precalculate
+      for (unsigned int k = 0; k < dofs_per_cell; ++k)
+        {
+          get_strain(fe_values, k, q, strains_ij[k]);
+        }
+
       const double weight =
         dim == 2 ? fe_values.JxW(q) * fe_values.quadrature_point(q)[0] :
                    fe_values.JxW(q);
@@ -975,16 +983,13 @@ StressSolver<dim>::local_assemble_system(const IteratorPair & cell_pair,
 
       for (unsigned int i = 0; i < dofs_per_cell; ++i)
         {
-          get_strain(fe_values, i, q, strain_i);
-
           const Tensor<1, n_components> strain_i_stiffness =
-            strain_i * stiffness;
+            strains_ij[i] * stiffness;
 
           for (unsigned int j = 0; j < dofs_per_cell; ++j)
             {
-              get_strain(fe_values, j, q, strain_j);
-
-              cell_matrix(i, j) += (strain_i_stiffness * strain_j) * weight;
+              cell_matrix(i, j) +=
+                (strain_i_stiffness * strains_ij[j]) * weight;
             }
           cell_rhs(i) += (strain_i_stiffness * epsilon_T_c_q) * weight;
         }
