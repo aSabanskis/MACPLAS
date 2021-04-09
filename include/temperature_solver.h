@@ -1490,6 +1490,18 @@ TemperatureSolver<dim>::solve_system()
                    temperature_update,
                    system_rhs,
                    preconditioner);
+
+      if (control.last_step() >= solver_iterations ||
+          control.last_value() >= solver_tolerance)
+        {
+          if (!(log_history || log_result))
+            std::cout << "\n";
+
+          std::cout << solver_name() << "  Warning: not converged! Residual(0)="
+                    << control.initial_value() << " Residual("
+                    << control.last_step() << ")=" << control.last_value()
+                    << "\n";
+        }
     }
 
   std::cout << " " << format_time(timer) << "\n";
