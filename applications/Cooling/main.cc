@@ -257,6 +257,8 @@ Problem<dim>::initialize()
   temperature.add(prm.get_double("Initial temperature"));
   temperature_solver.output_vtk();
 
+  temperature_solver.output_parameter_table();
+
   if (prm.get_bool("Temperature only"))
     return;
 
@@ -265,6 +267,8 @@ Problem<dim>::initialize()
   dislocation_solver.get_temperature() = temperature;
   dislocation_solver.solve(true);
   dislocation_solver.output_vtk();
+
+  dislocation_solver.output_parameter_table();
 }
 
 template <int dim>

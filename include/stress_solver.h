@@ -160,6 +160,13 @@ public:
   void
   output_mesh() const;
 
+  /** Calculate and write temperature-dependent parameters to disk
+   */
+  void
+  output_parameter_table(const double       T1 = 250,
+                         const double       T2 = 1700,
+                         const unsigned int n  = 30) const;
+
   /** Number of distinct elements of the stress tensor (3D: 6, 2D: 4)
    */
   static const unsigned int n_components = 2 * dim;
@@ -809,6 +816,34 @@ StressSolver<dim>::output_mesh() const
   grid_out.write_msh(triangulation, output);
 
   std::cout << " " << format_time(timer) << "\n";
+}
+
+template <int dim>
+void
+StressSolver<dim>::output_parameter_table(const double       T1,
+                                          const double       T2,
+                                          const unsigned int n) const
+{
+  std::ofstream output("stress-parameter-table.csv");
+
+  const int precision = prm.get_integer("Output precision");
+  output << std::setprecision(precision);
+
+  output << "T[K]\t"
+         << "E[Pa]\t"
+         << "C_11[Pa]\t"
+         << "C_12[Pa]\t"
+         << "C_44[Pa]\t"
+         << "alpha[K^-1]\n";
+
+  for (unsigned int i = 0; i < n; ++i)
+    {
+      const double T = T1 + (T2 - T1) * i / (n - 1);
+
+      output << T << '\t' << calc_E(T) << '\t' << calc_C_11(T) << '\t'
+             << calc_C_12(T) << '\t' << calc_C_44(T) << '\t' << calc_alpha(T)
+             << '\n';
+    }
 }
 
 template <int dim>

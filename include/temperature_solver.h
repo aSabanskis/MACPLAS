@@ -222,6 +222,13 @@ public:
   void
   output_mesh() const;
 
+  /** Calculate and write temperature-dependent parameters to disk
+   */
+  void
+  output_parameter_table(const double       T1 = 250,
+                         const double       T2 = 1700,
+                         const unsigned int n  = 30) const;
+
 private:
   /** Initialize parameters. Called by the constructor
    */
@@ -308,6 +315,17 @@ private:
    */
   double
   calc_derivative_lambda(const double T) const;
+
+  /** Calculate the temperature-dependent density \f$\rho\f$, kg m<sup>-3</sup>
+   */
+  double
+  calc_rho(const double T) const;
+
+  /** Calculate the temperature-dependent specific heat capacity \f$c_p\f$,
+   * J kg K<sup>-1</sup>
+   */
+  double
+  calc_c_p(const double T) const;
 
   /** Calculate the temperature-dependent product of density and specific heat
    * capacity \f$\rho c_p\f$, J m<sup>-3</sup> K<sup>-1</sup>
@@ -863,10 +881,8 @@ TemperatureSolver<dim>::output_vtk() const
     l(temperature.size()), dl_dT(temperature.size());
   for (unsigned int i = 0; i < temperature.size(); ++i)
     {
-      const Point<1> x(temperature[i]);
-      rho[i] = m_rho.value(x);
-      c_p[i] = m_c_p.value(x);
-
+      rho[i]   = calc_rho(temperature[i]);
+      c_p[i]   = calc_c_p(temperature[i]);
       l[i]     = calc_lambda(temperature[i]);
       dl_dT[i] = calc_derivative_lambda(temperature[i]);
     }
@@ -967,6 +983,32 @@ TemperatureSolver<dim>::output_mesh() const
 }
 
 template <int dim>
+void
+TemperatureSolver<dim>::output_parameter_table(const double       T1,
+                                               const double       T2,
+                                               const unsigned int n) const
+{
+  std::ofstream output("temperature-parameter-table.csv");
+
+  const int precision = prm.get_integer("Output precision");
+  output << std::setprecision(precision);
+
+  output << "T[K]\t"
+         << "rho[kgm^-3]\t"
+         << "c_p[Jkg^-1K^-1]\t"
+         << "lambda[Wm^-1K^-1]\t"
+         << "derivative_lambda[Wm^-1K^-2]\n";
+
+  for (unsigned int i = 0; i < n; ++i)
+    {
+      const double T = T1 + (T2 - T1) * i / (n - 1);
+
+      output << T << '\t' << calc_rho(T) << '\t' << calc_c_p(T) << '\t'
+             << calc_lambda(T) << '\t' << calc_derivative_lambda(T) << '\n';
+    }
+}
+
+template <int dim>
 double
 TemperatureSolver<dim>::calc_lambda(const double T) const
 {
@@ -978,6 +1020,20 @@ double
 TemperatureSolver<dim>::calc_derivative_lambda(const double T) const
 {
   return m_derivative_lambda.value(Point<1>(T));
+}
+
+template <int dim>
+double
+TemperatureSolver<dim>::calc_rho(const double T) const
+{
+  return m_rho.value(Point<1>(T));
+}
+
+template <int dim>
+double
+TemperatureSolver<dim>::calc_c_p(const double T) const
+{
+  return m_c_p.value(Point<1>(T));
 }
 
 template <int dim>
@@ -1067,9 +1123,9 @@ TemperatureSolver<dim>::output_probes() const
   for (const auto &v : values)
     output << '\t' << v;
   for (const auto &v : values)
-    output << '\t' << m_rho.value(Point<1>(v));
+    output << '\t' << calc_rho(v);
   for (const auto &v : values)
-    output << '\t' << m_c_p.value(Point<1>(v));
+    output << '\t' << calc_c_p(v);
   for (const auto &v : values)
     output << '\t' << calc_lambda(v);
   for (const auto &v : values)

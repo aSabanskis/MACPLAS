@@ -191,6 +191,13 @@ public:
   void
   output_mesh() const;
 
+  /** Calculate and write temperature-dependent parameters to disk
+   */
+  void
+  output_parameter_table(const double       T1 = 250,
+                         const double       T2 = 1700,
+                         const unsigned int n  = 30) const;
+
 private:
   /** Initialize parameters. Called by the constructor
    */
@@ -969,6 +976,31 @@ DislocationSolver<dim>::output_mesh() const
   grid_out.write_msh(get_mesh(), output);
 
   std::cout << " " << format_time(timer) << "\n";
+}
+
+template <int dim>
+void
+DislocationSolver<dim>::output_parameter_table(const double       T1,
+                                               const double       T2,
+                                               const unsigned int n) const
+{
+  std::ofstream output("dislocation-parameter-table.csv");
+
+  const int precision = prm.get_integer("Output precision");
+  output << std::setprecision(precision);
+
+  output << "T[K]\t"
+         << "Q[eV]\t"
+         << "D[Nm^-1]\n";
+
+  for (unsigned int i = 0; i < n; ++i)
+    {
+      const double T = T1 + (T2 - T1) * i / (n - 1);
+
+      output << T << '\t' << calc_Q(T) << '\t' << calc_D(T) << '\n';
+    }
+
+  stress_solver.output_parameter_table(T1, T2, n);
 }
 
 template <int dim>
