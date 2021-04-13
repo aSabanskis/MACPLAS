@@ -8,6 +8,11 @@ Also includes the temperature solver and utilities for interpolation of the exte
 # Installation
 ## Library
 The MACPLAS library is designed as header-only, hence no precompilation is needed. Simply include the necessary headers from the ```include``` directory and compile as usual. MACPLAS relies on the [deal.II](https://www.dealii.org/) library which should be installed beforehand.
+Optionally, the header files can be installed from the top-level directory as
+```
+cmake -DCMAKE_INSTALL_PREFIX=/my/location/include .
+make install
+```
 
 ## Examples
 Several examples are included in the ```applications``` and ```tests``` directories. To compile, go to the desired subdirectory and type
