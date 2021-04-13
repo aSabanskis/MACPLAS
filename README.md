@@ -24,7 +24,7 @@ To compile the debug version of the program, type ```make debug``` or simply ```
 
 
 # Documentation
-To generate documentation in HTML and LaTeX formats, execute the command ```doxygen doxygen.conf``` in the ```doc``` directory.
+To generate documentation in HTML and LaTeX formats, execute the command ```doxygen doxygen.conf``` in the ```doc``` directory or ```cmake --build . --target doc``` from the top-level directory.
 
 
 # License
