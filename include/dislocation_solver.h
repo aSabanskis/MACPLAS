@@ -49,7 +49,7 @@ public:
    * then only the stress is calculated.
    */
   bool
-  solve(const double stress_only = false);
+  solve(const bool stress_only = false);
 
   /** Get mesh
    */
@@ -618,7 +618,7 @@ DislocationSolver<dim>::solver_name() const
 
 template <int dim>
 bool
-DislocationSolver<dim>::solve(const double stress_only)
+DislocationSolver<dim>::solve(const bool stress_only)
 {
   if (stress_only)
     {
