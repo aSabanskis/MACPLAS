@@ -36,6 +36,8 @@ sed -Ei "s/(set Lx *= *).*/\1 0.84/" problem.prm
 sed -Ei "s/(set Ly *= *).*/\1 0.84/" problem.prm
 sed -Ei "s/(set Lz *= *).*/\1 0.40/" problem.prm
 
+sed -Ei "s/(set Probe coordinates z *= *).*/\1 -0.2, -0.1975, -0.195, 0, 0.0025, 0.005, 0.195, 0.1975, 0.2/" problem.prm
+
 sed -Ei "s/(set Nx *= *).*/\1 21/" problem.prm
 sed -Ei "s/(set Ny *= *).*/\1 21/" problem.prm
 sed -Ei "s/(set Nz *= *).*/\1 10/" problem.prm
