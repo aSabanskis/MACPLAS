@@ -44,8 +44,8 @@ sed -Ei "s/(set Nz *= *).*/\1 10/" problem.prm
 
 sed -Ei "s/(set Number of threads *= *).*/\1$nthreads/" stress.prm
 sed -Ei "s/(set Number of threads *= *).*/\1$nthreads/" temperature.prm
-sed -Ei "s/(set Log convergence final *= *).*/\1 false/" stress.prm
-sed -Ei "s/(set Log convergence final *= *).*/\1 false/" temperature.prm
+sed -Ei "s/(set Log convergence final *= *).*/\1 true/" stress.prm
+sed -Ei "s/(set Log convergence final *= *).*/\1 true/" temperature.prm
 sed -Ei "s/(set Max time *= *).*/\1$tmax/" temperature.prm
 sed -Ei "s/(set Max time *= *).*/\1$tmax/" dislocation.prm
 sed -Ei "s/(set Initial dislocation density *= *).*/\1 0/" dislocation.prm
@@ -76,7 +76,7 @@ sed -Ei "s|(set Initial temperature *= *).*|\1 1683|" problem.prm
 sed -Ei "s/(set Reference temperature *= *).*/\1 1683/" stress.prm
 sed -Ei "s/(set Poisson's ratio *= *).*/\1 0.25/" stress.prm
 sed -Ei "s/(set Young's modulus *= *).*/\1 1.7e11-2.771e4*T^2/" stress.prm
-sed -Ei "s|(set Thermal expansion coefficient *= *).*|\1 T<280 ? 2.432e-06 : T<300 ? 2.432e-06+6.8e-08*(T-280)/20 : T<400 ? 2.5e-06+3.42e-07*(T-300)/100 : T<500 ? 2.842e-06+2.61e-07*(T-400)/100 : T<600 ? 3.103e-06+1.91e-07*(T-500)/100 : T<700 ? 3.294e-06+1.49e-07*(T-600)/100 : T<800 ? 3.443e-06+1.21e-07*(T-700)/100 : T<900 ? 3.564e-06+9.7e-08*(T-800)/100 : T<1000 ? 3.661e-06+7.7e-08*(T-900)/100 : T<1100 ? 3.738e-06+6.7e-08*(T-1000)/100 : T<1200 ? 3.805e-06+5.9e-08*(T-1100)/100 : T<1300 ? 3.864e-06+5.3e-08*(T-1200)/100 : T<1400 ? 3.917e-06+4.9e-08*(T-1300)/100 : T<1500 ? 3.966e-06+4.6e-08*(T-1400)/100 : T<1600 ? 4.012e-06+4.3e-08*(T-1500)/100 : T<1684 ? 4.055e-06+3.5e-08*(T-1600)/84 : T<1688 ? 4.09e-06+1e-09*(T-1684)/4 : 4.091e-06|" stress.prm
+sed -Ei "s|(set Thermal expansion coefficient *= *).*|\1 T<280 ? 2.43e-06 : T<300 ? 2.43e-06+1.9e-07*(T-280)/20 : T<400 ? 2.62e-06+6.3e-07*(T-300)/100 : T<500 ? 3.25e-06+3.6e-07*(T-400)/100 : T<600 ? 3.61e-06+2.3e-07*(T-500)/100 : T<700 ? 3.84e-06+1.8e-07*(T-600)/100 : T<800 ? 4.02e-06+1.3e-07*(T-700)/100 : T<900 ? 4.15e-06+4e-08*(T-800)/100 : T<1000 ? 4.19e-06+7e-08*(T-900)/100 : T<1100 ? 4.26e-06+6e-08*(T-1000)/100 : T<1200 ? 4.32e-06+6e-08*(T-1100)/100 : T<1300 ? 4.38e-06+6e-08*(T-1200)/100 : T<1400 ? 4.44e-06+6e-08*(T-1300)/100 : T<1500 ? 4.5e-06+6e-08*(T-1400)/100 : T<1600 ? 4.56e-06+5e-08*(T-1500)/100 : T<1687 ? 4.61e-06+5e-08*(T-1600)/87 : 4.66e-06|" stress.prm
 
 sed -Ei "s/(set Average Schmid factor *= *).*/\1 0.56984471569/" dislocation.prm
 sed -Ei "s/(set Average Taylor factor *= *).*/\1 1.7782388291/" dislocation.prm
