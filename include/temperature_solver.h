@@ -988,7 +988,11 @@ TemperatureSolver<dim>::output_parameter_table(const double       T1,
                                                const double       T2,
                                                const unsigned int n) const
 {
-  std::ofstream output("temperature-parameter-table.csv");
+  const std::string fname = "temperature-parameter-table.tsv";
+  std::cout << solver_name() << "  Saving table '" << fname << "', T=" << T1
+            << "-" << T2 << " K, n=" << n << '\n';
+
+  std::ofstream output(fname);
 
   const int precision = prm.get_integer("Output precision");
   output << std::setprecision(precision);
