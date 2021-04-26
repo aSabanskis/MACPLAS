@@ -10,7 +10,7 @@ template <int dim>
 class Problem
 {
 public:
-  Problem(unsigned int order = 2);
+  Problem(const unsigned int order = 2);
 
   void
   run();
@@ -28,7 +28,7 @@ private:
 };
 
 template <int dim>
-Problem<dim>::Problem(unsigned int order)
+Problem<dim>::Problem(const unsigned int order)
   : manifold(2)
   , solver(order)
 {}
@@ -101,7 +101,7 @@ Problem<dim>::initialize()
   surf.interpolate(
     SurfaceInterpolator3D::PointField, "q", points, boundary_dofs, q);
 
-  std::function<double(double)> zero = [=](double) { return 0; };
+  std::function<double(const double)> zero = [=](const double) { return 0; };
   solver.set_bc_rad_mixed(boundary_id, q, zero, zero);
 
 

@@ -1071,7 +1071,8 @@ StressSolver<dim>::solve_system()
     }
   else
     {
-      const int solver_iterations = prm.get_integer("Linear solver iterations");
+      const unsigned int solver_iterations =
+        prm.get_integer("Linear solver iterations");
       const double solver_tolerance = prm.get_double("Linear solver tolerance");
 
       const bool log_history = prm.get_bool("Log convergence full");

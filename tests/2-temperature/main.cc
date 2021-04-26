@@ -8,7 +8,7 @@ template <int dim>
 class Problem
 {
 public:
-  Problem(unsigned int order = 2, int bc = 0);
+  Problem(const unsigned int order = 2, const int bc = 0);
 
   void
   run();
@@ -26,7 +26,7 @@ private:
 };
 
 template <int dim>
-Problem<dim>::Problem(unsigned int order, int bc)
+Problem<dim>::Problem(const unsigned int order, const int bc)
   : solver(order)
   , BC(bc)
 {}
@@ -136,7 +136,9 @@ Problem<dim>::initialize()
             q[i] = 3e5;
         }
 
-      std::function<double(double)> zero = [=](double) { return 0.0; };
+      std::function<double(const double)> zero = [=](const double) {
+        return 0.0;
+      };
 
       solver.set_bc_rad_mixed(boundary_id, q, zero, zero);
       return;
@@ -179,12 +181,12 @@ Problem<dim>::initialize()
       if (boundary_dofs[i])
         q[i] = 1e4;
     }
-  const double                  emissivity0 = 0.46;
-  std::function<double(double)> emissivity  = [=](double T) {
+  const double                        emissivity0 = 0.46;
+  std::function<double(const double)> emissivity  = [=](const double T) {
     const double t = T / T0;
     return emissivity0 * (t < 0.593 ? 1.39 : 1.96 - 0.96 * t);
   };
-  std::function<double(double)> emissivity_deriv = [=](double T) {
+  std::function<double(const double)> emissivity_deriv = [=](const double T) {
     const double t = T / T0;
     return emissivity0 * (t < 0.593 ? 0 : -0.96 / T0);
   };

@@ -52,11 +52,11 @@ struct heat_flux_data
 
   /** Temperature-dependent emissivity \f$\varepsilon(T)\f$, dimensionless
    */
-  std::function<double(double)> emissivity;
+  std::function<double(const double)> emissivity;
 
   /** Emissivity temperature derivative \f$d\varepsilon(T)/dT\f$, K<sup>-1</sup>
    */
-  std::function<double(double)> emissivity_deriv;
+  std::function<double(const double)> emissivity_deriv;
 };
 
 /** Data structure for convective cooling BC (Newton's law of cooling)
@@ -176,10 +176,10 @@ public:
    * \f$q = \sigma_\mathrm{SB} \varepsilon(T) T^4 - q_\mathrm{in}\f$
    */
   void
-  set_bc_rad_mixed(const unsigned int            id,
-                   const Vector<double> &        q_in,
-                   std::function<double(double)> emissivity,
-                   std::function<double(double)> emissivity_deriv);
+  set_bc_rad_mixed(const unsigned int                  id,
+                   const Vector<double> &              q_in,
+                   std::function<double(const double)> emissivity,
+                   std::function<double(const double)> emissivity_deriv);
 
   /** Set convective cooling boundary condition
    * \f$q = h (T - T_\mathrm{ref})\f$
@@ -797,10 +797,10 @@ TemperatureSolver<dim>::set_bc1(const unsigned int id, const double val)
 template <int dim>
 void
 TemperatureSolver<dim>::set_bc_rad_mixed(
-  const unsigned int            id,
-  const Vector<double> &        q_in,
-  std::function<double(double)> emissivity,
-  std::function<double(double)> emissivity_deriv)
+  const unsigned int                  id,
+  const Vector<double> &              q_in,
+  std::function<double(const double)> emissivity,
+  std::function<double(const double)> emissivity_deriv)
 {
   bc_rad_mixed_data[id].q_in             = q_in;
   bc_rad_mixed_data[id].emissivity       = emissivity;
@@ -1464,7 +1464,8 @@ TemperatureSolver<dim>::solve_system()
     }
   else
     {
-      const int solver_iterations = prm.get_integer("Linear solver iterations");
+      const unsigned int solver_iterations =
+        prm.get_integer("Linear solver iterations");
       const double solver_tolerance = prm.get_double("Linear solver tolerance");
 
       const bool log_history = prm.get_bool("Log convergence full");

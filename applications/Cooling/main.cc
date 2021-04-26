@@ -10,7 +10,7 @@ template <int dim>
 class Problem
 {
 public:
-  Problem(unsigned int order = 2, const bool use_default_prm = false);
+  Problem(const unsigned int order = 2, const bool use_default_prm = false);
 
   void
   run();
@@ -43,7 +43,7 @@ private:
 };
 
 template <int dim>
-Problem<dim>::Problem(unsigned int order, const bool use_default_prm)
+Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
   : temperature_solver(order, use_default_prm)
   , dislocation_solver(order, use_default_prm)
 {
