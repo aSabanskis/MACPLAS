@@ -76,7 +76,7 @@ sed -Ei "s|(set Initial temperature *= *).*|\1 1683|" problem.prm
 sed -Ei "s/(set Reference temperature *= *).*/\1 1683/" stress.prm
 sed -Ei "s/(set Poisson's ratio *= *).*/\1 0.25/" stress.prm
 sed -Ei "s/(set Young's modulus *= *).*/\1 1.7e11-2.771e4*T^2/" stress.prm
-sed -Ei "s|(set Thermal expansion coefficient *= *).*|\1 T<280 ? 2.43e-06 : T<300 ? 2.43e-06+1.9e-07*(T-280)/20 : T<400 ? 2.62e-06+6.3e-07*(T-300)/100 : T<500 ? 3.25e-06+3.6e-07*(T-400)/100 : T<600 ? 3.61e-06+2.3e-07*(T-500)/100 : T<700 ? 3.84e-06+1.8e-07*(T-600)/100 : T<800 ? 4.02e-06+1.3e-07*(T-700)/100 : T<900 ? 4.15e-06+4e-08*(T-800)/100 : T<1000 ? 4.19e-06+7e-08*(T-900)/100 : T<1100 ? 4.26e-06+6e-08*(T-1000)/100 : T<1200 ? 4.32e-06+6e-08*(T-1100)/100 : T<1300 ? 4.38e-06+6e-08*(T-1200)/100 : T<1400 ? 4.44e-06+6e-08*(T-1300)/100 : T<1500 ? 4.5e-06+6e-08*(T-1400)/100 : T<1600 ? 4.56e-06+5e-08*(T-1500)/100 : T<1687 ? 4.61e-06+5e-08*(T-1600)/87 : 4.66e-06|" stress.prm
+sed -Ei "s|(set Thermal expansion coefficient *= *).*|\1 3.725e-6*(1-exp(-5.88e-3*(T-124)))+5.548e-10*T|" stress.prm
 
 sed -Ei "s/(set Average Schmid factor *= *).*/\1 0.56984471569/" dislocation.prm
 sed -Ei "s/(set Average Taylor factor *= *).*/\1 1.7782388291/" dislocation.prm
