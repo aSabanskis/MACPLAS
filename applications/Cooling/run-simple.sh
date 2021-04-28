@@ -44,8 +44,8 @@ sed -Ei "s/(set Nz *= *).*/\1 10/" problem.prm
 
 sed -Ei "s/(set Number of threads *= *).*/\1$nthreads/" stress.prm
 sed -Ei "s/(set Number of threads *= *).*/\1$nthreads/" temperature.prm
-sed -Ei "s/(set Log convergence final *= *).*/\1 true/" stress.prm
-sed -Ei "s/(set Log convergence final *= *).*/\1 true/" temperature.prm
+sed -Ei "s/(set Log convergence final *= *).*/\1 false/" stress.prm
+sed -Ei "s/(set Log convergence final *= *).*/\1 false/" temperature.prm
 sed -Ei "s/(set Max time *= *).*/\1$tmax/" temperature.prm
 sed -Ei "s/(set Max time *= *).*/\1$tmax/" dislocation.prm
 sed -Ei "s/(set Initial dislocation density *= *).*/\1 0/" dislocation.prm
@@ -62,8 +62,8 @@ sed -Ei "s/(set Output frequency *= *).*/\1 60/" problem.prm
 sed -Ei "s/(set Temperature only *= *).*/\1 false/" problem.prm
 
 # http://dx.doi.org/10.1016/j.jcrysgro.2016.06.007
-sed -Ei "s|(set Density *= *).*|\1 T<280 ? 2330 : T<300 ? 2330+0*(T-280)/20 : T<400 ? 2330-3*(T-300)/100 : T<500 ? 2327-2*(T-400)/100 : T<600 ? 2325-3*(T-500)/100 : T<700 ? 2322-4*(T-600)/100 : T<800 ? 2318-3*(T-700)/100 : T<900 ? 2315-3*(T-800)/100 : T<1000 ? 2312-3*(T-900)/100 : T<1100 ? 2309-3*(T-1000)/100 : T<1200 ? 2306-4*(T-1100)/100 : T<1300 ? 2302-3*(T-1200)/100 : T<1400 ? 2299-4*(T-1300)/100 : T<1500 ? 2295-3*(T-1400)/100 : T<1600 ? 2292-4*(T-1500)/100 : T<1685 ? 2288-3*(T-1600)/85 : 2285|" temperature.prm
-sed -Ei "s|(set Specific heat capacity *= *).*|\1 T<300 ? 671 : T<400 ? 671+87*(T-300)/100 : T<500 ? 758+61*(T-400)/100 : T<600 ? 819+31*(T-500)/100 : T<700 ? 850+25*(T-600)/100 : T<800 ? 875+18*(T-700)/100 : T<900 ? 893+14*(T-800)/100 : T<1000 ? 907+18*(T-900)/100 : T<1100 ? 925+12*(T-1000)/100 : T<1200 ? 937+12*(T-1100)/100 : T<1300 ? 949+10*(T-1200)/100 : T<1400 ? 959+11*(T-1300)/100 : T<1500 ? 970+11*(T-1400)/100 : T<1600 ? 981+9*(T-1500)/100 : T<1687 ? 990+3*(T-1600)/87 : 993|" temperature.prm
+sed -Ei "s|(set Density *= *).*|\1 2337.77-0.025044*T-3.75768e-06*T^2|" temperature.prm
+sed -Ei "s|(set Specific heat capacity *= *).*|\1 1046.43-0.0426946*T+3.07177e-05*T^2-109539/T|" temperature.prm
 sed -Ei "s|(set Thermal conductivity *= *).*|\1 T<250 ? 195 : T<300 ? 195-39*(T-250)/50 : T<400 ? 156-51*(T-300)/100 : T<500 ? 105-25*(T-400)/100 : T<600 ? 80-16*(T-500)/100 : T<700 ? 64-12*(T-600)/100 : T<800 ? 52-9*(T-700)/100 : T<900 ? 43-7.4*(T-800)/100 : T<1000 ? 35.6-4.6*(T-900)/100 : T<1100 ? 31-3*(T-1000)/100 : T<1200 ? 28-1.9*(T-1100)/100 : T<1300 ? 26.1-1.3*(T-1200)/100 : T<1400 ? 24.8-1.1*(T-1300)/100 : T<1500 ? 23.7-1*(T-1400)/100 : T<1600 ? 22.7-0.8*(T-1500)/100 : T<1681 ? 21.9-0.3*(T-1600)/81 : 21.6|" temperature.prm
 sed -Ei "s/(set Thermal conductivity derivative *= *).*/\1 -0.398349 +2*0.000276322*T -3*6.48418e-08*T^2/" temperature.prm
 
