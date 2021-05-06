@@ -468,12 +468,15 @@ main(int argc, char *argv[])
   const std::vector<std::string> arguments(argv, argv + argc);
 
   bool init      = false;
+  int  order     = 2;
   int  dimension = 3;
 
   for (unsigned int i = 1; i < arguments.size(); ++i)
     {
       if (arguments[i] == "init" || arguments[i] == "use_default_prm")
         init = true;
+      if (arguments[i] == "order" && i + 1 < arguments.size())
+        order = std::stoi(arguments[i + 1]);
       if (arguments[i] == "2d" || arguments[i] == "2D")
         dimension = 2;
     }
@@ -483,13 +486,13 @@ main(int argc, char *argv[])
 
   if (dimension == 3)
     {
-      Problem<3> p3d(2, init);
+      Problem<3> p3d(order, init);
       if (!init)
         p3d.run();
     }
   else if (dimension == 2)
     {
-      Problem<2> p2d(2, init);
+      Problem<2> p2d(order, init);
       if (!init)
         p2d.run();
     }
