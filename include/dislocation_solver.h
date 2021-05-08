@@ -204,6 +204,12 @@ private:
   void
   initialize_parameters();
 
+  /** Initialize variables related to the adaptive time-stepping.
+   * Sets user-defined output values \c max_dt_*[s] to zero.
+   */
+  void
+  initialize_dt_output();
+
   /** Minimum time step \f$\Delta t_\min\f$, s
    */
   double
@@ -607,6 +613,7 @@ DislocationSolver<dim>::DislocationSolver(const unsigned int order,
       }
 
   initialize_parameters();
+  initialize_dt_output();
 }
 
 template <int dim>
@@ -1050,6 +1057,16 @@ DislocationSolver<dim>::initialize_parameters()
 }
 
 template <int dim>
+void
+DislocationSolver<dim>::initialize_dt_output()
+{
+  add_output("max_dt_v[s]");
+  for (unsigned int i = 0; i < StressSolver<dim>::n_components; ++i)
+    add_output("max_dt_dot_strain_c_" + std::to_string(i) + "[s]");
+  add_output("max_dt_dot_N_m_rel[s]");
+}
+
+template <int dim>
 double
 DislocationSolver<dim>::get_time_step_min() const
 {
@@ -1096,6 +1113,8 @@ DislocationSolver<dim>::update_time_step()
 
   std::vector<double> time_steps;
 
+  initialize_dt_output();
+
   if (v_dt_max > 0)
     {
       const Vector<double> v = dislocation_velocity(N_m, J_2, T);
@@ -1106,8 +1125,11 @@ DislocationSolver<dim>::update_time_step()
         {
           const double dt = v_dt_max / v_max;
           time_steps.push_back(dt);
+          add_output("max_dt_v[s]", dt);
+#ifdef DEBUG
           std::cout << "dt=" << dt << " s, "
                     << "v_max=" << v_max << " m/s\n";
+#endif
         }
     }
 
@@ -1124,9 +1146,13 @@ DislocationSolver<dim>::update_time_step()
             {
               const double dt = dstrain_c_max / dot_strain_c;
               time_steps.push_back(dt);
+              add_output("max_dt_dot_strain_c_" + std::to_string(i) + "[s]",
+                         dt);
+#ifdef DEBUG
               std::cout << "dt=" << dt << " s, "
                         << "dot_strain_c_" << i << "_max=" << dot_strain_c
                         << " 1/s\n";
+#endif
             }
         }
     }
@@ -1148,8 +1174,11 @@ DislocationSolver<dim>::update_time_step()
         {
           const double dt = dN_m_rel_max / dot_N_m_rel;
           time_steps.push_back(dt);
+          add_output("max_dt_dot_N_m_rel[s]", dt);
+#ifdef DEBUG
           std::cout << "dt=" << dt << " s, "
                     << "dot_N_m_rel_max=" << dot_N_m_rel << "\n";
+#endif
         }
     }
 
