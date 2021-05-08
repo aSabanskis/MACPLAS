@@ -43,7 +43,14 @@ private:
   solve_temperature();
 
   void
+  output_results(const bool data = true, const bool vtk = true) const;
+
+  void
   update_T_max();
+
+  // false if only the temperature field is calculated
+  bool
+  with_dislocation() const;
 
   TemperatureSolver<dim> temperature_solver;
   DislocationSolver<dim> dislocation_solver;
@@ -166,7 +173,7 @@ Problem<dim>::run()
   make_grid();
   initialize();
 
-  if (prm.get_bool("Temperature only"))
+  if (!with_dislocation())
     {
       if (temperature_solver.get_time_step() == 0)
         {
@@ -214,8 +221,7 @@ Problem<dim>::solve_steady_temperature()
 
   update_T_max();
 
-  temperature_solver.output_data();
-  temperature_solver.output_vtk();
+  output_results();
 }
 
 template <int dim>
@@ -234,8 +240,7 @@ Problem<dim>::solve_dislocation()
     }
   else
     {
-      dislocation_solver.output_data();
-      dislocation_solver.output_vtk();
+      output_results();
     }
 
   dislocation_solver.solve(true);
@@ -248,8 +253,7 @@ Problem<dim>::solve_dislocation()
         break;
     };
 
-  dislocation_solver.output_data();
-  dislocation_solver.output_vtk();
+  output_results();
 }
 
 template <int dim>
@@ -285,13 +289,11 @@ Problem<dim>::solve_temperature_dislocation()
 
       if (n_output > 0 && i % n_output == 0)
         {
-          temperature_solver.output_vtk();
-          dislocation_solver.output_vtk();
+          output_results(false);
         }
     };
 
-  temperature_solver.output_vtk();
-  dislocation_solver.output_vtk();
+  output_results(false);
 }
 
 template <int dim>
@@ -314,11 +316,30 @@ Problem<dim>::solve_temperature()
 
       if (n_output > 0 && i % n_output == 0)
         {
-          temperature_solver.output_vtk();
+          output_results(false);
         }
     };
 
-  temperature_solver.output_vtk();
+  output_results(false);
+}
+
+template <int dim>
+void
+Problem<dim>::output_results(const bool data, const bool vtk) const
+{
+  if (data)
+    {
+      temperature_solver.output_data();
+      if (with_dislocation())
+        dislocation_solver.output_data();
+    }
+
+  if (vtk)
+    {
+      temperature_solver.output_vtk();
+      if (with_dislocation())
+        dislocation_solver.output_vtk();
+    }
 }
 
 template <int dim>
@@ -460,6 +481,13 @@ Problem<dim>::update_T_max()
     T_max[k] = std::max(T_max[k], T[k]);
 
   temperature_solver.add_field("T_max", T_max);
+}
+
+template <int dim>
+bool
+Problem<dim>::with_dislocation() const
+{
+  return !prm.get_bool("Temperature only");
 }
 
 int
