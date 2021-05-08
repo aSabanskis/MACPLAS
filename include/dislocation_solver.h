@@ -634,7 +634,8 @@ DislocationSolver<dim>::solve(const bool stress_only)
   const double t     = get_time();
   const double t_max = get_max_time();
 
-  std::cout << solver_name() << "  Time " << t << " s\n";
+  std::cout << solver_name() << "  Time " << t << " s"
+            << " step " << dt << " s\n";
 
 
   if (time_scheme == "Euler")

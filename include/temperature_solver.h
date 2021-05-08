@@ -657,6 +657,7 @@ TemperatureSolver<dim>::solve()
       const double max_abs_dT = temperature_update.linfty_norm();
       std::cout << solver_name() << "  "
                 << "Time " << t << " s"
+                << " step " << dt << " s"
                 << "  Newton iteration " << i << "  max T change " << max_abs_dT
                 << " K\n";
       if (max_abs_dT < prm.get_double("Max absolute change"))
