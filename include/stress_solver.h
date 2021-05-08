@@ -35,7 +35,8 @@
 using namespace dealii;
 
 /** Class for calculation of the thermal stresses for a given temperature field.
- * The creep strain is also taken into account.
+ * Implemented for \c dim=2 (axisymmetric) and 3 (three-dimensional simulation).
+ * The creep strain is also taken into account (updated by DislocationSolver).
  */
 template <int dim>
 class StressSolver
@@ -170,6 +171,10 @@ public:
   /** Number of distinct elements of the stress tensor (3D: 6, 2D: 4)
    */
   static const unsigned int n_components = 2 * dim;
+
+  /** Names of stress components in Voigt notation
+   */
+  static const std::array<std::string, n_components> stress_component_names;
 
 private:
   /** Initialize parameters. Called by the constructor
@@ -419,6 +424,10 @@ StressSolver<dim>::StressSolver(const unsigned int order,
                ")\n";
 
   AssertThrow(dim == 2 || dim == 3, ExcNotImplemented());
+
+  std::cout << "Stress components in Voigt notation:\n";
+  for (unsigned int i = 0; i < stress_component_names.size(); ++i)
+    std::cout << i << " " << stress_component_names[i] << "\n";
 
   const std::string info_T = " (temperature function)";
 
@@ -1414,5 +1423,14 @@ StressSolver<dim>::output_name_suffix() const
   ss << "-" << dim << "d-order" << fe.degree;
   return ss.str();
 }
+
+// Specialization for dim=2 and 3 (not needed for dim=1)
+template <>
+const std::array<std::string, StressSolver<2>::n_components>
+  StressSolver<2>::stress_component_names{"rr", "zz", "ff", "rz"};
+
+template <>
+const std::array<std::string, StressSolver<3>::n_components>
+  StressSolver<3>::stress_component_names{"xx", "yy", "zz", "yz", "xz", "xy"};
 
 #endif
