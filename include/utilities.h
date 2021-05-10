@@ -56,6 +56,11 @@ format_time(const double x);
 inline std::string
 format_time(const Timer &timer);
 
+/** Names of coordinates in \c dim dimensions
+ */
+inline std::vector<std::string>
+coordinate_names(const unsigned int dim);
+
 /** Save data (\c Vector, \c BlockVector) to disk.
  *
  * Internally calls \c block_write
@@ -412,6 +417,19 @@ std::string
 format_time(const Timer &timer)
 {
   return format_time(timer.wall_time());
+}
+
+std::vector<std::string>
+coordinate_names(const unsigned int dim)
+{
+  if (dim == 1)
+    return {"x"};
+  if (dim == 2)
+    return {"r", "z"};
+  if (dim == 3)
+    return {"x", "y", "z"};
+
+  AssertThrow(false, ExcNotImplemented());
 }
 
 template <typename T>

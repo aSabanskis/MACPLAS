@@ -217,6 +217,11 @@ public:
   void
   output_vtk() const;
 
+  /** Save results at DOFs of boundary \c id to disk
+   */
+  void
+  output_boundary_values(const unsigned int id) const;
+
   /** Save mesh to disk in \c msh format
    */
   void
@@ -961,6 +966,62 @@ TemperatureSolver<dim>::output_vtk() const
   output << std::setprecision(precision);
 
   data_out.write_vtk(output);
+
+  std::cout << " " << format_time(timer) << "\n";
+}
+
+template <int dim>
+void
+TemperatureSolver<dim>::output_boundary_values(const unsigned int id) const
+{
+  Timer timer;
+
+  std::vector<Point<dim>> points;
+  std::vector<bool>       boundary_dofs;
+  get_boundary_points(id, points, boundary_dofs);
+
+  if (std::none_of(boundary_dofs.cbegin(),
+                   boundary_dofs.cend(),
+                   [](const bool b) { return b; }))
+    {
+      std::cout << solver_name()
+                << "  output_boundary_values: skipping empty boundary " << id
+                << "\n";
+      return;
+    }
+
+  const std::string file_name = "result-temperature" + output_name_suffix() +
+                                "-boundary" + std::to_string(id) + ".dat";
+  std::cout << solver_name() << "  Saving to '" << file_name << "'";
+
+  std::ofstream output(file_name);
+
+  const int precision = prm.get_integer("Output precision");
+  output << std::setprecision(precision);
+
+  const Vector<double> &T = get_temperature();
+
+  const auto dims = coordinate_names(dim);
+  for (const auto &d : dims)
+    output << d << "[m]\t";
+
+  output << "T[K]\t"
+         << "rho[kgm^-3]\t"
+         << "c_p[Jkg^-1K^-1]\t"
+         << "lambda[Wm^-1K^-1]\n";
+
+  for (unsigned int i = 0; i < points.size(); ++i)
+    {
+      if (!boundary_dofs[i])
+        continue;
+
+      // a simple '<< points[i]' would put space between coordinates
+      for (unsigned int d = 0; d < dim; ++d)
+        output << points[i][d] << '\t';
+
+      output << T[i] << '\t' << calc_rho(T[i]) << '\t' << calc_c_p(T[i]) << '\t'
+             << calc_lambda(T[i]) << '\n';
+    }
 
   std::cout << " " << format_time(timer) << "\n";
 }

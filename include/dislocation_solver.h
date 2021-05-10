@@ -121,6 +121,18 @@ public:
   BlockVector<double> &
   get_strain_c();
 
+  /** Get coordinates of boundary DOFs for temperature
+   */
+  void
+  get_boundary_points(const unsigned int       id,
+                      std::vector<Point<dim>> &points,
+                      std::vector<bool> &      boundary_dofs) const;
+
+  /** Get coordinates of DOFs for temperature
+   */
+  void
+  get_support_points(std::vector<Point<dim>> &points) const;
+
   /** Get degrees of freedom for temperature
    */
   const DoFHandler<dim> &
@@ -185,6 +197,11 @@ public:
    */
   void
   output_vtk() const;
+
+  /** Save results at DOFs of boundary \c id to disk
+   */
+  void
+  output_boundary_values(const unsigned int id) const;
 
   /** Save mesh to disk in \c msh format
    */
@@ -762,6 +779,32 @@ DislocationSolver<dim>::get_strain_c()
 }
 
 template <int dim>
+void
+DislocationSolver<dim>::get_boundary_points(
+  const unsigned int       id,
+  std::vector<Point<dim>> &points,
+  std::vector<bool> &      boundary_dofs) const
+{
+  const DoFHandler<dim> &dh = get_dof_handler();
+  get_support_points(points);
+  boundary_dofs.resize(dh.n_dofs());
+  DoFTools::extract_boundary_dofs(dh,
+                                  ComponentMask(),
+                                  boundary_dofs,
+                                  {static_cast<types::boundary_id>(id)});
+}
+
+template <int dim>
+void
+DislocationSolver<dim>::get_support_points(
+  std::vector<Point<dim>> &points) const
+{
+  const DoFHandler<dim> &dh = get_dof_handler();
+  points.resize(dh.n_dofs());
+  DoFTools::map_dofs_to_support_points(MappingQ1<dim>(), dh, points);
+}
+
+template <int dim>
 const DoFHandler<dim> &
 DislocationSolver<dim>::get_dof_handler() const
 {
@@ -964,6 +1007,93 @@ DislocationSolver<dim>::output_vtk() const
   output << std::setprecision(precision);
 
   data_out.write_vtk(output);
+
+  std::cout << " " << format_time(timer) << "\n";
+}
+
+template <int dim>
+void
+DislocationSolver<dim>::output_boundary_values(const unsigned int id) const
+{
+  Timer timer;
+
+  std::vector<Point<dim>> points;
+  std::vector<bool>       boundary_dofs;
+  get_boundary_points(id, points, boundary_dofs);
+
+  if (std::none_of(boundary_dofs.cbegin(),
+                   boundary_dofs.cend(),
+                   [](const bool b) { return b; }))
+    {
+      std::cout << solver_name()
+                << "  output_boundary_values: skipping empty boundary " << id
+                << "\n";
+      return;
+    }
+
+  const std::string file_name = "result-dislocation" + output_name_suffix() +
+                                "-boundary" + std::to_string(id) + ".dat";
+  std::cout << solver_name() << "  Saving to '" << file_name << "'";
+
+  std::ofstream output(file_name);
+
+  const int precision = prm.get_integer("Output precision");
+  output << std::setprecision(precision);
+
+  const Vector<double> &     T   = get_temperature();
+  const Vector<double> &     N_m = get_dislocation_density();
+  const Vector<double> &     J_2 = get_stress_J_2();
+  const BlockVector<double> &s   = get_stress();
+  const BlockVector<double> &S   = get_stress_deviator();
+  const BlockVector<double> &e_c = get_strain_c();
+
+  const auto dims = coordinate_names(dim);
+  for (const auto &d : dims)
+    output << d << "[m]\t";
+
+  output << "T[K]\t"
+         << "N_m[m^-2]\t"
+         << "dot_N_m[m^-2s^-1]\t"
+         << "v[ms^-1]\t";
+
+  for (unsigned int k = 0; k < s.n_blocks(); ++k)
+    output << "stress_" << k << "[Pa]\t";
+
+  for (unsigned int k = 0; k < S.n_blocks(); ++k)
+    output << "strain_c_" << k << "[-]\t";
+
+  for (unsigned int k = 0; k < e_c.n_blocks(); ++k)
+    output << "dot_strain_c_" << k << "[s^-1]\t";
+
+  output << "tau_eff[Pa]\t"
+         << "stress_J_2[Pa^2]\n";
+
+  for (unsigned int i = 0; i < points.size(); ++i)
+    {
+      if (!boundary_dofs[i])
+        continue;
+
+      // a simple '<< points[i]' would put space between coordinates
+      for (unsigned int d = 0; d < dim; ++d)
+        output << points[i][d] << '\t';
+
+      output << T[i] << '\t' << N_m[i] << '\t'
+             << derivative_N_m(N_m[i], J_2[i], T[i]) << '\t'
+             << dislocation_velocity(N_m[i], J_2[i], T[i]) << '\t';
+
+      for (unsigned int k = 0; k < s.n_blocks(); ++k)
+        output << s.block(k)[i] << '\t';
+
+      for (unsigned int k = 0; k < S.n_blocks(); ++k)
+        output << derivative_strain(N_m[i], J_2[i], T[i], S.block(k)[i])
+               << '\t';
+
+      for (unsigned int k = 0; k < e_c.n_blocks(); ++k)
+        output << derivative_strain(N_m[i], J_2[i], T[i], S.block(k)[i])
+               << '\t';
+
+      output << tau_eff(N_m[i], J_2[i], T[i]) << '\t' << J_2[i] << '\t' << '\n';
+    }
 
   std::cout << " " << format_time(timer) << "\n";
 }

@@ -43,7 +43,9 @@ private:
   solve_temperature();
 
   void
-  output_results(const bool data = true, const bool vtk = true) const;
+  output_results(const bool data     = true,
+                 const bool vtk      = true,
+                 const bool boundary = dim == 2) const;
 
   void
   update_T_max();
@@ -325,7 +327,9 @@ Problem<dim>::solve_temperature()
 
 template <int dim>
 void
-Problem<dim>::output_results(const bool data, const bool vtk) const
+Problem<dim>::output_results(const bool data,
+                             const bool vtk,
+                             const bool boundary) const
 {
   if (data)
     {
@@ -340,6 +344,16 @@ Problem<dim>::output_results(const bool data, const bool vtk) const
       if (with_dislocation())
         dislocation_solver.output_vtk();
     }
+
+  // Exports values at the crystal surface and on axis in 2D.
+  // Export is disabled by default in 3D.
+  if (boundary)
+    for (unsigned int id = 0; id < 2; ++id)
+      {
+        temperature_solver.output_boundary_values(id);
+        if (with_dislocation())
+          dislocation_solver.output_boundary_values(id);
+      }
 }
 
 template <int dim>
