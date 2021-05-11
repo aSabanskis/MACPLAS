@@ -476,6 +476,11 @@ TemperatureSolver<dim>::TemperatureSolver(const unsigned int order,
                     Patterns::Integer(0),
                     "Maximum number of Newton iterations (0 - unlimited)");
 
+  prm.declare_entry("Newton step length",
+                    "1",
+                    Patterns::Double(0, 1),
+                    "Value of Newton step length");
+
   prm.declare_entry("Time step",
                     "1",
                     Patterns::Double(0),
@@ -655,8 +660,7 @@ TemperatureSolver<dim>::solve()
       assemble_system();
       solve_system();
 
-      // Using step length 1
-      temperature += temperature_update;
+      temperature.add(prm.get_double("Newton step length"), temperature_update);
 
       // Check convergence
       const double max_abs_dT = temperature_update.linfty_norm();

@@ -6,6 +6,11 @@ cp parameters/*.prm .
 
 sed -Ei "s|(set Temperature only *= *).*|\1 true|" problem.prm
 sed -Ei "s|(set Time step *= *).*|\1 0|" temperature.prm
+sed -Ei "s|(set Newton step length *= *).*|\1 0.8|" temperature.prm
+
+sed -Ei "s|(set Electrical conductivity *= *).*|\1 100*10^(4.247-2924.0/T)|" problem.prm
+sed -Ei "s|(set Emissivity *= *).*|\1 0.57|" problem.prm
+sed -Ei "s|(set Inductor position *= *).*|\1 0|" problem.prm
 
 
 # 2D or 3D simulation mode
@@ -36,3 +41,5 @@ for i in "${!arr_I[@]}"; do
 
     mv -- *-${dim}d-order$order-t0* "$r"
 done
+
+./plot-steady-temperature.gnu
