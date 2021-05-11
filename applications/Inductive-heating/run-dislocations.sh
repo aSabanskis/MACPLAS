@@ -1,5 +1,9 @@
 #!/bin/bash
 
+set -e # exit script on error
+
+cp parameters/*.prm .
+
 sed -Ei "s|(set Load saved results *= *).*|\1 true|" problem.prm
 
 # Inductor currents, A and dislocation densities, m^-2

@@ -14,4 +14,4 @@ set Thermal conductivity      = 25
 set Thermal conductivity derivative = 0
 set Time step                 = 10 # 0
 set Log convergence full      = false
-set Log convergence final     = true
+set Log convergence final     = false
