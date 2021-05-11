@@ -1,6 +1,6 @@
 #!/bin/bash
 
-sed -i "s/set Load saved results.*/set Load saved results = true/g" problem.prm
+sed -Ei "s|(set Load saved results *= *).*|\1 true|" problem.prm
 
 # Inductor currents, A and dislocation densities, m^-2
 arr_I=(20 25 30 35 40 45 50 55 60 65 70 75 80 85 90 95 100 105 110 115 120 125 130 135 140)
@@ -28,7 +28,7 @@ for i in "${!arr_I[@]}"; do
 
 		# start N_m defined in .prm
 		rm *density* *t[1-9]*
-		sed -i "s/set Initial dislocation density.*/set Initial dislocation density = $N/g" dislocation.prm
+		sed -Ei "s|(set Initial dislocation density *= *).*|\1 $N|" dislocation.prm
 		./macplas-inductive-heating > log
 		./plot-probes-minmax.gnu
 

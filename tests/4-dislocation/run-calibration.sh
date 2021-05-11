@@ -19,11 +19,11 @@ for i in "${!arr_T[@]}"; do
     Q=${arr_Q[$i]}
     D=${arr_D[$i]}
 
-    sed -Ei "s/(set Initial temperature *= *).*/\1$T/"     problem.prm
-    sed -Ei "s/(set Reference temperature *= *).*/\1$T/"   stress.prm
-    sed -Ei "s/(set Young's modulus *= *).*/\1$E/"         stress.prm
-    sed -Ei "s/(set Peierls potential *= *).*/\1$Q/"       dislocation.prm
-    sed -Ei "s/(set Strain hardening factor *= *).*/\1$D/" dislocation.prm
+    sed -Ei "s|(set Initial temperature *= *).*|\1$T|"     problem.prm
+    sed -Ei "s|(set Reference temperature *= *).*|\1$T|"   stress.prm
+    sed -Ei "s|(set Young's modulus *= *).*|\1$E|"         stress.prm
+    sed -Ei "s|(set Peierls potential *= *).*|\1$Q|"       dislocation.prm
+    sed -Ei "s|(set Strain hardening factor *= *).*|\1$D|" dislocation.prm
 
     id="T$T"
     echo "$id"

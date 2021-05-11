@@ -15,7 +15,7 @@ for i in "${!arr_I[@]}"; do
     echo "$r"
     mkdir -p "$r"
 
-    sed -i "s/set Inductor current.*/set Inductor current = $I/g" problem.prm
+    sed -Ei "s|(set Inductor current *= *).*|\1 $I|" problem.prm
     cp -- *.prm "$r"
 
     ./macplas-inductive-heating > "$r/log"

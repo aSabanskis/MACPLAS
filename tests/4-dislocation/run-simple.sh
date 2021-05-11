@@ -7,20 +7,20 @@ mkdir -p $r
 rm *.prm
 ./macplas-test-4 init
 
-sed -i "s/set Time scheme.*/set Time scheme = Linearized N_m/g" dislocation.prm
-sed -i "s/set Time step.*/set Time step = 0.1/g" dislocation.prm
-sed -i "s/set Max time  .*/set Max time  = 1000/g" dislocation.prm
-sed -i "s/set Max time step.*/set Max time step = 1/g" dislocation.prm
-sed -i "s/set Min time step.*/set Min time step = 0.001/g" dislocation.prm
-sed -i "s/set Max relative time step increase.*/set Max relative time step increase = 0.1/g" dislocation.prm
-sed -i "s/set Max dstrain_c.*/set Max dstrain_c = 1e-6/g" dislocation.prm
-sed -i "s/set Max relative dN_m.*/set Max relative dN_m = 0.1/g" dislocation.prm
-sed -i "s/set Number of threads.*/set Number of threads = 1/g" stress.prm
-sed -i "s/set Log convergence final.*/set Log convergence final = false/g" stress.prm
+sed -Ei "s|(set Time scheme *= *).*|\1 Linearized N_m|" dislocation.prm
+sed -Ei "s|(set Time step *= *).*|\1 0.1|" dislocation.prm
+sed -Ei "s|(set Max time *= *).*|\1 1000|" dislocation.prm
+sed -Ei "s|(set Max time step *= *).*|\1 1|" dislocation.prm
+sed -Ei "s|(set Min time step *= *).*|\1 0.001|" dislocation.prm
+sed -Ei "s|(set Max relative time step increase *= *).*|\1 0.1|" dislocation.prm
+sed -Ei "s|(set Max dstrain_c *= *).*|\1 1e-6|" dislocation.prm
+sed -Ei "s|(set Max relative dN_m *= *).*|\1 0.1|" dislocation.prm
+sed -Ei "s|(set Number of threads *= *).*|\1 1|" stress.prm
+sed -Ei "s|(set Log convergence final *= *).*|\1 false|" stress.prm
 
 for T in 700 800 900 1000 1100 1200 1300 1400 1500 1600; do
-    sed -i "s/set Initial temperature.*/set Initial temperature = $T/g" problem.prm
-    sed -i "s/set Reference temperature.*/set Reference temperature = $T/g" stress.prm
+    sed -Ei "s|(set Initial temperature *= *).*|\1 $T|" problem.prm
+    sed -Ei "s|(set Reference temperature *= *).*|\1 $T|" stress.prm
 
     id="T$T"
     echo "$id"
