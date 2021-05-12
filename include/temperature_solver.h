@@ -588,7 +588,7 @@ template <int dim>
 void
 TemperatureSolver<dim>::initialize_parameters()
 {
-  std::cout << solver_name() << "  Intializing parameters";
+  std::cout << solver_name() << "  Initializing parameters";
 
   const std::string m_rho_expression = prm.get("Density");
   m_rho.initialize("T",
@@ -753,11 +753,17 @@ template <int dim>
 void
 TemperatureSolver<dim>::initialize()
 {
+  Timer timer;
+
+  std::cout << solver_name() << "  Initializing finite element solution";
+
   dh.distribute_dofs(fe);
   const unsigned int n_dofs = dh.n_dofs();
 
   temperature.reinit(n_dofs);
   temperature_update.reinit(n_dofs);
+
+  std::cout << " " << format_time(timer) << "\n";
 
   std::cout << solver_name() << "  "
             << "Number of active cells: " << triangulation.n_active_cells()

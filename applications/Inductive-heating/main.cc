@@ -207,6 +207,8 @@ Problem<dim>::solve_steady_temperature()
       return;
     }
 
+  std::cout << "Calculating steady-state temperature field\n";
+
   double max_dT;
   do
     {
@@ -230,6 +232,8 @@ template <int dim>
 void
 Problem<dim>::solve_dislocation()
 {
+  std::cout << "Calculating dislocation density\n";
+
   // initialize dislocations and stresses
   dislocation_solver.initialize();
   dislocation_solver.get_temperature() = temperature_solver.get_temperature();
@@ -262,6 +266,8 @@ template <int dim>
 void
 Problem<dim>::solve_temperature_dislocation()
 {
+  std::cout << "Calculating temperature and dislocation density\n";
+
   // initialize dislocations and stresses
   dislocation_solver.initialize();
   dislocation_solver.get_temperature() = temperature_solver.get_temperature();
@@ -302,6 +308,8 @@ template <int dim>
 void
 Problem<dim>::solve_temperature()
 {
+  std::cout << "Calculating transient temperature field\n";
+
   const int n_output = prm.get_integer("Output frequency");
 
   update_T_max();
@@ -331,17 +339,21 @@ Problem<dim>::output_results(const bool data,
                              const bool vtk,
                              const bool boundary) const
 {
+  const bool has_dislocation =
+    with_dislocation() &&
+    dislocation_solver.get_dof_handler().has_active_dofs();
+
   if (data)
     {
       temperature_solver.output_data();
-      if (with_dislocation())
+      if (has_dislocation)
         dislocation_solver.output_data();
     }
 
   if (vtk)
     {
       temperature_solver.output_vtk();
-      if (with_dislocation())
+      if (has_dislocation)
         dislocation_solver.output_vtk();
     }
 
@@ -351,7 +363,7 @@ Problem<dim>::output_results(const bool data,
     for (unsigned int id = 0; id < 2; ++id)
       {
         temperature_solver.output_boundary_values(id);
-        if (with_dislocation())
+        if (has_dislocation)
           dislocation_solver.output_boundary_values(id);
       }
 }

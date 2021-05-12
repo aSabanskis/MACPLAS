@@ -523,7 +523,7 @@ template <int dim>
 void
 StressSolver<dim>::initialize_parameters()
 {
-  std::cout << solver_name() << "  Intializing parameters";
+  std::cout << solver_name() << "  Initializing parameters";
 
   const std::string m_E_expression = prm.get("Young's modulus");
   m_E.initialize("T", m_E_expression, typename FunctionParser<1>::ConstMap());

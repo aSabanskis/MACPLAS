@@ -1150,7 +1150,7 @@ template <int dim>
 void
 DislocationSolver<dim>::initialize_parameters()
 {
-  std::cout << solver_name() << "  Intializing parameters";
+  std::cout << solver_name() << "  Initializing parameters";
 
   const std::string m_Q_expression = prm.get("Peierls potential");
   m_Q.initialize("T", m_Q_expression, typename FunctionParser<1>::ConstMap());
