@@ -11,10 +11,18 @@ order=2
 filename(I, boundary) = \
 sprintf('T-%gd-order%g-I%g/result-temperature-2d-order2-t0-boundary%g.dat', dim, order, I, boundary)
 
-set xrange [0.2:0.334] # symmetric to T maximum
+z0 = 0.26685
+dz = 0.06
+set xrange [z0-dz:z0+dz] # symmetric to T maximum
 set xlabel 'z, m'
 set yrange [600:1600]
 set ylabel 'Temperature, K'
+
+set arrow from z0, graph 0 to z0, graph 1 lw 2 dt 3 nohead
+z0_meas = z0-.0054
+dz_meas = .0057
+set arrow from z0_meas+dz_meas/2, graph 0 to z0_meas+dz_meas/2, graph 1 lw 2 dt 3 nohead
+set arrow from z0_meas-dz_meas/2, graph 0 to z0_meas-dz_meas/2, graph 1 lw 2 dt 3 nohead
 
 set output sprintf('T-%gd-order%g.pdf', dim, order)
 

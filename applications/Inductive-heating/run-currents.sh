@@ -5,7 +5,7 @@ set -e # exit script on error
 cp parameters/*.prm .
 
 # Inductor currents, A
-arr_I=(30 35 40 45 50 55 60 65 70 75 80 85 90 95 100 105 110 115 120 125 130 135 140)
+arr_I=(30 35 40 45 50 55 60 65 70 75 80 85 90 95 100 105 110 115 120)
 
 for i in "${!arr_I[@]}"; do
     I=${arr_I[$i]}
