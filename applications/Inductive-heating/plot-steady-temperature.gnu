@@ -24,7 +24,7 @@ dz_meas = .0057
 set arrow from z0_meas+dz_meas/2, graph 0 to z0_meas+dz_meas/2, graph 1 lw 2 dt 3 nohead
 set arrow from z0_meas-dz_meas/2, graph 0 to z0_meas-dz_meas/2, graph 1 lw 2 dt 3 nohead
 
-set output sprintf('T-%gd-order%g.pdf', dim, order)
+set output sprintf('results-T(z)-%gd-order%g.pdf', dim, order)
 
 I0 = 30
 dI = 10

@@ -2,4 +2,4 @@
 
 set -e # exit script on error
 
-rm -f -- *d-order* probes*.txt
+rm -f -- *d-order* probes*.txt results-*.dat
