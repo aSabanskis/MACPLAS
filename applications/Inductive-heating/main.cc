@@ -137,6 +137,16 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
     Patterns::Integer(0),
     "Number of time steps between result output (0 - disabled)");
 
+  prm.declare_entry("Probe coordinates x",
+                    "0, 0, 0",
+                    Patterns::List(Patterns::Double(), 1),
+                    "Comma-separated radial coordinates");
+
+  prm.declare_entry("Probe coordinates z",
+                    "0.067, 0.267, 0.467",
+                    Patterns::List(Patterns::Double(), 1),
+                    "Comma-separated vertical coordinates");
+
   if (use_default_prm)
     {
       std::ofstream of("problem.prm");
@@ -390,10 +400,15 @@ Problem<dim>::initialize()
 
   temperature_solver.output_mesh();
 
-  Point<dim> p;
-  for (int i = 0; i <= 2; ++i)
+  const std::vector<double> X = split_string(prm.get("Probe coordinates x"));
+  const std::vector<double> Z = split_string(prm.get("Probe coordinates z"));
+  AssertDimension(X.size(), Z.size());
+
+  for (unsigned int i = 0; i < X.size(); ++i)
     {
-      p[dim - 1] = 0.067 + 0.2 * i;
+      Point<dim> p;
+      p[0]       = X[i];
+      p[dim - 1] = Z[i];
       temperature_solver.add_probe(p);
       dislocation_solver.add_probe(p);
     }

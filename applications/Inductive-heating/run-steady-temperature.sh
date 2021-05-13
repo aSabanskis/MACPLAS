@@ -14,6 +14,8 @@ sed -Ei "s|(set Thermal conductivity *= *).*|\1 25|" temperature.prm
 sed -Ei "s|(set Electrical conductivity *= *).*|\1 100*10^(4.247-2924.0/T)|" problem.prm
 sed -Ei "s|(set Emissivity *= *).*|\1 0.57|" problem.prm
 sed -Ei "s|(set Inductor position *= *).*|\1 0|" problem.prm
+sed -Ei "s|(set Probe coordinates x *= *).*|\1 0.01, 0.01|" problem.prm
+sed -Ei "s|(set Probe coordinates z *= *).*|\1 0.26685, 0.26145|" problem.prm
 
 
 # 2D or 3D simulation mode
