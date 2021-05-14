@@ -17,10 +17,8 @@ with open(file_out, "a") as f:
     if write_header:
         print("Writing header")
         for id, line in enumerate(data):
-            if line.startswith("#"):
-                f.write(line)
+            f.write(line)
             if not line.startswith("#"):
-                f.write(line)
                 break
 
     print("Writing last result")
