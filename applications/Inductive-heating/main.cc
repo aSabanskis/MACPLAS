@@ -214,6 +214,8 @@ Problem<dim>::solve_steady_temperature()
   if (prm.get_bool("Load saved results"))
     {
       temperature_solver.load_data();
+      update_T_max();
+      output_results();
       return;
     }
 
@@ -234,7 +236,6 @@ Problem<dim>::solve_steady_temperature()
   } while (max_dT > prm.get_double("Max temperature change"));
 
   update_T_max();
-
   output_results();
 }
 
@@ -248,18 +249,15 @@ Problem<dim>::solve_dislocation()
   dislocation_solver.initialize();
   dislocation_solver.get_temperature() = temperature_solver.get_temperature();
 
-  update_T_max();
-
   if (prm.get_bool("Load saved results"))
     {
       dislocation_solver.load_data();
     }
-  else
-    {
-      output_results();
-    }
 
   dislocation_solver.solve(true);
+
+  update_T_max();
+  output_results();
 
   while (true)
     {
@@ -282,9 +280,10 @@ Problem<dim>::solve_temperature_dislocation()
   dislocation_solver.initialize();
   dislocation_solver.get_temperature() = temperature_solver.get_temperature();
 
-  update_T_max();
-
   dislocation_solver.solve(true);
+
+  update_T_max();
+  output_results();
 
   const int n_output = prm.get_integer("Output frequency");
 
@@ -421,6 +420,8 @@ Problem<dim>::initialize()
   if (prm.get_bool("Load saved results"))
     {
       temperature_solver.load_data();
+      update_T_max();
+      output_results();
       return;
     }
 }
