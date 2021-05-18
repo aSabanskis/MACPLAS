@@ -1,6 +1,6 @@
 # Thermal stress solver
 
-A simple thermal stress calculation program using user-defined temperature field T(x,y,z) specified in ```problem.prm```. The mesh is read from ```mesh-<dim>d.msh```, where the dimension ```dim``` is 2 (axisymmetric simulation) or 3. An example of ```gmsh``` script file ```mesh-3d.geo``` to generate the mesh is provided.
+A simple thermal stress calculation program using user-defined temperature field T(x,y,z) specified in ```problem.prm```. The mesh is read from ```mesh-<dim>d.msh```, where the dimension ```dim``` is 2 (axisymmetric simulation) or 3. An example of ```gmsh``` script file ```mesh-3d.geo``` to generate the mesh is provided together with ```create-mesh.sh```.
 
 Command-line arguments:
 
