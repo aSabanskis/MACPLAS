@@ -430,6 +430,7 @@ coordinate_names(const unsigned int dim)
     return {"x", "y", "z"};
 
   AssertThrow(false, ExcNotImplemented());
+  return {};
 }
 
 template <typename T>
