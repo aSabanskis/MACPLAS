@@ -1,6 +1,6 @@
 set Electrical conductivity           = 100*10^(4.247-2924.0/T)
 set Emissivity                        = 0.57
-set Inductor position                 = -0.22645 + 0.39*t/12900
+set Inductor position                 = 0.0404 + 0.39*t/12900
 set Inductor current                  = t<=12900 ? 33.5 + 73*t/12900 : 0
 set Initial temperature               = 1000
 set Max temperature change            = 1e-1
@@ -8,5 +8,6 @@ set Output frequency                  = 30
 set Probe coordinates x               = 0, 0, 0
 set Probe coordinates z               = 0.067, 0.267, 0.467
 set Reference electrical conductivity = 5e4
+set Reference inductor position       = 0.26685
 set Load saved results                = false
 set Temperature only                  = false

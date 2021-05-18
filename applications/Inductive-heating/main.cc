@@ -94,6 +94,12 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     Patterns::Double(0),
                     "Maximum temperature change in K");
 
+  prm.declare_entry(
+    "Reference inductor position",
+    "0.26685",
+    Patterns::Double(),
+    "Reference vertical inductor position (qEM data file) in m");
+
   prm.declare_entry("Inductor position",
                     "0",
                     Patterns::Anything(),
@@ -415,7 +421,9 @@ Problem<dim>::initialize()
   Vector<double> &temperature = temperature_solver.get_temperature();
   temperature.add(prm.get_double("Initial temperature"));
 
-  interpolate_q_em(inductor_position.value(Point<1>(0)));
+  const double z  = inductor_position.value(Point<1>(0));
+  const double z0 = prm.get_double("Reference inductor position");
+  interpolate_q_em(z - z0);
 
   if (prm.get_bool("Load saved results"))
     {
@@ -438,7 +446,8 @@ Problem<dim>::apply_q_em()
   const double z = inductor_position.value(Point<1>(t));
   temperature_solver.add_output("z[m]", z);
 
-  interpolate_q_em(z);
+  const double z0 = prm.get_double("Reference inductor position");
+  interpolate_q_em(z - z0);
 
   Vector<double> q = q0;
 
