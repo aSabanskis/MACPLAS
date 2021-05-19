@@ -48,7 +48,13 @@ private:
                  const bool boundary = dim == 2) const;
 
   void
+  postprocess_T();
+
+  void
   update_T_max();
+
+  void
+  measure_T();
 
   // false if only the temperature field is calculated
   bool
@@ -66,6 +72,8 @@ private:
 
   // max temperature during the whole simulation
   Vector<double> T_max;
+
+  std::ofstream T_measurement_file;
 
   constexpr static unsigned int boundary_id = 0;
 
@@ -93,6 +101,16 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     "0.1",
                     Patterns::Double(0),
                     "Maximum temperature change in K");
+
+  prm.declare_entry("Temperature measurement dz_low",
+                    "-0.00825",
+                    Patterns::Double(),
+                    "Minimum vertical temperature measurement position in m");
+
+  prm.declare_entry("Temperature measurement dz_high",
+                    "-0.00255",
+                    Patterns::Double(),
+                    "Maximum vertical temperature measurement position in m");
 
   prm.declare_entry(
     "Reference inductor position",
@@ -220,7 +238,7 @@ Problem<dim>::solve_steady_temperature()
   if (prm.get_bool("Load saved results"))
     {
       temperature_solver.load_data();
-      update_T_max();
+      postprocess_T();
       output_results();
       return;
     }
@@ -241,7 +259,7 @@ Problem<dim>::solve_steady_temperature()
       std::cout << "max_dT=" << max_dT << " K\n";
   } while (max_dT > prm.get_double("Max temperature change"));
 
-  update_T_max();
+  postprocess_T();
   output_results();
 }
 
@@ -262,7 +280,7 @@ Problem<dim>::solve_dislocation()
 
   dislocation_solver.solve(true);
 
-  update_T_max();
+  postprocess_T();
   output_results();
 
   while (true)
@@ -288,7 +306,7 @@ Problem<dim>::solve_temperature_dislocation()
 
   dislocation_solver.solve(true);
 
-  update_T_max();
+  postprocess_T();
   output_results();
 
   const int n_output = prm.get_integer("Output frequency");
@@ -303,7 +321,7 @@ Problem<dim>::solve_temperature_dislocation()
       dislocation_solver.get_temperature() =
         temperature_solver.get_temperature();
 
-      update_T_max();
+      postprocess_T();
 
       const bool keep_going_disl = dislocation_solver.solve();
 
@@ -327,14 +345,14 @@ Problem<dim>::solve_temperature()
 
   const int n_output = prm.get_integer("Output frequency");
 
-  update_T_max();
+  postprocess_T();
 
   for (unsigned int i = 1;; ++i)
     {
       apply_q_em();
       const bool keep_going_temp = temperature_solver.solve();
 
-      update_T_max();
+      postprocess_T();
 
       if (!keep_going_temp)
         break;
@@ -428,8 +446,6 @@ Problem<dim>::initialize()
   if (prm.get_bool("Load saved results"))
     {
       temperature_solver.load_data();
-      update_T_max();
-      output_results();
       return;
     }
 }
@@ -516,6 +532,14 @@ Problem<2>::interpolate_q_em(const double z)
 
 template <int dim>
 void
+Problem<dim>::postprocess_T()
+{
+  update_T_max();
+  measure_T();
+}
+
+template <int dim>
+void
 Problem<dim>::update_T_max()
 {
   const Vector<double> &T = temperature_solver.get_temperature();
@@ -532,6 +556,58 @@ Problem<dim>::update_T_max()
     T_max[k] = std::max(T_max[k], T[k]);
 
   temperature_solver.add_field("T_max", T_max);
+}
+
+template <int dim>
+void
+Problem<dim>::measure_T()
+{
+  if (!T_measurement_file.is_open())
+    {
+      const std::string s =
+        "measurements-temperature-" + std::to_string(dim) + "d.txt";
+
+      std::cout << "Writing heater to '" << s << "'\n";
+
+      T_measurement_file.open(s);
+      T_measurement_file << "t[s]\tz_ind[m]\t";
+
+      const auto dims = coordinate_names(dim);
+      for (const auto &d : dims)
+        T_measurement_file << d << "[m]\t";
+
+      T_measurement_file << "T[K]\n";
+    }
+
+  const double t     = temperature_solver.get_time();
+  const double z_ind = inductor_position.value(Point<1>(t));
+  const double z_min = z_ind + prm.get_double("Temperature measurement dz_low");
+  const double z_max =
+    z_ind + prm.get_double("Temperature measurement dz_high");
+
+  const Vector<double> &temperature = temperature_solver.get_temperature();
+
+  std::vector<Point<dim>> points;
+  std::vector<bool>       boundary_dofs;
+  temperature_solver.get_boundary_points(boundary_id, points, boundary_dofs);
+
+  for (unsigned int i = 0; i < temperature.size(); ++i)
+    {
+      if (!boundary_dofs[i])
+        continue;
+
+      const double z = points[i][dim - 1];
+
+      if (z >= z_min && z <= z_max)
+        {
+          T_measurement_file << t << '\t' << z_ind << '\t';
+
+          for (unsigned int d = 0; d < dim; ++d)
+            T_measurement_file << points[i][d] << '\t';
+
+          T_measurement_file << temperature[i] << '\n';
+        }
+    }
 }
 
 template <int dim>
