@@ -576,7 +576,7 @@ Problem<dim>::measure_T()
       for (const auto &d : dims)
         T_measurement_file << d << "[m]\t";
 
-      T_measurement_file << "T[K]\n";
+      T_measurement_file << "T[K]\tT_low[K]\tT_high[K]\n";
     }
 
   const double t     = temperature_solver.get_time();
@@ -591,6 +591,8 @@ Problem<dim>::measure_T()
   std::vector<bool>       boundary_dofs;
   temperature_solver.get_boundary_points(boundary_id, points, boundary_dofs);
 
+  std::vector<unsigned int> picked_dofs;
+
   for (unsigned int i = 0; i < temperature.size(); ++i)
     {
       if (!boundary_dofs[i])
@@ -600,13 +602,31 @@ Problem<dim>::measure_T()
 
       if (z >= z_min && z <= z_max)
         {
-          T_measurement_file << t << '\t' << z_ind << '\t';
-
-          for (unsigned int d = 0; d < dim; ++d)
-            T_measurement_file << points[i][d] << '\t';
-
-          T_measurement_file << temperature[i] << '\n';
+          picked_dofs.push_back(i);
         }
+    }
+
+  if (picked_dofs.empty())
+    return;
+
+  std::sort(picked_dofs.begin(),
+            picked_dofs.end(),
+            [&](const unsigned int v1, const unsigned int v2) {
+              return points[v1][dim - 1] < points[v2][dim - 1];
+            });
+
+  const auto temperature_low  = temperature[picked_dofs.front()];
+  const auto temperature_high = temperature[picked_dofs.back()];
+
+  for (const auto i : picked_dofs)
+    {
+      T_measurement_file << t << '\t' << z_ind << '\t';
+
+      for (unsigned int d = 0; d < dim; ++d)
+        T_measurement_file << points[i][d] << '\t';
+
+      T_measurement_file << temperature[i] << '\t' << temperature_low << '\t'
+                         << temperature_high << '\n';
     }
 }
 
