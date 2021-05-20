@@ -1,6 +1,7 @@
 #ifndef macplas_utilities_h
 #define macplas_utilities_h
 
+#include <deal.II/base/function_lib.h>
 #include <deal.II/base/point.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/base/timer.h>
@@ -28,6 +29,14 @@ sqr(const double x);
  */
 inline std::vector<double>
 split_string(const std::string &s, const char delimiter = ',');
+
+/** Initialize function as \c InterpolatedTensorProductGridData if \c expression
+ * ends with \c txt, \c dat or \c tsv, otherwise \c FunctionParser.
+ */
+inline void
+initialize_function(std::unique_ptr<Function<1>> &f,
+                    const std::string &           expression,
+                    const std::string &           vars = "t");
 
 /** Just like \c std::minmax, for \c Vector argument
  */
@@ -372,6 +381,50 @@ split_string(const std::string &s, const char delimiter)
 {
   const auto s_split = Utilities::split_string_list(s, delimiter);
   return Utilities::string_to_double(s_split);
+}
+
+void
+initialize_function(std::unique_ptr<Function<1>> &f,
+                    const std::string &           expression,
+                    const std::string &           vars)
+{
+  const std::string ext =
+    expression.size() <= 4 ? "" : expression.substr(expression.size() - 4);
+
+  if (ext == ".txt" || ext == ".dat" || ext == ".tsv")
+    {
+      std::ifstream infile(expression);
+      AssertThrow(infile, ExcFileNotOpen(expression.c_str()));
+
+      std::vector<double> points, data;
+
+      std::string line;
+
+      while (std::getline(infile, line))
+        {
+          std::stringstream ss(line);
+
+          double x, y;
+          ss >> x >> y;
+
+          points.push_back(x);
+          data.push_back(y);
+        }
+
+      using F = Functions::InterpolatedTensorProductGridData<1>;
+
+      f = std::make_unique<F>(std::array<std::vector<double>, 1>{points},
+                              Table<1, double>{points.size(), data.begin()});
+    }
+  else
+    {
+      using F = FunctionParser<1>;
+
+      f = std::make_unique<F>();
+
+      auto *fp = dynamic_cast<F *>(f.get());
+      fp->initialize(vars, expression, F::ConstMap());
+    }
 }
 
 template <class T>

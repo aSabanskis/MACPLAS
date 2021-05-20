@@ -77,8 +77,8 @@ private:
 
   constexpr static unsigned int boundary_id = 0;
 
-  FunctionParser<1> inductor_position;
-  FunctionParser<1> inductor_current;
+  std::unique_ptr<Function<1>> inductor_position;
+  std::unique_ptr<Function<1>> inductor_current;
 
   ParameterHandler prm;
 
@@ -118,15 +118,17 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
     Patterns::Double(),
     "Reference vertical inductor position (qEM data file) in m");
 
-  prm.declare_entry("Inductor position",
-                    "0",
-                    Patterns::Anything(),
-                    "Vertical inductor shift in m (time function)");
+  prm.declare_entry(
+    "Inductor position",
+    "0",
+    Patterns::Anything(),
+    "Vertical inductor shift in m (time function or data file name)");
 
-  prm.declare_entry("Inductor current",
-                    "100",
-                    Patterns::Anything(),
-                    "Effective inductor current I in A (time function)");
+  prm.declare_entry(
+    "Inductor current",
+    "100",
+    Patterns::Anything(),
+    "Effective inductor current I in A (time function or data file name)");
 
   prm.declare_entry(
     "Reference electrical conductivity",
@@ -189,13 +191,9 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
         prm.print_parameters(of, ParameterHandler::Text);
       }
 
-  inductor_position.initialize("t",
-                               prm.get("Inductor position"),
-                               typename FunctionParser<1>::ConstMap());
+  initialize_function(inductor_position, prm.get("Inductor position"));
 
-  inductor_current.initialize("t",
-                              prm.get("Inductor current"),
-                              typename FunctionParser<1>::ConstMap());
+  initialize_function(inductor_current, prm.get("Inductor current"));
 
   electrical_conductivity.initialize("T",
                                      prm.get("Electrical conductivity"),
@@ -439,7 +437,7 @@ Problem<dim>::initialize()
   Vector<double> &temperature = temperature_solver.get_temperature();
   temperature.add(prm.get_double("Initial temperature"));
 
-  const double z  = inductor_position.value(Point<1>(0));
+  const double z  = inductor_position->value(Point<1>(0));
   const double z0 = prm.get_double("Reference inductor position");
   interpolate_q_em(z - z0);
 
@@ -459,7 +457,7 @@ Problem<dim>::apply_q_em()
 
   const Vector<double> &temperature = temperature_solver.get_temperature();
 
-  const double z = inductor_position.value(Point<1>(t));
+  const double z = inductor_position->value(Point<1>(t));
   temperature_solver.add_output("z[m]", z);
 
   const double z0 = prm.get_double("Reference inductor position");
@@ -467,7 +465,7 @@ Problem<dim>::apply_q_em()
 
   Vector<double> q = q0;
 
-  const double I = inductor_current.value(Point<1>(t));
+  const double I = inductor_current->value(Point<1>(t));
   temperature_solver.add_output("I[A]", I);
 
   // apply the current and temperature-dependent electrical conductivity
@@ -580,7 +578,7 @@ Problem<dim>::measure_T()
     }
 
   const double t     = temperature_solver.get_time();
-  const double z_ind = inductor_position.value(Point<1>(t));
+  const double z_ind = inductor_position->value(Point<1>(t));
   const double z_min = z_ind + prm.get_double("Temperature measurement dz_low");
   const double z_max =
     z_ind + prm.get_double("Temperature measurement dz_high");
