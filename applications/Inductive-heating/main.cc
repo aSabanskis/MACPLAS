@@ -157,6 +157,11 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     Patterns::Bool(),
                     "Calculate just the temperature field");
 
+  prm.declare_entry("Start from steady temperature",
+                    "true",
+                    Patterns::Bool(),
+                    "Calculate the steady-state temperature field at t=0");
+
   prm.declare_entry(
     "Output frequency",
     "0",
@@ -207,20 +212,21 @@ Problem<dim>::run()
   make_grid();
   initialize();
 
+  if (prm.get_bool("Start from steady temperature") ||
+      temperature_solver.get_time_step() == 0)
+    {
+      solve_steady_temperature();
+    }
+
   if (!with_dislocation())
     {
-      if (temperature_solver.get_time_step() == 0)
-        {
-          solve_steady_temperature();
-        }
-      else
+      if (temperature_solver.get_time_step() > 0)
         {
           solve_temperature();
         }
     }
   else if (temperature_solver.get_time_step() == 0)
     {
-      solve_steady_temperature();
       solve_dislocation();
     }
   else
@@ -243,6 +249,10 @@ Problem<dim>::solve_steady_temperature()
 
   std::cout << "Calculating steady-state temperature field\n";
 
+  const double dt0 = temperature_solver.get_time_step();
+
+  temperature_solver.get_time_step() = 0;
+
   double max_dT;
   do
     {
@@ -256,6 +266,8 @@ Problem<dim>::solve_steady_temperature()
 
       std::cout << "max_dT=" << max_dT << " K\n";
   } while (max_dT > prm.get_double("Max temperature change"));
+
+  temperature_solver.get_time_step() = dt0;
 
   postprocess_T();
   output_results();

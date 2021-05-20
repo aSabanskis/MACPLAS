@@ -10,4 +10,5 @@ set Probe coordinates z               = 0.067, 0.267, 0.467
 set Reference electrical conductivity = 5e4
 set Reference inductor position       = 0.26685
 set Load saved results                = false
+set Start from steady temperature     = true
 set Temperature only                  = false
