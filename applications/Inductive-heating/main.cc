@@ -580,16 +580,18 @@ Problem<dim>::measure_T()
       std::cout << "Writing heater to '" << s << "'\n";
 
       T_measurement_file.open(s);
-      T_measurement_file << "t[s]\tz_ind[m]\t";
+      T_measurement_file << "t[s]\tdt[s]\tz[m]\tI[A]\t";
 
       const auto dims = coordinate_names(dim);
       for (const auto &d : dims)
-        T_measurement_file << d << "[m]\t";
+        T_measurement_file << d << "_point[m]\t";
 
       T_measurement_file << "T[K]\tT_low[K]\tT_high[K]\n";
     }
 
   const double t     = temperature_solver.get_time();
+  const double dt    = temperature_solver.get_time_step();
+  const double I_ind = inductor_current->value(Point<1>(t));
   const double z_ind = inductor_position->value(Point<1>(t));
   const double z_min = z_ind + prm.get_double("Temperature measurement dz_low");
   const double z_max =
@@ -630,7 +632,8 @@ Problem<dim>::measure_T()
 
   for (const auto i : picked_dofs)
     {
-      T_measurement_file << t << '\t' << z_ind << '\t';
+      T_measurement_file << t << '\t' << dt << '\t' << z_ind << '\t' << I_ind
+                         << '\t';
 
       for (unsigned int d = 0; d < dim; ++d)
         T_measurement_file << points[i][d] << '\t';
