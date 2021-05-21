@@ -133,6 +133,13 @@ public:
   void
   get_support_points(std::vector<Point<dim>> &points) const;
 
+  /** Evaluate values of \c source field at \c points.
+   * Handles error for points outside the mesh by setting the value to zero.
+   */
+  std::vector<double>
+  get_field_at_points(const Vector<double> &         source,
+                      const std::vector<Point<dim>> &points) const;
+
   /** Get degrees of freedom for temperature
    */
   const DoFHandler<dim> &
@@ -260,7 +267,7 @@ private:
   void
   output_probes() const;
 
-  /** Evaluate values of source field at probe points
+  /** Evaluate values of \c source field at probe points
    */
   std::vector<double>
   get_field_at_probes(const Vector<double> &source) const;
@@ -802,6 +809,40 @@ DislocationSolver<dim>::get_support_points(
   const DoFHandler<dim> &dh = get_dof_handler();
   points.resize(dh.n_dofs());
   DoFTools::map_dofs_to_support_points(MappingQ1<dim>(), dh, points);
+}
+
+template <int dim>
+std::vector<double>
+DislocationSolver<dim>::get_field_at_points(
+  const Vector<double> &         source,
+  const std::vector<Point<dim>> &points) const
+{
+  Functions::FEFieldFunction<dim> ff(get_dof_handler(), source);
+
+  std::vector<double> values(points.size(), 0);
+
+  try
+    {
+      ff.value_list(points, values);
+    }
+  catch (std::exception &e)
+    {
+      std::cout << e.what() << "\n";
+
+      for (unsigned int i = 0; i < points.size(); ++i)
+        {
+          try
+            {
+              values[i] = ff.value(points[i]);
+            }
+          catch (std::exception &e)
+            {
+              values[i] = 0;
+            }
+        }
+    }
+
+  return values;
 }
 
 template <int dim>
@@ -1516,12 +1557,7 @@ template <int dim>
 std::vector<double>
 DislocationSolver<dim>::get_field_at_probes(const Vector<double> &source) const
 {
-  Functions::FEFieldFunction<dim> ff(get_dof_handler(), source);
-
-  std::vector<double> values(probes.size());
-  ff.value_list(probes, values);
-
-  return values;
+  return get_field_at_points(source, probes);
 }
 
 template <int dim>

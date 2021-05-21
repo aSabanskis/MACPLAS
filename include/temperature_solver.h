@@ -162,6 +162,13 @@ public:
   void
   get_support_points(std::vector<Point<dim>> &points) const;
 
+  /** Evaluate values of \c source field at \c points.
+   * Handles error for points outside the mesh by setting the value to zero.
+   */
+  std::vector<double>
+  get_field_at_points(const Vector<double> &         source,
+                      const std::vector<Point<dim>> &points) const;
+
   /** Get degrees of freedom for temperature
    */
   const DoFHandler<dim> &
@@ -308,6 +315,11 @@ private:
    */
   void
   output_probes() const;
+
+  /** Evaluate values of \c source field at probe points
+   */
+  std::vector<double>
+  get_field_at_probes(const Vector<double> &source) const;
 
   /** Calculate the temperature-dependent thermal conductivity \f$\lambda(T)\f$,
    * W m<sup>-1</sup> K<sup>-1</sup>
@@ -798,6 +810,40 @@ TemperatureSolver<dim>::get_support_points(
 }
 
 template <int dim>
+std::vector<double>
+TemperatureSolver<dim>::get_field_at_points(
+  const Vector<double> &         source,
+  const std::vector<Point<dim>> &points) const
+{
+  Functions::FEFieldFunction<dim> ff(get_dof_handler(), source);
+
+  std::vector<double> values(points.size(), 0);
+
+  try
+    {
+      ff.value_list(points, values);
+    }
+  catch (std::exception &e)
+    {
+      std::cout << e.what() << "\n";
+
+      for (unsigned int i = 0; i < points.size(); ++i)
+        {
+          try
+            {
+              values[i] = ff.value(points[i]);
+            }
+          catch (std::exception &e)
+            {
+              values[i] = 0;
+            }
+        }
+    }
+
+  return values;
+}
+
+template <int dim>
 const DoFHandler<dim> &
 TemperatureSolver<dim>::get_dof_handler() const
 {
@@ -1178,10 +1224,7 @@ TemperatureSolver<dim>::output_probes() const
       output << "\n";
     }
 
-  Functions::FEFieldFunction<dim> ff(dh, temperature);
-
-  std::vector<double> values(N);
-  ff.value_list(probes, values);
+  const std::vector<double> values = get_field_at_probes(temperature);
 
   const auto limits = minmax(temperature);
 
@@ -1211,6 +1254,13 @@ TemperatureSolver<dim>::output_probes() const
   output << "\n";
 
   std::cout << " " << format_time(timer) << "\n";
+}
+
+template <int dim>
+std::vector<double>
+TemperatureSolver<dim>::get_field_at_probes(const Vector<double> &source) const
+{
+  return get_field_at_points(source, probes);
 }
 
 template <int dim>
