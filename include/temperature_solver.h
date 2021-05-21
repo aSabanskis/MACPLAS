@@ -630,6 +630,8 @@ TemperatureSolver<dim>::initialize_parameters()
 
   get_time_step() = prm.get_double("Time step");
 
+  add_output("nNewton");
+
   std::cout << "  done\n";
 
   std::cout << "rho=" << m_rho_expression << "\n"
@@ -673,6 +675,8 @@ TemperatureSolver<dim>::solve()
       solve_system();
 
       temperature.add(prm.get_double("Newton step length"), temperature_update);
+
+      add_output("nNewton", i);
 
       // Check convergence
       const double max_abs_dT = temperature_update.linfty_norm();
