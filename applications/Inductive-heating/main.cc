@@ -73,7 +73,11 @@ private:
   // max temperature during the whole simulation
   Vector<double> T_max;
 
+  std::vector<Point<dim>> inductor_probes;
+
   std::ofstream T_measurement_file;
+
+  std::ofstream inductor_probe_file;
 
   constexpr static unsigned int boundary_id = 0;
 
@@ -178,6 +182,16 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     Patterns::List(Patterns::Double(), 1),
                     "Comma-separated vertical coordinates");
 
+  prm.declare_entry("Custom probes x relative to inductor",
+                    "0",
+                    Patterns::List(Patterns::Double(), 1),
+                    "Comma-separated radial coordinates");
+
+  prm.declare_entry("Custom probes z relative to inductor",
+                    "0",
+                    Patterns::List(Patterns::Double(), 1),
+                    "Comma-separated vertical coordinates");
+
   if (use_default_prm)
     {
       std::ofstream of("problem.prm");
@@ -203,6 +217,20 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
   electrical_conductivity.initialize("T",
                                      prm.get("Electrical conductivity"),
                                      typename FunctionParser<1>::ConstMap());
+
+  const std::vector<double> X =
+    split_string(prm.get("Custom probes x relative to inductor"));
+  const std::vector<double> Z =
+    split_string(prm.get("Custom probes z relative to inductor"));
+  AssertDimension(X.size(), Z.size());
+
+  inductor_probes.resize(X.size());
+
+  for (unsigned int i = 0; i < X.size(); ++i)
+    {
+      inductor_probes[i][0]       = X[i];
+      inductor_probes[i][dim - 1] = Z[i];
+    }
 }
 
 template <int dim>
@@ -589,6 +617,27 @@ Problem<dim>::measure_T()
       T_measurement_file << "T[K]\tT_low[K]\tT_high[K]\n";
     }
 
+  if (!inductor_probe_file.is_open())
+    {
+      const std::string s =
+        "probes-inductor-temperature-" + std::to_string(dim) + "d.txt";
+
+      std::cout << "Writing heater to '" << s << "'\n";
+
+      inductor_probe_file.open(s);
+
+      for (unsigned int i = 0; i < inductor_probes.size(); ++i)
+        inductor_probe_file << "# probe " << i << ":\t" << inductor_probes[i]
+                            << "\n";
+
+      inductor_probe_file << "t[s]\tdt[s]\tz[m]\tI[A]\tT_min[K]\tT_max[K]";
+
+      for (unsigned int i = 0; i < inductor_probes.size(); ++i)
+        inductor_probe_file << "\tT_" << i << "[K]";
+
+      inductor_probe_file << "\n";
+    }
+
   const double t     = temperature_solver.get_time();
   const double dt    = temperature_solver.get_time_step();
   const double I_ind = inductor_current->value(Point<1>(t));
@@ -641,6 +690,25 @@ Problem<dim>::measure_T()
       T_measurement_file << temperature[i] << '\t' << temperature_low << '\t'
                          << temperature_high << '\n';
     }
+
+
+  // Convert the vertical coordinate from inductor to crystal reference frame
+  points = inductor_probes;
+  for (auto &p : points)
+    p[dim - 1] += z_ind;
+
+  const std::vector<double> values_T =
+    temperature_solver.get_field_at_points(temperature, points);
+
+  const auto limits_T = minmax(temperature);
+
+  inductor_probe_file << t << '\t' << dt << '\t' << z_ind << '\t' << I_ind
+                      << '\t' << limits_T.first << '\t' << limits_T.second;
+
+  for (const auto &v : values_T)
+    inductor_probe_file << '\t' << v;
+
+  inductor_probe_file << "\n";
 }
 
 template <int dim>
