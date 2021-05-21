@@ -603,7 +603,7 @@ Problem<dim>::measure_T()
   if (!T_measurement_file.is_open())
     {
       const std::string s =
-        "measurements-temperature-" + std::to_string(dim) + "d.txt";
+        "probes-measurements-temperature-" + std::to_string(dim) + "d.txt";
 
       std::cout << "Writing heater to '" << s << "'\n";
 
