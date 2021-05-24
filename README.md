@@ -4,6 +4,7 @@ MAcroscopic Crystal PLAsticity Simulator
 Uses [deal.II](https://www.dealii.org/) C++ finite element library to model thermal stresses and dislocation density dynamics during single crystal growth.
 Also includes the temperature solver and utilities for interpolation of the external boundary conditions.
 
+*The development is still ongoing, so beware that the functionality of the library, including public member functions, could change in the future.*
 
 # Installation
 ## Library
