@@ -145,6 +145,16 @@ public:
   double
   get_max_time() const;
 
+  /** Get parameters \c prm
+   */
+  const ParameterHandler &
+  get_parameters() const;
+
+  /** Get parameters \c prm
+   */
+  ParameterHandler &
+  get_parameters();
+
   /** Initialize fields
    */
   void
@@ -763,6 +773,20 @@ double
 TemperatureSolver<dim>::get_max_time() const
 {
   return prm.get_double("Max time");
+}
+
+template <int dim>
+const ParameterHandler &
+TemperatureSolver<dim>::get_parameters() const
+{
+  return prm;
+}
+
+template <int dim>
+ParameterHandler &
+TemperatureSolver<dim>::get_parameters()
+{
+  return prm;
 }
 
 template <int dim>
