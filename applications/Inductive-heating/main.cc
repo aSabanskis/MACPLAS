@@ -484,6 +484,19 @@ Problem<dim>::initialize()
   Vector<double> &temperature = temperature_solver.get_temperature();
   temperature.add(prm.get_double("Initial temperature"));
 
+  if (dim == 3)
+    {
+      q3d.read_vtu("qEM-3d.vtu");
+      q3d.convert(SurfaceInterpolator3D::CellField,
+                  "QEM",
+                  SurfaceInterpolator3D::PointField,
+                  "q");
+    }
+  else if (dim == 2)
+    {
+      q2d.read_txt("qEM-2d.txt");
+    }
+
   const double z  = inductor_position->value(Point<1>(0));
   const double z0 = prm.get_double("Reference inductor position");
   interpolate_q_em(z - z0);
@@ -545,11 +558,6 @@ Problem<3>::interpolate_q_em(const double z)
   for (auto &p : points)
     p[2] -= z;
 
-  q3d.read_vtu("qEM-3d.vtu");
-  q3d.convert(SurfaceInterpolator3D::CellField,
-              "QEM",
-              SurfaceInterpolator3D::PointField,
-              "q");
   q3d.interpolate(
     SurfaceInterpolator3D::PointField, "q", points, boundary_dofs, q0);
 
@@ -568,7 +576,6 @@ Problem<2>::interpolate_q_em(const double z)
   for (auto &p : points)
     p[1] -= z;
 
-  q2d.read_txt("qEM-2d.txt");
   q2d.interpolate("QEM", points, boundary_dofs, q0);
 
   // normalize for future use
