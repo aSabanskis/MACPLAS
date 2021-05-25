@@ -85,6 +85,11 @@ public:
    * \c temperature-default.prm.
    * Default values are used and written to \c temperature.prm if
    * \c use_default_prm parameter is specified.
+   *
+   * \todo Redesign boundary condition handling to keep TemperatureSolver
+   * maintainable in the future
+   * \todo Automatically calculate temperature derivatives needed for the
+   * Newton's method
    */
   TemperatureSolver(const unsigned int order           = 2,
                     const bool         use_default_prm = false);

@@ -148,7 +148,7 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
 
   prm.declare_entry("Emissivity",
                     "0.57",
-                    Patterns::Double(0, 1),
+                    Patterns::Anything(),
                     "Emissivity epsilon (dimensionless)");
 
   prm.declare_entry("Load saved results",
@@ -536,14 +536,28 @@ Problem<dim>::apply_q_em()
       q[i] *= I2 / std::sqrt(s);
     }
 
-  const double e = prm.get_double("Emissivity");
 
-  std::function<double(double)> emissivity       = [=](double) { return e; };
-  std::function<double(double)> emissivity_deriv = [=](double) { return 0.0; };
+  // Setting emissivity this way works but should be improved in the future
+  const std::string e_expr = prm.get("Emissivity");
+  const bool        e_T    = e_expr == "Ratnieks";
+  const double      e_0    = e_T ? 0.46 : std::stod(e_expr);
+
+  std::function<double(const double)> emissivity_const = [=](const double T) {
+    return e_0;
+  };
+
+  std::function<double(const double)> emissivity_T = [=](const double T) {
+    return e_0 * (T / 1687 < 0.593 ? 1.39 : 1.96 - 0.96 * T / 1687);
+  };
+
+  // Leave out the temperature derivative for simplicity
+  std::function<double(const double)> emissivity_deriv = [=](const double) {
+    return 0.0;
+  };
 
   temperature_solver.set_bc_rad_mixed(boundary_id,
                                       q,
-                                      emissivity,
+                                      e_T ? emissivity_T : emissivity_const,
                                       emissivity_deriv);
 }
 
