@@ -33,6 +33,7 @@ CMakeCache.txt
 log*
 *.log*
 results
+results-*
 html
 latex
 *.pdf

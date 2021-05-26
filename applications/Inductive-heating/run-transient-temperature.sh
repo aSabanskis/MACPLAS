@@ -34,6 +34,8 @@ sed -Ei "s|(set Newton step length *= *).*|\1 0.8|" temperature.prm
 sed -Ei "s|(set Thermal conductivity *= *).*|\1 25|" temperature.prm
 sed -Ei "s|(set Electrical conductivity *= *).*|\1 100*10^(4.247-2924.0/T)|" problem.prm
 sed -Ei "s|(set Emissivity *= *).*|\1 0.57|" problem.prm
+sed -Ei "s|(set Probe coordinates x *= *).*|\1 0.01, 0.01|" problem.prm
+sed -Ei "s|(set Probe coordinates z *= *).*|\1 0.40, 0.42|" problem.prm
 sed -Ei "s|(set Custom probes x relative to inductor *= *).*|\1 0.01, 0.01, 0.01, 0.01, 0.01|" problem.prm
 sed -Ei "s|(set Custom probes z relative to inductor *= *).*|\1 -0.00825, -0.0054, -0.00255, 0, 0.0054|" problem.prm
 
