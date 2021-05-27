@@ -75,8 +75,6 @@ private:
 
   std::vector<Point<dim>> inductor_probes;
 
-  std::ofstream T_measurement_file;
-
   std::ofstream inductor_probe_file;
 
   constexpr static unsigned int boundary_id = 0;
@@ -105,16 +103,6 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     "0.1",
                     Patterns::Double(0),
                     "Maximum temperature change in K");
-
-  prm.declare_entry("Temperature measurement dz_low",
-                    "-0.00825",
-                    Patterns::Double(),
-                    "Minimum vertical temperature measurement position in m");
-
-  prm.declare_entry("Temperature measurement dz_high",
-                    "-0.00255",
-                    Patterns::Double(),
-                    "Maximum vertical temperature measurement position in m");
 
   prm.declare_entry(
     "Reference inductor position",
@@ -628,23 +616,6 @@ template <int dim>
 void
 Problem<dim>::measure_T()
 {
-  if (!T_measurement_file.is_open())
-    {
-      const std::string s =
-        "probes-measurements-temperature-" + std::to_string(dim) + "d.txt";
-
-      std::cout << "Writing heater to '" << s << "'\n";
-
-      T_measurement_file.open(s);
-      T_measurement_file << "t[s]\tdt[s]\tz[m]\tI[A]\t";
-
-      const auto dims = coordinate_names(dim);
-      for (const auto &d : dims)
-        T_measurement_file << d << "_point[m]\t";
-
-      T_measurement_file << "T[K]\tT_low[K]\tT_high[K]\n";
-    }
-
   if (!inductor_probe_file.is_open())
     {
       const std::string s =
@@ -670,58 +641,11 @@ Problem<dim>::measure_T()
   const double dt    = temperature_solver.get_time_step();
   const double I_ind = inductor_current->value(Point<1>(t));
   const double z_ind = inductor_position->value(Point<1>(t));
-  const double z_min = z_ind + prm.get_double("Temperature measurement dz_low");
-  const double z_max =
-    z_ind + prm.get_double("Temperature measurement dz_high");
 
   const Vector<double> &temperature = temperature_solver.get_temperature();
 
-  std::vector<Point<dim>> points;
-  std::vector<bool>       boundary_dofs;
-  temperature_solver.get_boundary_points(boundary_id, points, boundary_dofs);
-
-  std::vector<unsigned int> picked_dofs;
-
-  for (unsigned int i = 0; i < temperature.size(); ++i)
-    {
-      if (!boundary_dofs[i])
-        continue;
-
-      const double z = points[i][dim - 1];
-
-      if (z >= z_min && z <= z_max)
-        {
-          picked_dofs.push_back(i);
-        }
-    }
-
-  if (picked_dofs.empty())
-    return;
-
-  std::sort(picked_dofs.begin(),
-            picked_dofs.end(),
-            [&](const unsigned int v1, const unsigned int v2) {
-              return points[v1][dim - 1] < points[v2][dim - 1];
-            });
-
-  const auto temperature_low  = temperature[picked_dofs.front()];
-  const auto temperature_high = temperature[picked_dofs.back()];
-
-  for (const auto i : picked_dofs)
-    {
-      T_measurement_file << t << '\t' << dt << '\t' << z_ind << '\t' << I_ind
-                         << '\t';
-
-      for (unsigned int d = 0; d < dim; ++d)
-        T_measurement_file << points[i][d] << '\t';
-
-      T_measurement_file << temperature[i] << '\t' << temperature_low << '\t'
-                         << temperature_high << '\n';
-    }
-
-
   // Convert the vertical coordinate from inductor to crystal reference frame
-  points = inductor_probes;
+  std::vector<Point<dim>> points = inductor_probes;
   for (auto &p : points)
     p[dim - 1] += z_ind;
 
