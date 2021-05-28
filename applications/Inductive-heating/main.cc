@@ -530,7 +530,7 @@ Problem<dim>::apply_q_em()
   const bool        e_T    = e_expr == "Ratnieks";
   const double      e_0    = e_T ? 0.46 : std::stod(e_expr);
 
-  std::function<double(const double)> emissivity_const = [=](const double T) {
+  std::function<double(const double)> emissivity_const = [=](const double) {
     return e_0;
   };
 
@@ -538,15 +538,18 @@ Problem<dim>::apply_q_em()
     return e_0 * (T / 1687 < 0.593 ? 1.39 : 1.96 - 0.96 * T / 1687);
   };
 
-  // Leave out the temperature derivative for simplicity
-  std::function<double(const double)> emissivity_deriv = [=](const double) {
-    return 0.0;
+  std::function<double(const double)> emissivity_deriv_const =
+    [](const double) { return 0.0; };
+
+  std::function<double(const double)> emissivity_deriv_T = [=](const double T) {
+    return e_0 * (T / 1687 < 0.593 ? 0.0 : -0.96 / 1687);
   };
 
   temperature_solver.set_bc_rad_mixed(boundary_id,
                                       q,
                                       e_T ? emissivity_T : emissivity_const,
-                                      emissivity_deriv);
+                                      e_T ? emissivity_deriv_T :
+                                            emissivity_deriv_const);
 }
 
 template <>
