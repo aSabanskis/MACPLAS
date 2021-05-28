@@ -270,10 +270,13 @@ Problem<dim>::solve_steady_temperature()
   ParameterHandler &prm_T = temperature_solver.get_parameters();
   // saving as string to avoid ambiguous overloads
   const std::string n0 = prm_T.get("Max Newton iterations");
+  const std::string a0 = prm_T.get("Newton step length");
 
   temperature_solver.get_time_step() = 0;
   // just one iteration to update external Joulean heat flux BC
   prm_T.set("Max Newton iterations", "1");
+  // reduce step length to avoid divergence
+  prm_T.set("Newton step length", "0.6");
 
   double max_dT;
   do
@@ -291,6 +294,7 @@ Problem<dim>::solve_steady_temperature()
 
   temperature_solver.get_time_step() = dt0;
   prm_T.set("Max Newton iterations", n0);
+  prm_T.set("Newton step length", a0);
 
   postprocess_T();
   output_results();
