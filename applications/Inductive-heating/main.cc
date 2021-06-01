@@ -533,20 +533,23 @@ Problem<dim>::apply_q_em()
   const std::string e_expr = prm.get("Emissivity");
   const bool        e_T    = e_expr == "Ratnieks";
   const double      e_0    = e_T ? 0.46 : std::stod(e_expr);
+  const double      T_0    = 1687;
 
   std::function<double(const double)> emissivity_const = [=](const double) {
     return e_0;
   };
 
   std::function<double(const double)> emissivity_T = [=](const double T) {
-    return e_0 * (T / 1687 < 0.593 ? 1.39 : 1.96 - 0.96 * T / 1687);
+    const double t = T / T_0;
+    return e_0 * (t < 0.593 ? 1.39 : t > 1 ? 1 : 1.96 - 0.96 * t);
   };
 
   std::function<double(const double)> emissivity_deriv_const =
     [](const double) { return 0.0; };
 
   std::function<double(const double)> emissivity_deriv_T = [=](const double T) {
-    return e_0 * (T / 1687 < 0.593 ? 0.0 : -0.96 / 1687);
+    const double t = T / T_0;
+    return e_0 * (t < 0.593 || t > 1 ? 0.0 : -0.96 / T_0);
   };
 
   temperature_solver.set_bc_rad_mixed(boundary_id,
