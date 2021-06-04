@@ -674,7 +674,8 @@ DislocationSolver<dim>::solve(const bool stress_only)
   const double t     = get_time();
   const double t_max = get_max_time();
 
-  std::cout << std::defaultfloat << std::setprecision(8);
+  std::cout.unsetf(std::ios_base::floatfield);
+  std::cout << std::setprecision(8);
   std::cout << solver_name() << "  Time " << t << " s"
             << " step " << dt << " s\n";
 
@@ -2013,7 +2014,7 @@ std::string
 DislocationSolver<dim>::output_name_suffix() const
 {
   std::stringstream ss;
-  ss << std::defaultfloat << std::setprecision(8);
+  ss << std::setprecision(8);
   ss << "-" << dim << "d-order" << get_dof_handler().get_fe().degree << "-t"
      << get_time();
   return ss.str();

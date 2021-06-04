@@ -695,7 +695,9 @@ TemperatureSolver<dim>::solve()
 
       // Check convergence
       const double max_abs_dT = temperature_update.linfty_norm();
-      std::cout << std::defaultfloat << std::setprecision(8);
+
+      std::cout.unsetf(std::ios_base::floatfield);
+      std::cout << std::setprecision(8);
       std::cout << solver_name() << "  "
                 << "Time " << t << " s"
                 << " step " << dt << " s"
@@ -1205,7 +1207,7 @@ std::string
 TemperatureSolver<dim>::output_name_suffix() const
 {
   std::stringstream ss;
-  ss << std::defaultfloat << std::setprecision(8);
+  ss << std::setprecision(8);
   ss << "-" << dim << "d-order" << fe.degree << "-t" << get_time();
   return ss.str();
 }
