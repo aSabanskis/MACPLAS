@@ -620,6 +620,9 @@ Problem<dim>::update_T_max()
     T_max[k] = std::max(T_max[k], T[k]);
 
   temperature_solver.add_field("T_max", T_max);
+
+  if (with_dislocation())
+    dislocation_solver.add_field("T_max", T_max);
 }
 
 template <int dim>

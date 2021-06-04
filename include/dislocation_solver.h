@@ -190,6 +190,11 @@ public:
   void
   add_output(const std::string &name, const double value = 0);
 
+  /** Add user-defined field
+   */
+  void
+  add_field(const std::string &name, const Vector<double> &value);
+
   /** Read raw results from disk
    */
   void
@@ -416,6 +421,10 @@ private:
   /** Dislocation density \f$N_m\f$, m<sup>-2</sup>
    */
   Vector<double> dislocation_density;
+
+  /** User-defined fields
+   */
+  std::map<std::string, Vector<double>> additional_fields;
 
   /** Locations of probe points
    */
@@ -922,6 +931,14 @@ DislocationSolver<dim>::add_output(const std::string &name, const double value)
 
 template <int dim>
 void
+DislocationSolver<dim>::add_field(const std::string &   name,
+                                  const Vector<double> &value)
+{
+  additional_fields[name] = value;
+}
+
+template <int dim>
+void
 DislocationSolver<dim>::load_data()
 {
   Timer timer;
@@ -1038,6 +1055,12 @@ DislocationSolver<dim>::output_vtk() const
     {
       const std::string name = "dot_epsilon_c_" + std::to_string(i);
       data_out.add_data_vector(dot_epsilon_c.block(i), name);
+    }
+
+  for (const auto &it : additional_fields)
+    {
+      if (it.second.size() == T.size())
+        data_out.add_data_vector(it.second, it.first);
     }
 
   data_out.build_patches(fe.degree);
