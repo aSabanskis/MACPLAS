@@ -413,14 +413,25 @@ initialize_function(std::unique_ptr<Function<1>> &f,
 
       using F = Functions::InterpolatedTensorProductGridData<1>;
 
+      const unsigned int n = points.size();
+
+#ifdef DEAL_II_WITH_CXX14
       f = std::make_unique<F>(std::array<std::vector<double>, 1>{points},
-                              Table<1, double>{points.size(), data.begin()});
+                              Table<1, double>{n, data.begin()});
+#else
+      f = std::unique_ptr<F>(new F(std::array<std::vector<double>, 1>{points},
+                                   Table<1, double>{n, data.begin()}));
+#endif
     }
   else
     {
       using F = FunctionParser<1>;
 
+#ifdef DEAL_II_WITH_CXX14
       f = std::make_unique<F>();
+#else
+      f = std::unique_ptr<F>(new F());
+#endif
 
       auto *fp = dynamic_cast<F *>(f.get());
       fp->initialize(vars, expression, F::ConstMap());
