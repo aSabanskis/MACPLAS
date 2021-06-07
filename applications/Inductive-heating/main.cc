@@ -139,6 +139,17 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     Patterns::Anything(),
                     "Emissivity epsilon (dimensionless)");
 
+  prm.declare_entry("Heat transfer coefficient",
+                    "0",
+                    Patterns::Double(0),
+                    "Heat transfer coefficient h in W/m^2/K");
+
+  prm.declare_entry("Reference temperature",
+                    "1000",
+                    Patterns::Double(0),
+                    "Reference temperature T_ref in K");
+
+
   prm.declare_entry("Load saved results",
                     "false",
                     Patterns::Bool(),
@@ -563,6 +574,11 @@ Problem<dim>::apply_q_em()
                                       e_T ? emissivity_T : emissivity_const,
                                       e_T ? emissivity_deriv_T :
                                             emissivity_deriv_const);
+
+  const double h     = prm.get_double("Heat transfer coefficient");
+  const double T_ref = prm.get_double("Reference temperature");
+
+  temperature_solver.set_bc_convective(boundary_id, h, T_ref);
 }
 
 template <>

@@ -1,5 +1,7 @@
 set Electrical conductivity           = 100*10^(4.247-2924.0/T)
 set Emissivity                        = 0.57
+set Heat transfer coefficient         = 0
+set Reference temperature             = 1000
 set Inductor position                 = 0.0404 + 0.39*t/12900
 set Inductor current                  = t<=12900 ? 33.5 + 73*t/12900 : 0
 set Initial temperature               = 1000
