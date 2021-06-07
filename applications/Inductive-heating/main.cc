@@ -520,6 +520,12 @@ Problem<dim>::apply_q_em()
   const double I = inductor_current->value(Point<1>(t));
   temperature_solver.add_output("I[A]", I);
 
+  if (with_dislocation())
+    {
+      dislocation_solver.add_output("z[m]", z);
+      dislocation_solver.add_output("I[A]", I);
+    }
+
   // apply the current and temperature-dependent electrical conductivity
   const double I2 = sqr(I);
   for (unsigned int i = 0; i < q.size(); ++i)
