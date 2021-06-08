@@ -57,6 +57,10 @@ struct heat_flux_data
   /** Emissivity temperature derivative \f$d\varepsilon(T)/dT\f$, K<sup>-1</sup>
    */
   std::function<double(const double)> emissivity_deriv;
+
+  /** Ambient temperature \f$T_\mathrm{amb}\f$, K
+   */
+  double T_amb;
 };
 
 /** Data structure for convective cooling BC (Newton's law of cooling)
@@ -195,13 +199,15 @@ public:
   set_bc1(const unsigned int id, const double val);
 
   /** Set thermal radiation and incoming heat flux density boundary condition
-   * \f$q = \sigma_\mathrm{SB} \varepsilon(T) T^4 - q_\mathrm{in}\f$
+   * \f$q = \sigma_\mathrm{SB} \varepsilon(T) (T^4 - T_\mathrm{amb}^4) -
+   * q_\mathrm{in}\f$
    */
   void
   set_bc_rad_mixed(const unsigned int                  id,
                    const Vector<double> &              q_in,
                    std::function<double(const double)> emissivity,
-                   std::function<double(const double)> emissivity_deriv);
+                   std::function<double(const double)> emissivity_deriv,
+                   const double                        T_amb = 0);
 
   /** Set convective cooling boundary condition
    * \f$q = h (T - T_\mathrm{ref})\f$
@@ -898,11 +904,13 @@ TemperatureSolver<dim>::set_bc_rad_mixed(
   const unsigned int                  id,
   const Vector<double> &              q_in,
   std::function<double(const double)> emissivity,
-  std::function<double(const double)> emissivity_deriv)
+  std::function<double(const double)> emissivity_deriv,
+  const double                        T_amb)
 {
   bc_rad_mixed_data[id].q_in             = q_in;
   bc_rad_mixed_data[id].emissivity       = emissivity;
   bc_rad_mixed_data[id].emissivity_deriv = emissivity_deriv;
+  bc_rad_mixed_data[id].T_amb            = T_amb;
 }
 
 template <int dim>
@@ -1507,10 +1515,10 @@ TemperatureSolver<dim>::local_assemble_system(
 
       for (unsigned int q = 0; q < n_face_q_points; ++q)
         {
-          const double net_heat_flux = sigma_SB *
-                                         it->second.emissivity(T_face_q[q]) *
-                                         std::pow(T_face_q[q], 4) -
-                                       heat_flux_in_face_q[q];
+          const double net_heat_flux =
+            sigma_SB * it->second.emissivity(T_face_q[q]) *
+              (std::pow(T_face_q[q], 4) - std::pow(it->second.T_amb, 4)) -
+            heat_flux_in_face_q[q];
 
           const double weight =
             dim == 2 ?
@@ -1526,7 +1534,8 @@ TemperatureSolver<dim>::local_assemble_system(
                     (it->second.emissivity(T_face_q[q]) * 4.0 *
                        std::pow(T_face_q[q], 3) +
                      it->second.emissivity_deriv(T_face_q[q]) *
-                       std::pow(T_face_q[q], 4)) *
+                       (std::pow(T_face_q[q], 4) -
+                        std::pow(it->second.T_amb, 4))) *
                     fe_face_values.shape_value(i, q) *
                     fe_face_values.shape_value(j, q) * weight;
                 }

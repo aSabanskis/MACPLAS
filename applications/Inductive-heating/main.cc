@@ -139,6 +139,11 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     Patterns::Anything(),
                     "Emissivity epsilon (dimensionless)");
 
+  prm.declare_entry("Ambient temperature",
+                    "0",
+                    Patterns::Double(0),
+                    "Ambient temperature T_amb in K");
+
   prm.declare_entry("Heat transfer coefficient",
                     "0",
                     Patterns::Double(0),
@@ -551,6 +556,7 @@ Problem<dim>::apply_q_em()
   const bool        e_T    = e_expr == "Ratnieks";
   const double      e_0    = e_T ? 0.46 : std::stod(e_expr);
   const double      T_0    = 1687;
+  const double      T_a    = prm.get_double("Ambient temperature");
 
   std::function<double(const double)> emissivity_const = [=](const double) {
     return e_0;
@@ -573,7 +579,8 @@ Problem<dim>::apply_q_em()
                                       q,
                                       e_T ? emissivity_T : emissivity_const,
                                       e_T ? emissivity_deriv_T :
-                                            emissivity_deriv_const);
+                                            emissivity_deriv_const,
+                                      T_a);
 
   const double h     = prm.get_double("Heat transfer coefficient");
   const double T_ref = prm.get_double("Reference temperature");
