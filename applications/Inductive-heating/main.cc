@@ -22,13 +22,21 @@ private:
   make_grid();
 
   void
-  initialize();
+  initialize_temperature();
+
+  void
+  initialize_dislocation();
 
   void
   apply_q_em();
 
   void
   interpolate_q_em(const double z);
+
+  /** Checks whether the results need to be outputted at the end of the current
+   * time step, and adjusts it if necessary */
+  bool
+  update_output_time_step(const unsigned int time_step_index = 0);
 
   void
   solve_steady_temperature();
@@ -81,6 +89,9 @@ private:
 
   std::unique_ptr<Function<1>> inductor_position;
   std::unique_ptr<Function<1>> inductor_current;
+
+  double previous_time_step;
+  double next_output_time;
 
   ParameterHandler prm;
 
@@ -176,6 +187,13 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
     Patterns::Integer(0),
     "Number of time steps between result output (0 - disabled)");
 
+  prm.declare_entry("Output time step",
+                    "0",
+                    Patterns::Double(0),
+                    "Time interval in s between result output (0 - disabled). "
+                    "The time step is adjusted to match the required time. "
+                    "Overrides 'Output frequency'.");
+
   prm.declare_entry("Probe coordinates x",
                     "0, 0, 0",
                     Patterns::List(Patterns::Double(), 1),
@@ -235,6 +253,8 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
       inductor_probes[i][0]       = X[i];
       inductor_probes[i][dim - 1] = Z[i];
     }
+
+  next_output_time = prm.get_double("Output time step");
 }
 
 template <int dim>
@@ -242,7 +262,7 @@ void
 Problem<dim>::run()
 {
   make_grid();
-  initialize();
+  initialize_temperature();
 
   if (prm.get_bool("Start from steady temperature") ||
       temperature_solver.get_time_step() == 0)
@@ -265,6 +285,43 @@ Problem<dim>::run()
     {
       solve_temperature_dislocation();
     }
+}
+
+template <int dim>
+bool
+Problem<dim>::update_output_time_step(const unsigned int time_step_index)
+{
+  const double t  = temperature_solver.get_time();
+  const double dt = temperature_solver.get_time_step();
+
+  const double dt_output = prm.get_double("Output time step");
+  const int    n_output  = prm.get_integer("Output frequency");
+
+  // output time step is not specified, check the index
+  if (dt_output <= 0)
+    {
+      return time_step_index > 0 && n_output > 0 &&
+             time_step_index % n_output == 0;
+    }
+
+  // output time too far away, nothing to do
+  if (dt_output > 0 && t + (1 + 1e-4) * dt < next_output_time)
+    {
+      return false;
+    }
+
+  // output time is specified and the time step has to be adjusted
+
+  dislocation_solver.get_time_step() = temperature_solver.get_time_step() =
+    next_output_time - t;
+
+  std::cout << "dt changed from " << dt << " to "
+            << temperature_solver.get_time_step()
+            << " s for result output at t=" << next_output_time << " s\n";
+
+  next_output_time += dt_output;
+
+  return true;
 }
 
 template <int dim>
@@ -322,16 +379,7 @@ Problem<dim>::solve_dislocation()
 {
   std::cout << "Calculating dislocation density\n";
 
-  // initialize dislocations and stresses
-  dislocation_solver.initialize();
-  dislocation_solver.get_temperature() = temperature_solver.get_temperature();
-
-  if (prm.get_bool("Load saved results"))
-    {
-      dislocation_solver.load_data();
-    }
-
-  dislocation_solver.solve(true);
+  initialize_dislocation();
 
   postprocess_T();
   output_results();
@@ -353,19 +401,15 @@ Problem<dim>::solve_temperature_dislocation()
 {
   std::cout << "Calculating temperature and dislocation density\n";
 
-  // initialize dislocations and stresses
-  dislocation_solver.initialize();
-  dislocation_solver.get_temperature() = temperature_solver.get_temperature();
-
-  dislocation_solver.solve(true);
+  initialize_dislocation();
 
   postprocess_T();
   output_results();
 
-  const int n_output = prm.get_integer("Output frequency");
-
   for (unsigned int i = 1;; ++i)
     {
+      const bool output_enabled = update_output_time_step(i);
+
       temperature_solver.get_time_step() = dislocation_solver.get_time_step();
 
       apply_q_em();
@@ -381,9 +425,12 @@ Problem<dim>::solve_temperature_dislocation()
       if (!keep_going_temp || !keep_going_disl)
         break;
 
-      if (n_output > 0 && i % n_output == 0)
+      if (output_enabled)
         {
           output_results(false);
+
+          dislocation_solver.get_time_step() =
+            temperature_solver.get_time_step() = previous_time_step;
         }
     };
 
@@ -396,12 +443,12 @@ Problem<dim>::solve_temperature()
 {
   std::cout << "Calculating transient temperature field\n";
 
-  const int n_output = prm.get_integer("Output frequency");
-
   postprocess_T();
 
   for (unsigned int i = 1;; ++i)
     {
+      const bool output_enabled = update_output_time_step(i);
+
       apply_q_em();
       const bool keep_going_temp = temperature_solver.solve();
 
@@ -410,9 +457,12 @@ Problem<dim>::solve_temperature()
       if (!keep_going_temp)
         break;
 
-      if (n_output > 0 && i % n_output == 0)
+      if (output_enabled)
         {
           output_results(false);
+
+          dislocation_solver.get_time_step() =
+            temperature_solver.get_time_step() = previous_time_step;
         }
     };
 
@@ -470,9 +520,11 @@ Problem<dim>::make_grid()
 
 template <int dim>
 void
-Problem<dim>::initialize()
+Problem<dim>::initialize_temperature()
 {
   temperature_solver.initialize(); // sets T=0
+
+  previous_time_step = temperature_solver.get_time_step();
 
   temperature_solver.output_mesh();
 
@@ -514,6 +566,24 @@ Problem<dim>::initialize()
       temperature_solver.load_data();
       return;
     }
+}
+
+template <int dim>
+void
+Problem<dim>::initialize_dislocation()
+{
+  // initialize dislocations and stresses
+  dislocation_solver.initialize();
+  dislocation_solver.get_temperature() = temperature_solver.get_temperature();
+
+  if (prm.get_bool("Load saved results"))
+    {
+      dislocation_solver.load_data();
+    }
+
+  dislocation_solver.solve(true);
+
+  previous_time_step = temperature_solver.get_time_step();
 }
 
 template <int dim>
