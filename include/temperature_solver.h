@@ -682,10 +682,17 @@ TemperatureSolver<dim>::solve()
       probes_header_written = true;
     }
 
+  double &     dt     = get_time_step();
+  const double t_prev = get_time();
+  const double t_max  = get_max_time();
+
+  // stop exactly at max time
+  if (t_prev + (1 + 1e-4) * dt >= t_max)
+    dt = t_max - t_prev;
+
   advance_time();
-  const double dt    = get_time_step();
-  const double t     = get_time();
-  const double t_max = get_max_time();
+
+  const double t = get_time();
 
   temperature_prev = temperature;
 
