@@ -733,7 +733,7 @@ Problem<dim>::measure_T()
       const std::string s =
         "probes-inductor-temperature-" + std::to_string(dim) + "d.txt";
 
-      std::cout << "Writing heater to '" << s << "'\n";
+      std::cout << "Writing header to '" << s << "'\n";
 
       inductor_probe_file.open(s);
 

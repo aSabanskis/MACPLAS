@@ -23,6 +23,7 @@ macplas-*
 
 # Temporary files and directories
 *.dir
+build
 CMakeFiles
 CMakeCache.txt
 *cmake*
