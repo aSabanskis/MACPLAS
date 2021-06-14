@@ -1114,7 +1114,16 @@ TemperatureSolver<dim>::output_boundary_values(const unsigned int id) const
   output << "T[K]\t"
          << "rho[kgm^-3]\t"
          << "c_p[Jkg^-1K^-1]\t"
-         << "lambda[Wm^-1K^-1]\n";
+         << "lambda[Wm^-1K^-1]";
+
+  for (const auto &it : additional_fields)
+    {
+      if (it.second.size() == T.size())
+        output << '\t' << it.first;
+    }
+
+  output << '\n';
+
 
   for (unsigned int i = 0; i < points.size(); ++i)
     {
@@ -1126,7 +1135,15 @@ TemperatureSolver<dim>::output_boundary_values(const unsigned int id) const
         output << points[i][d] << '\t';
 
       output << T[i] << '\t' << calc_rho(T[i]) << '\t' << calc_c_p(T[i]) << '\t'
-             << calc_lambda(T[i]) << '\n';
+             << calc_lambda(T[i]);
+
+      for (const auto &it : additional_fields)
+        {
+          if (it.second.size() == T.size())
+            output << '\t' << it.second[i];
+        }
+
+      output << '\n';
     }
 
   std::cout << " " << format_time(timer) << "\n";

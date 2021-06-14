@@ -1131,7 +1131,16 @@ DislocationSolver<dim>::output_boundary_values(const unsigned int id) const
     output << "dot_strain_c_" << k << "[s^-1]\t";
 
   output << "tau_eff[Pa]\t"
-         << "stress_J_2[Pa^2]\n";
+         << "stress_J_2[Pa^2]";
+
+  for (const auto &it : additional_fields)
+    {
+      if (it.second.size() == T.size())
+        output << '\t' << it.first;
+    }
+
+  output << '\n';
+
 
   for (unsigned int i = 0; i < points.size(); ++i)
     {
@@ -1157,7 +1166,15 @@ DislocationSolver<dim>::output_boundary_values(const unsigned int id) const
         output << derivative_strain(N_m[i], J_2[i], T[i], S.block(k)[i])
                << '\t';
 
-      output << tau_eff(N_m[i], J_2[i], T[i]) << '\t' << J_2[i] << '\t' << '\n';
+      output << tau_eff(N_m[i], J_2[i], T[i]) << '\t' << J_2[i];
+
+      for (const auto &it : additional_fields)
+        {
+          if (it.second.size() == T.size())
+            output << '\t' << it.second[i];
+        }
+
+      output << '\n';
     }
 
   std::cout << " " << format_time(timer) << "\n";
