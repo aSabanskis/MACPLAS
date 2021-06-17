@@ -1154,6 +1154,24 @@ TemperatureSolver<dim>::output_boundary_values(const unsigned int id) const
       output << '\n';
     }
 
+#ifdef DEBUG
+  if (it_q_in != bc_rad_mixed_data.end())
+    {
+      const QGauss<dim - 1>   face_quadrature(fe.degree + 1);
+       FEFaceValues<dim> fe_face_values(
+        fe, face_quadrature, update_quadrature_points | update_values);
+
+      output_boundary_field_at_quadrature_points(get_dof_handler(),
+                                                 fe_face_values,
+                                                 it_q_in->second.q_in,
+                                                 id,
+                                                 "result-q_in" +
+                                                   output_name_suffix() +
+                                                   "-boundary" +
+                                                   std::to_string(id) + ".dat");
+    }
+#endif
+
   std::cout << " " << format_time(timer) << "\n";
 }
 

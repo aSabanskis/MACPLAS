@@ -86,6 +86,17 @@ template <typename T>
 inline void
 read_data(T &data, const std::string &file_name);
 
+/** Write coordinates and field values at quadrature points to disk
+ */
+template <int dim>
+inline void
+output_boundary_field_at_quadrature_points(
+  const DoFHandler<dim> &dh,
+  FEFaceValues<dim> &    fe_face_values,
+  const Vector<double> & field,
+  const unsigned int     boundary_id = 0,
+  const std::string &    file_name   = "values_q.txt");
+
 /** Get point on a line segment which is closest to the given point \f$p\f$
  */
 template <int dim>
@@ -522,6 +533,67 @@ read_data(T &data, const std::string &file_name)
       std::cout << "Reading from '" << file_name << "'\n";
       std::ifstream f(file_name);
       data.block_read(f);
+    }
+  catch (std::exception &e)
+    {
+      std::cout << e.what() << "\n";
+    }
+}
+
+template <int dim>
+void
+output_boundary_field_at_quadrature_points(const DoFHandler<dim> &dh,
+                                           FEFaceValues<dim> &   fe_face_values,
+                                           const Vector<double> &field,
+                                           const unsigned int    boundary_id,
+                                           const std::string &   file_name)
+{
+  try
+    {
+      std::cout << "Saving to '" << file_name << "'\n";
+      std::ofstream output(file_name);
+
+      const auto dims = coordinate_names(dim);
+      for (const auto &d : dims)
+        output << d << "[m]\t";
+
+      output << "f\n";
+
+
+      const Quadrature<dim - 1> &face_quadrature =
+        fe_face_values.get_quadrature();
+      const unsigned int n_face_q_points = face_quadrature.size();
+
+      std::vector<double> field_face_q(n_face_q_points);
+
+      typename DoFHandler<dim>::active_cell_iterator cell = dh.begin_active(),
+                                                     endc = dh.end();
+      for (; cell != endc; ++cell)
+        {
+          for (unsigned int face_number = 0;
+               face_number < GeometryInfo<dim>::faces_per_cell;
+               ++face_number)
+            {
+              if (!cell->face(face_number)->at_boundary())
+                continue;
+
+              if (cell->face(face_number)->boundary_id() != boundary_id)
+                continue;
+
+              fe_face_values.reinit(cell, face_number);
+              fe_face_values.get_function_values(field, field_face_q);
+
+              for (unsigned int q = 0; q < n_face_q_points; ++q)
+                {
+                  const Point<dim> &p = fe_face_values.quadrature_point(q);
+
+                  for (unsigned int d = 0; d < dim; ++d)
+                    output << p[d] << '\t';
+
+                  output << field_face_q[q] << '\n';
+                }
+            }
+        }
     }
   catch (std::exception &e)
     {
