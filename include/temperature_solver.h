@@ -1107,6 +1107,8 @@ TemperatureSolver<dim>::output_boundary_values(const unsigned int id) const
 
   const Vector<double> &T = get_temperature();
 
+  const auto it_q_in = bc_rad_mixed_data.find(id);
+
   const auto dims = coordinate_names(dim);
   for (const auto &d : dims)
     output << d << "[m]\t";
@@ -1121,6 +1123,9 @@ TemperatureSolver<dim>::output_boundary_values(const unsigned int id) const
       if (it.second.size() == T.size())
         output << '\t' << it.first;
     }
+
+  if (it_q_in != bc_rad_mixed_data.end())
+    output << '\t' << "q_in[Wm^-2]";
 
   output << '\n';
 
@@ -1142,6 +1147,9 @@ TemperatureSolver<dim>::output_boundary_values(const unsigned int id) const
           if (it.second.size() == T.size())
             output << '\t' << it.second[i];
         }
+
+      if (it_q_in != bc_rad_mixed_data.end())
+        output << '\t' << it_q_in->second.q_in[i];
 
       output << '\n';
     }
