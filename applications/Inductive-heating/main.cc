@@ -297,6 +297,8 @@ Problem<dim>::update_output_time_step(const unsigned int time_step_index)
   const double dt_output = prm.get_double("Output time step");
   const int    n_output  = prm.get_integer("Output frequency");
 
+  previous_time_step = dt;
+
   // output time step is not specified, check the index
   if (dt_output <= 0)
     {
@@ -429,6 +431,7 @@ Problem<dim>::solve_temperature_dislocation()
         {
           output_results(false);
 
+          std::cout << "Restoring previous dt=" << previous_time_step << "s\n";
           dislocation_solver.get_time_step() =
             temperature_solver.get_time_step() = previous_time_step;
         }
@@ -461,6 +464,7 @@ Problem<dim>::solve_temperature()
         {
           output_results(false);
 
+          std::cout << "Restoring previous dt=" << previous_time_step << "s\n";
           dislocation_solver.get_time_step() =
             temperature_solver.get_time_step() = previous_time_step;
         }
