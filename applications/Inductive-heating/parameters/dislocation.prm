@@ -9,6 +9,7 @@ set Material constant l             = 1.0
 set Material constant p             = 1.1
 set Max dstrain_c                   = 0
 set Max relative dN_m               = 0
+set Max relative dtau_eff           = 0
 set Max relative time step increase = 0
 set Max time                        = 14400
 set Max time step                   = 0

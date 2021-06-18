@@ -307,6 +307,14 @@ private:
           const Vector<double> &J_2,
           const Vector<double> &T) const;
 
+  /** Calculate the partial derivative
+   * \f$\partial \tau_\mathrm{eff} / \partial N_m\f$
+   */
+  double
+  derivative_tau_eff_N_m(const double N_m,
+                         const double J_2,
+                         const double T) const;
+
   /** Calculate the time derivative of dislocation density \f$\dot{N_m} =
    * K v \tau_\mathrm{eff}^l N_m\f$
    */
@@ -610,6 +618,12 @@ DislocationSolver<dim>::DislocationSolver(const unsigned int order,
     "0",
     Patterns::Double(0),
     "Maximum relative dislocation density change for adaptive time-stepping (0 - disabled)");
+
+  prm.declare_entry(
+    "Max relative dtau_eff",
+    "0",
+    Patterns::Double(0),
+    "Maximum relative effective stress change for adaptive time-stepping (0 - disabled)");
 
   prm.declare_entry("Max time",
                     "10",
@@ -1316,6 +1330,7 @@ DislocationSolver<dim>::update_time_step()
   const double v_dt_max      = prm.get_double("Max v*dt");
   const double dstrain_c_max = prm.get_double("Max dstrain_c");
   const double dN_m_rel_max  = prm.get_double("Max relative dN_m");
+  const double dtau_rel_max  = prm.get_double("Max relative dtau_eff");
   const double dt_rel_max = prm.get_double("Max relative time step increase");
 
   const Vector<double> &     T   = get_temperature();
@@ -1390,6 +1405,36 @@ DislocationSolver<dim>::update_time_step()
 #ifdef DEBUG
           std::cout << "dt=" << dt << " s, "
                     << "dot_N_m_rel_max=" << dot_N_m_rel << "\n";
+#endif
+        }
+    }
+
+  if (dtau_rel_max > 0)
+    {
+      const Vector<double> tau = tau_eff(N_m, J_2, T);
+      Vector<double>       dtau(tau.size());
+
+      for (unsigned int i = 0; i < dtau.size(); ++i)
+        {
+          dtau[i] = derivative_tau_eff_N_m(N_m[i], J_2[i], T[i]) *
+                    derivative_N_m(N_m[i], J_2[i], T[i]);
+
+          if (tau[i] != 0)
+            dtau[i] /= tau[i];
+          else
+            dtau[i] = 0;
+        }
+
+      const double dot_tau_rel = dtau.linfty_norm();
+
+      if (dot_tau_rel > 0)
+        {
+          const double dt = dtau_rel_max / dot_tau_rel;
+          time_steps.push_back(dt);
+          add_output("max_dt_dot_tau_eff_rel[s]", dt);
+#ifdef DEBUG
+          std::cout << "dt=" << dt << " s, "
+                    << "max_dt_dot_tau_eff_rel=" << dot_tau_rel << "\n";
 #endif
         }
     }
@@ -1654,6 +1699,20 @@ DislocationSolver<dim>::tau_eff(const Vector<double> &N_m,
     result[i] = tau_eff(N_m[i], J_2[i], T[i]);
 
   return result;
+}
+
+template <int dim>
+double
+DislocationSolver<dim>::derivative_tau_eff_N_m(const double N_m,
+                                               const double J_2,
+                                               const double T) const
+{
+  const double tau = tau_eff(N_m, J_2, T);
+
+  if (tau == 0 || N_m == 0)
+    return 0;
+
+  return -calc_D(T) / (2 * std::sqrt(N_m));
 }
 
 template <int dim>
