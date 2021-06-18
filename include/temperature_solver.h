@@ -1157,8 +1157,8 @@ TemperatureSolver<dim>::output_boundary_values(const unsigned int id) const
 #ifdef DEBUG
   if (it_q_in != bc_rad_mixed_data.end())
     {
-      const QGauss<dim - 1>   face_quadrature(fe.degree + 1);
-       FEFaceValues<dim> fe_face_values(
+      const QGauss<dim - 1> face_quadrature(fe.degree + 1);
+      FEFaceValues<dim>     fe_face_values(
         fe, face_quadrature, update_quadrature_points | update_values);
 
       output_boundary_field_at_quadrature_points(get_dof_handler(),
@@ -1550,7 +1550,8 @@ TemperatureSolver<dim>::local_assemble_system(
       if (!cell->face(face_number)->at_boundary())
         continue;
 
-      auto it = bc_rad_mixed_data.find(cell->face(face_number)->boundary_id());
+      const auto it =
+        bc_rad_mixed_data.find(cell->face(face_number)->boundary_id());
       if (it == bc_rad_mixed_data.end())
         continue;
 
@@ -1602,7 +1603,8 @@ TemperatureSolver<dim>::local_assemble_system(
       if (!cell->face(face_number)->at_boundary())
         continue;
 
-      auto it = bc_convective_data.find(cell->face(face_number)->boundary_id());
+      const auto it =
+        bc_convective_data.find(cell->face(face_number)->boundary_id());
       if (it == bc_convective_data.end())
         continue;
 
