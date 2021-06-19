@@ -459,6 +459,11 @@ private:
    */
   double current_time_step;
 
+  /** Time stepping: previous time step \f$\Delta t_\mathrm{prev}\f$, s.
+   * Used by the adaptive time-stepping algorithm.
+   */
+  double previous_time_step;
+
   /** Peierls potential \f$Q\f$ (temperature function), eV
    */
   FunctionParser<1> m_Q;
@@ -509,6 +514,7 @@ DislocationSolver<dim>::DislocationSolver(const unsigned int order,
   : stress_solver(order, use_default_prm)
   , current_time(0)
   , current_time_step(0)
+  , previous_time_step(0)
 {
   std::cout << "Creating dislocation density solver, order=" << order
             << ", dim=" << dim
@@ -1265,7 +1271,7 @@ DislocationSolver<dim>::initialize_parameters()
 
   time_scheme = prm.get("Time scheme");
 
-  get_time_step() = prm.get_double("Time step");
+  get_time_step() = previous_time_step = prm.get_double("Time step");
 
   std::cout << "  done\n";
 
@@ -1332,6 +1338,9 @@ DislocationSolver<dim>::update_time_step()
   const double dN_m_rel_max  = prm.get_double("Max relative dN_m");
   const double dtau_rel_max  = prm.get_double("Max relative dtau_eff");
   const double dt_rel_max = prm.get_double("Max relative time step increase");
+
+  const bool dt_was_reduced = dt < previous_time_step;
+  previous_time_step        = dt;
 
   const Vector<double> &     T   = get_temperature();
   const Vector<double> &     N_m = get_dislocation_density();
@@ -1455,6 +1464,11 @@ DislocationSolver<dim>::update_time_step()
       if (dt_change > dt_prev * dt_rel_max)
         dt = dt_prev + dt_prev * dt_rel_max;
     }
+
+  // if the time step was previously reduced but is now larger, do one more step
+  // with the same dt and only then increase
+  if (dt_was_reduced && dt > dt_prev)
+    dt = dt_prev;
 
   limit_time_step();
 
