@@ -561,9 +561,8 @@ Problem<dim>::initialize_temperature()
       q2d.read_txt("qEM-2d.txt");
     }
 
-  const double z  = inductor_position->value(Point<1>(0));
-  const double z0 = prm.get_double("Reference inductor position");
-  interpolate_q_em(z - z0);
+  const double z = inductor_position->value(Point<1>(0));
+  interpolate_q_em(z);
 
   if (prm.get_bool("Load saved results"))
     {
@@ -602,8 +601,7 @@ Problem<dim>::apply_q_em()
   const double z = inductor_position->value(Point<1>(t));
   temperature_solver.add_output("z[m]", z);
 
-  const double z0 = prm.get_double("Reference inductor position");
-  interpolate_q_em(z - z0);
+  interpolate_q_em(z);
 
   Vector<double> q = q0;
 
@@ -670,8 +668,11 @@ Problem<3>::interpolate_q_em(const double z)
   std::vector<bool>     boundary_dofs;
   temperature_solver.get_boundary_points(boundary_id, points, boundary_dofs);
 
+  const double z0 = prm.get_double("Reference inductor position");
+  const double dz = z0 - z;
+
   for (auto &p : points)
-    p[2] -= z;
+    p[2] += dz;
 
   q3d.interpolate(
     SurfaceInterpolator3D::PointField, "q", points, boundary_dofs, q0);
@@ -688,8 +689,11 @@ Problem<2>::interpolate_q_em(const double z)
   std::vector<bool>     boundary_dofs;
   temperature_solver.get_boundary_points(boundary_id, points, boundary_dofs);
 
+  const double z0 = prm.get_double("Reference inductor position");
+  const double dz = z0 - z;
+
   for (auto &p : points)
-    p[1] -= z;
+    p[1] += dz;
 
   q2d.interpolate("QEM", points, boundary_dofs, q0);
 
