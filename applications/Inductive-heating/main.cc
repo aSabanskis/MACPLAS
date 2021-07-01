@@ -64,6 +64,9 @@ private:
   void
   measure_T();
 
+  void
+  approximate_T_skin_effect();
+
   // false if only the temperature field is calculated
   bool
   with_dislocation() const;
@@ -180,6 +183,13 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     "true",
                     Patterns::Bool(),
                     "Calculate the steady-state temperature field at t=0");
+
+
+  prm.declare_entry(
+    "Approximate skin effect",
+    "false",
+    Patterns::Bool(),
+    "Approximate skin effect for temperature (for testing only)");
 
   prm.declare_entry(
     "Output frequency",
@@ -370,6 +380,12 @@ Problem<dim>::solve_steady_temperature()
   temperature_solver.get_time_step() = dt0;
   prm_T.set("Max Newton iterations", n0);
   prm_T.set("Newton step length", a0);
+
+  if (prm.get_bool("Approximate skin effect"))
+    {
+      approximate_T_skin_effect();
+      prm.set("Approximate skin effect", false);
+    }
 
   postprocess_T();
   output_results();
@@ -781,6 +797,77 @@ Problem<dim>::measure_T()
     inductor_probe_file << '\t' << v;
 
   inductor_probe_file << "\n";
+}
+
+template <int dim>
+void
+Problem<dim>::approximate_T_skin_effect()
+{
+  AssertThrow(dim == 2, ExcNotImplemented());
+
+  std::vector<Point<dim>> points;
+  std::vector<bool>       markers;
+  temperature_solver.get_boundary_points(boundary_id, points, markers);
+
+  // calculate the radius
+  double R = 0;
+  for (unsigned int i = 0; i < points.size(); ++i)
+    {
+      if (markers[i])
+        R = std::max(R, points[i][0]);
+    }
+  std::cout << "R=" << R << " m\n";
+
+  // save the original temperature
+  Vector<double> &temperature = temperature_solver.get_temperature();
+  temperature_solver.add_field("T0", temperature);
+
+  // interpolate HF EM field to volume
+  const double z  = inductor_position->value(Point<1>(0));
+  const double z0 = prm.get_double("Reference inductor position");
+  const double dz = z0 - z;
+
+  for (auto &p : points)
+    p[dim - 1] += dz;
+
+  Vector<double> q(temperature.size());
+
+  std::fill(markers.begin(), markers.end(), true);
+  q2d.interpolate("QEM", points, markers, q);
+  q *= 1e-6 * std::sqrt(prm.get_double("Reference electrical conductivity"));
+
+  // estimate the temperature change
+  const double I      = inductor_current->value(Point<1>(0));
+  const double f      = 2.715e6;
+  const double lambda = 22;
+
+  Vector<double> temperature_deviation(temperature.size());
+  Vector<double> delta(temperature.size());
+
+  for (unsigned int i = 0; i < q.size(); ++i)
+    {
+      const double s = electrical_conductivity.value(Point<1>(temperature[i]));
+
+      q[i] *= sqr(I) / std::sqrt(s);
+      delta[i] = 1.0 / std::sqrt(numbers::PI * 4e-7 * numbers::PI * f * s);
+
+      const double a = 2 * q[i] / delta[i];
+      const double x = R - points[i][0];
+
+      temperature_deviation[i] =
+        -(a / lambda) * std::exp(-2 * x / delta[i]) * sqr(delta[i] / 2);
+
+      q[i] *= std::exp(-x / delta[i]);
+    }
+
+  std::cout << "Max T_deviation=" << temperature_deviation.linfty_norm()
+            << " K\n";
+
+  temperature += temperature_deviation;
+
+  temperature_solver.add_field("q", q);
+  temperature_solver.add_field("delta", delta);
+  temperature_solver.add_field("T_deviation", temperature_deviation);
 }
 
 template <int dim>
