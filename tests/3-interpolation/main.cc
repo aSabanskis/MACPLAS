@@ -24,13 +24,15 @@ private:
 
   CylindricalManifold<dim> manifold;
 
-  TemperatureSolver<dim> solver;
+  TemperatureSolver<dim>     solver;
+  TemperatureSolver<dim - 1> solver2;
 };
 
 template <int dim>
 Problem<dim>::Problem(const unsigned int order)
   : manifold(2)
   , solver(order)
+  , solver2(order)
 {}
 
 template <int dim>
@@ -41,6 +43,7 @@ Problem<dim>::run()
   initialize();
   // do not calculate
   solver.output_vtk();
+  solver2.output_vtk();
 }
 
 template <int dim>
@@ -72,6 +75,12 @@ Problem<dim>::make_grid()
             face->set_boundary_id(3);
         }
     }
+
+  Triangulation<dim - 1> &triangulation2 = solver2.get_mesh();
+  GridGenerator::hyper_rectangle(triangulation2,
+                                 Point<dim - 1>(-0.1, 0),
+                                 Point<dim - 1>(0.1, 0.5));
+  triangulation2.refine_global(3);
 }
 
 template <int dim>
@@ -79,6 +88,7 @@ void
 Problem<dim>::initialize()
 {
   solver.initialize();
+  solver2.initialize();
   // no need to initialize the temperature field
 
   std::vector<Point<dim>> points;
@@ -112,6 +122,16 @@ Problem<dim>::initialize()
   solver.get_boundary_points(boundary_id, points, boundary_dofs);
   surf2.interpolate("q", points, boundary_dofs, q);
   solver.set_bc_rad_mixed(boundary_id, q, zero, zero);
+
+  std::vector<Point<dim - 1>> points2;
+  boundary_id = 0;
+  solver2.get_boundary_points(boundary_id, points2, boundary_dofs);
+  // test all DOFs, not just boundary
+  std::fill(boundary_dofs.begin(), boundary_dofs.end(), true);
+  q.reinit(points2.size());
+  surf.interpolate(
+    SurfaceInterpolator3D::PointField, "q", points2, boundary_dofs, q);
+  solver2.set_bc_rad_mixed(boundary_id, q, zero, zero);
 }
 
 int

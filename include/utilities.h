@@ -242,6 +242,15 @@ public:
               const std::vector<bool> &      markers,
               Vector<double> &               target_values) const;
 
+  /** Same as above, for target points in 2D
+   */
+  inline void
+  interpolate(const FieldType &                  field_type,
+              const std::string &                field_name,
+              const std::vector<Point<dim - 1>> &target_points,
+              const std::vector<bool> &          markers,
+              Vector<double> &                   target_values) const;
+
   /** Convert between cell and point fields
    * If target_name is not specified it is set to source_name.
    */
@@ -1157,6 +1166,29 @@ SurfaceInterpolator3D::interpolate(const FieldType &              field_type,
     }
 
   std::cout << " " << format_time(timer) << "\n";
+}
+
+void
+SurfaceInterpolator3D::interpolate(
+  const FieldType &                  field_type,
+  const std::string &                field_name,
+  const std::vector<Point<dim - 1>> &target_points,
+  const std::vector<bool> &          markers,
+  Vector<double> &                   target_values) const
+{
+  const unsigned int n_values = target_points.size();
+
+  std::vector<Point<dim>> points_3d(n_values);
+
+  // convert from 2D cylindrical coordinates (r,z) to 3D (x,y,z)
+  for (unsigned int i = 0; i < n_values; ++i)
+    {
+      points_3d[i][0] = target_points[i][0];
+      points_3d[i][1] = 0;
+      points_3d[i][2] = target_points[i][1];
+    }
+
+  interpolate(field_type, field_name, points_3d, markers, target_values);
 }
 
 void
