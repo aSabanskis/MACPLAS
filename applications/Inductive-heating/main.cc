@@ -93,6 +93,8 @@ private:
   std::unique_ptr<Function<1>> inductor_position;
   std::unique_ptr<Function<1>> inductor_current;
 
+  double previous_inductor_position;
+
   double previous_time_step;
   double next_output_time;
 
@@ -579,6 +581,7 @@ Problem<dim>::initialize_temperature()
 
   const double z = inductor_position->value(Point<1>(0));
   interpolate_q_em(z);
+  previous_inductor_position = z;
 
   if (prm.get_bool("Load saved results"))
     {
@@ -617,7 +620,13 @@ Problem<dim>::apply_q_em()
   const double z = inductor_position->value(Point<1>(t));
   temperature_solver.add_output("z[m]", z);
 
-  interpolate_q_em(z);
+  if (std::abs(z - previous_inductor_position) < 1e-12)
+    std::cout << "z=const, skipping EM field interpolation\n";
+  else
+    {
+      interpolate_q_em(z);
+      previous_inductor_position = z;
+    }
 
   Vector<double> q = q0;
 
@@ -676,42 +685,25 @@ Problem<dim>::apply_q_em()
   temperature_solver.set_bc_convective(boundary_id, h, T_ref);
 }
 
-template <>
+template <int dim>
 void
-Problem<3>::interpolate_q_em(const double z)
+Problem<dim>::interpolate_q_em(const double z)
 {
-  std::vector<Point<3>> points;
-  std::vector<bool>     boundary_dofs;
+  std::vector<Point<dim>> points;
+  std::vector<bool>       boundary_dofs;
   temperature_solver.get_boundary_points(boundary_id, points, boundary_dofs);
 
   const double z0 = prm.get_double("Reference inductor position");
   const double dz = z0 - z;
 
   for (auto &p : points)
-    p[2] += dz;
+    p[dim - 1] += dz;
 
-  q3d.interpolate(
-    SurfaceInterpolator3D::PointField, "q", points, boundary_dofs, q0);
-
-  // normalize for future use
-  q0 *= 1e-6 * std::sqrt(prm.get_double("Reference electrical conductivity"));
-}
-
-template <>
-void
-Problem<2>::interpolate_q_em(const double z)
-{
-  std::vector<Point<2>> points;
-  std::vector<bool>     boundary_dofs;
-  temperature_solver.get_boundary_points(boundary_id, points, boundary_dofs);
-
-  const double z0 = prm.get_double("Reference inductor position");
-  const double dz = z0 - z;
-
-  for (auto &p : points)
-    p[1] += dz;
-
-  q2d.interpolate("QEM", points, boundary_dofs, q0);
+  if (dim == 2)
+    q2d.interpolate("QEM", points, boundary_dofs, q0);
+  else
+    q3d.interpolate(
+      SurfaceInterpolator3D::PointField, "q", points, boundary_dofs, q0);
 
   // normalize for future use
   q0 *= 1e-6 * std::sqrt(prm.get_double("Reference electrical conductivity"));
