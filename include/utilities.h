@@ -328,6 +328,12 @@ private:
   preprocess();
 };
 
+/** Helper error message for failed interpolation
+ */
+template <int dim>
+DeclException1(ExcInterpolationFailed,
+               Point<dim>,
+               << "Interpolation at point " << arg1 << " failed.");
 
 /** Class for interpolation of 2D surface fields from external data.
  * Used for interpolation of boundary conditions between different meshes.
@@ -1148,6 +1154,31 @@ SurfaceInterpolator3D::interpolate(const FieldType &              field_type,
               j_found = j;
             }
         }
+
+      if (d2_min < 0)
+        {
+#ifdef DEBUG
+          std::cout << "Warning: point " << target_points[i]
+                    << " not found, continuing with full search\n";
+#endif
+          // same as above, now checking each triangle
+          for (unsigned int j = 0; j < n_triangles; ++j)
+            {
+              const Triangle<dim> &triangle = triangle_cache[j];
+
+              Point<dim> p_trial =
+                triangle.closest_triangle_point(target_points[i]);
+
+              double d2 = (p_trial - target_points[i]).norm_square();
+              if (d2 < d2_min || d2_min < 0)
+                {
+                  d2_min  = d2;
+                  p_found = p_trial;
+                  j_found = j;
+                }
+            }
+        }
+      AssertThrow(d2_min >= 0, ExcInterpolationFailed<dim>(target_points[i]));
 
       switch (field_type)
         {
