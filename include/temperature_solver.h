@@ -193,6 +193,35 @@ public:
   const DoFHandler<dim> &
   get_dof_handler() const;
 
+  /** Calculate the temperature-dependent thermal conductivity \f$\lambda(T)\f$,
+   * W m<sup>-1</sup> K<sup>-1</sup>
+   */
+  double
+  calc_lambda(const double T) const;
+
+  /** Calculate the derivative of thermal conductivity \f$d\lambda(T)/dT\f$,
+   * W m<sup>-1</sup> K<sup>-2</sup>
+   */
+  double
+  calc_derivative_lambda(const double T) const;
+
+  /** Calculate the temperature-dependent density \f$\rho\f$, kg m<sup>-3</sup>
+   */
+  double
+  calc_rho(const double T) const;
+
+  /** Calculate the temperature-dependent specific heat capacity \f$c_p\f$,
+   * J kg K<sup>-1</sup>
+   */
+  double
+  calc_c_p(const double T) const;
+
+  /** Calculate the temperature-dependent product of density and specific heat
+   * capacity \f$\rho c_p\f$, J m<sup>-3</sup> K<sup>-1</sup>
+   */
+  double
+  calc_rho_c_p(const double T) const;
+
   /** Set first-type boundary condition
    */
   void
@@ -341,35 +370,6 @@ private:
    */
   std::vector<double>
   get_field_at_probes(const Vector<double> &source) const;
-
-  /** Calculate the temperature-dependent thermal conductivity \f$\lambda(T)\f$,
-   * W m<sup>-1</sup> K<sup>-1</sup>
-   */
-  double
-  calc_lambda(const double T) const;
-
-  /** Calculate the derivative of thermal conductivity \f$d\lambda(T)/dT\f$,
-   * W m<sup>-1</sup> K<sup>-2</sup>
-   */
-  double
-  calc_derivative_lambda(const double T) const;
-
-  /** Calculate the temperature-dependent density \f$\rho\f$, kg m<sup>-3</sup>
-   */
-  double
-  calc_rho(const double T) const;
-
-  /** Calculate the temperature-dependent specific heat capacity \f$c_p\f$,
-   * J kg K<sup>-1</sup>
-   */
-  double
-  calc_c_p(const double T) const;
-
-  /** Calculate the temperature-dependent product of density and specific heat
-   * capacity \f$\rho c_p\f$, J m<sup>-3</sup> K<sup>-1</sup>
-   */
-  double
-  calc_rho_c_p(const double T) const;
 
   /** Helper method for creating output file name
    *

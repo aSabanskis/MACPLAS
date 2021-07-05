@@ -65,7 +65,7 @@ private:
   measure_T();
 
   void
-  approximate_T_skin_effect();
+  approximate_skin_effect();
 
   // false if only the temperature field is calculated
   bool
@@ -390,7 +390,7 @@ Problem<dim>::solve_steady_temperature()
 
   if (prm.get_bool("Approximate skin effect"))
     {
-      approximate_T_skin_effect();
+      approximate_skin_effect();
       prm.set("Approximate skin effect", false);
     }
 
@@ -584,7 +584,8 @@ Problem<dim>::initialize_temperature()
       q2d.read_txt("qEM-2d.txt");
     }
 
-  const double z = inductor_position->value(Point<1>(0));
+  const double t = temperature_solver.get_time();
+  const double z = inductor_position->value(Point<1>(t));
   interpolate_q_em(z);
   previous_inductor_position = z;
 
@@ -704,6 +705,9 @@ Problem<dim>::interpolate_q_em(const double z)
   for (auto &p : points)
     p[dim - 1] += dz;
 
+  if (prm.get_bool("Approximate skin effect"))
+    std::fill(boundary_dofs.begin(), boundary_dofs.end(), true);
+
   if (dim == 2)
     q2d.interpolate("QEM", points, boundary_dofs, q0);
   else
@@ -798,7 +802,7 @@ Problem<dim>::measure_T()
 
 template <int dim>
 void
-Problem<dim>::approximate_T_skin_effect()
+Problem<dim>::approximate_skin_effect()
 {
   AssertThrow(dim == 2, ExcNotImplemented());
 
@@ -819,27 +823,14 @@ Problem<dim>::approximate_T_skin_effect()
   Vector<double> &temperature = temperature_solver.get_temperature();
   temperature_solver.add_field("T0", temperature);
 
-  // interpolate HF EM field to volume
-  const double z  = inductor_position->value(Point<1>(0));
-  const double z0 = prm.get_double("Reference inductor position");
-  const double dz = z0 - z;
-
-  for (auto &p : points)
-    p[dim - 1] += dz;
-
-  Vector<double> q(temperature.size());
-
-  std::fill(markers.begin(), markers.end(), true);
-  q2d.interpolate("QEM", points, markers, q);
-  q *= 1e-6 * std::sqrt(prm.get_double("Reference electrical conductivity"));
-
   // estimate the temperature change
-  const double I      = inductor_current->value(Point<1>(0));
-  const double f      = prm.get_double("Inductor frequency");
-  const double lambda = 22;
+  const double t = temperature_solver.get_time();
+  const double I = inductor_current->value(Point<1>(t));
+  const double f = prm.get_double("Inductor frequency");
 
   Vector<double> temperature_deviation(temperature.size());
   Vector<double> delta(temperature.size());
+  Vector<double> q = q0;
 
   for (unsigned int i = 0; i < q.size(); ++i)
     {
@@ -850,6 +841,8 @@ Problem<dim>::approximate_T_skin_effect()
 
       const double a = 2 * q[i] / delta[i];
       const double x = R - points[i][0];
+
+      const double lambda = temperature_solver.calc_lambda(temperature[i]);
 
       temperature_deviation[i] =
         -(a / lambda) * std::exp(-2 * x / delta[i]) * sqr(delta[i] / 2);
