@@ -138,6 +138,11 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
     Patterns::Anything(),
     "Effective inductor current I in A (time function or data file name)");
 
+  prm.declare_entry("Inductor frequency",
+                    "2.715e6",
+                    Patterns::Double(0),
+                    "Inductor frequency f in Hz");
+
   prm.declare_entry(
     "Reference electrical conductivity",
     "5e4",
@@ -830,7 +835,7 @@ Problem<dim>::approximate_T_skin_effect()
 
   // estimate the temperature change
   const double I      = inductor_current->value(Point<1>(0));
-  const double f      = 2.715e6;
+  const double f      = prm.get_double("Inductor frequency");
   const double lambda = 22;
 
   Vector<double> temperature_deviation(temperature.size());
