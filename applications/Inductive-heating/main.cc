@@ -65,7 +65,7 @@ private:
   measure_T();
 
   void
-  approximate_skin_effect();
+  approximate_LF_EM();
 
   // false if only the temperature field is calculated
   bool
@@ -197,6 +197,11 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
     "false",
     Patterns::Bool(),
     "Approximate skin effect for temperature (for testing only)");
+
+  prm.declare_entry("Use LF EM field",
+                    "false",
+                    Patterns::Bool(),
+                    "Approximate LF EM field from HF EM data");
 
   prm.declare_entry(
     "Output frequency",
@@ -390,7 +395,7 @@ Problem<dim>::solve_steady_temperature()
 
   if (prm.get_bool("Approximate skin effect"))
     {
-      approximate_skin_effect();
+      approximate_LF_EM();
       prm.set("Approximate skin effect", false);
     }
 
@@ -645,12 +650,21 @@ Problem<dim>::apply_q_em()
       dislocation_solver.add_output("I[A]", I);
     }
 
-  // apply the current and temperature-dependent electrical conductivity
-  const double I2 = sqr(I);
-  for (unsigned int i = 0; i < q.size(); ++i)
+  if (prm.get_bool("Use LF EM field"))
     {
-      const double s = electrical_conductivity.value(Point<1>(temperature[i]));
-      q[i] *= I2 / std::sqrt(s);
+      q = 0;
+      approximate_LF_EM();
+    }
+  else
+    {
+      // apply the current and temperature-dependent electrical conductivity
+      const double I2 = sqr(I);
+      for (unsigned int i = 0; i < q.size(); ++i)
+        {
+          const double s =
+            electrical_conductivity.value(Point<1>(temperature[i]));
+          q[i] *= I2 / std::sqrt(s);
+        }
     }
 
 
@@ -705,7 +719,8 @@ Problem<dim>::interpolate_q_em(const double z)
   for (auto &p : points)
     p[dim - 1] += dz;
 
-  if (prm.get_bool("Approximate skin effect"))
+  if (prm.get_bool("Approximate skin effect") ||
+      prm.get_bool("Use LF EM field"))
     std::fill(boundary_dofs.begin(), boundary_dofs.end(), true);
 
   if (dim == 2)
@@ -802,9 +817,11 @@ Problem<dim>::measure_T()
 
 template <int dim>
 void
-Problem<dim>::approximate_skin_effect()
+Problem<dim>::approximate_LF_EM()
 {
   AssertThrow(dim == 2, ExcNotImplemented());
+
+  const bool use_LF = prm.get_bool("Use LF EM field");
 
   std::vector<Point<dim>> points;
   std::vector<bool>       markers;
@@ -819,23 +836,21 @@ Problem<dim>::approximate_skin_effect()
     }
   std::cout << "R=" << R << " m\n";
 
-  // save the original temperature
-  Vector<double> &temperature = temperature_solver.get_temperature();
-  temperature_solver.add_field("T0", temperature);
-
   // estimate the temperature change
   const double t = temperature_solver.get_time();
   const double I = inductor_current->value(Point<1>(t));
   const double f = prm.get_double("Inductor frequency");
 
-  Vector<double> temperature_deviation(temperature.size());
-  Vector<double> delta(temperature.size());
-  Vector<double> q = q0;
+  Vector<double> &temperature = temperature_solver.get_temperature();
+  Vector<double>  temperature_deviation(temperature.size());
+  Vector<double>  delta(temperature.size());
+  Vector<double>  q = q0;
 
   for (unsigned int i = 0; i < q.size(); ++i)
     {
       const double s = electrical_conductivity.value(Point<1>(temperature[i]));
 
+      // HF value
       q[i] *= sqr(I) / std::sqrt(s);
       delta[i] = 1.0 / std::sqrt(numbers::PI * 4e-7 * numbers::PI * f * s);
 
@@ -847,17 +862,27 @@ Problem<dim>::approximate_skin_effect()
       temperature_deviation[i] =
         -(a / lambda) * std::exp(-2 * x / delta[i]) * sqr(delta[i] / 2);
 
-      q[i] *= std::exp(-x / delta[i]);
+      // convert to LF
+      q[i] *= 2 * std::exp(-2 * x / delta[i]) / delta[i];
     }
 
-  std::cout << "Max T_deviation=" << temperature_deviation.linfty_norm()
-            << " K\n";
+  if (use_LF)
+    {
+      temperature_solver.get_heat_source() = q;
+    }
+  else
+    {
+      std::cout << "Max T_deviation=" << temperature_deviation.linfty_norm()
+                << " K\n";
 
-  temperature += temperature_deviation;
+      temperature_solver.add_field("T0", temperature);
+      temperature += temperature_deviation;
+
+      temperature_solver.add_field("T_deviation", temperature_deviation);
+    }
 
   temperature_solver.add_field("q", q);
   temperature_solver.add_field("delta", delta);
-  temperature_solver.add_field("T_deviation", temperature_deviation);
 }
 
 template <int dim>

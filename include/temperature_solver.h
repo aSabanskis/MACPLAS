@@ -129,6 +129,16 @@ public:
   Vector<double> &
   get_temperature();
 
+  /** Get volumetric heat source \f$\dot{q}\f$, W m<sup>-3</sup>
+   */
+  const Vector<double> &
+  get_heat_source() const;
+
+  /** Get volumetric heat source \f$\dot{q}\f$, W m<sup>-3</sup>
+   */
+  Vector<double> &
+  get_heat_source();
+
   /** Current time \f$t\f$, s
    */
   double
@@ -322,6 +332,7 @@ private:
 
     std::vector<double>         T_q;
     std::vector<double>         T_prev_q;
+    std::vector<double>         dot_q_q;
     std::vector<Tensor<1, dim>> grad_T_q;
     std::vector<double>         T_face_q;
     std::vector<double>         heat_flux_in_face_q;
@@ -414,6 +425,10 @@ private:
   /** Newton update for temperature \f$\delta T\f$, K
    */
   Vector<double> temperature_update;
+
+  /** Volumetric heat source \f$\dot{q}\f$, W m<sup>-3</sup>
+   */
+  Vector<double> vol_heat_source;
 
   /** User-defined fields
    */
@@ -761,6 +776,20 @@ TemperatureSolver<dim>::get_temperature()
 }
 
 template <int dim>
+const Vector<double> &
+TemperatureSolver<dim>::get_heat_source() const
+{
+  return vol_heat_source;
+}
+
+template <int dim>
+Vector<double> &
+TemperatureSolver<dim>::get_heat_source()
+{
+  return vol_heat_source;
+}
+
+template <int dim>
 double
 TemperatureSolver<dim>::get_time() const
 {
@@ -822,6 +851,7 @@ TemperatureSolver<dim>::initialize()
 
   temperature.reinit(n_dofs);
   temperature_update.reinit(n_dofs);
+  vol_heat_source.reinit(n_dofs);
 
   std::cout << " " << format_time(timer) << "\n";
 
@@ -989,6 +1019,7 @@ TemperatureSolver<dim>::output_vtk() const
   data_out.attach_dof_handler(dh);
   data_out.add_data_vector(temperature, "T");
   data_out.add_data_vector(temperature_update, "dT");
+  data_out.add_data_vector(vol_heat_source, "dot_q");
 
   Vector<double> rho(temperature.size()), c_p(temperature.size()),
     l(temperature.size()), dl_dT(temperature.size());
@@ -1400,6 +1431,7 @@ TemperatureSolver<dim>::AssemblyScratchData::AssemblyScratchData(
                    update_quadrature_points | update_values | update_JxW_values)
   , T_q(quadrature.size())
   , T_prev_q(quadrature.size())
+  , dot_q_q(quadrature.size())
   , grad_T_q(quadrature.size())
   , T_face_q(face_quadrature.size())
   , heat_flux_in_face_q(face_quadrature.size())
@@ -1416,6 +1448,7 @@ TemperatureSolver<dim>::AssemblyScratchData::AssemblyScratchData(
                    scratch_data.fe_face_values.get_update_flags())
   , T_q(scratch_data.T_q)
   , T_prev_q(scratch_data.T_prev_q)
+  , dot_q_q(scratch_data.dot_q_q)
   , grad_T_q(scratch_data.grad_T_q)
   , T_face_q(scratch_data.T_face_q)
   , heat_flux_in_face_q(scratch_data.heat_flux_in_face_q)
@@ -1492,6 +1525,7 @@ TemperatureSolver<dim>::local_assemble_system(
 
   std::vector<double> &        T_q      = scratch_data.T_q;
   std::vector<double> &        T_prev_q = scratch_data.T_prev_q;
+  std::vector<double> &        dot_q_q  = scratch_data.dot_q_q;
   std::vector<Tensor<1, dim>> &grad_T_q = scratch_data.grad_T_q;
 
   std::vector<types::global_dof_index> &local_dof_indices =
@@ -1504,6 +1538,7 @@ TemperatureSolver<dim>::local_assemble_system(
 
   fe_values.get_function_values(temperature, T_q);
   fe_values.get_function_values(temperature_prev, T_prev_q);
+  fe_values.get_function_values(vol_heat_source, dot_q_q);
   fe_values.get_function_gradients(temperature, grad_T_q);
 
   for (unsigned int q = 0; q < n_q_points; ++q)
@@ -1538,8 +1573,9 @@ TemperatureSolver<dim>::local_assemble_system(
                 weight;
             }
 
-          cell_rhs(i) -=
-            (lambda_q * tmp_grad_i + tmp_i * (T_q[q] - T_prev_q[q])) * weight;
+          cell_rhs(i) -= (lambda_q * tmp_grad_i +
+                          tmp_i * (T_q[q] - T_prev_q[q]) - dot_q_q[q] * phi_i) *
+                         weight;
         }
     }
 

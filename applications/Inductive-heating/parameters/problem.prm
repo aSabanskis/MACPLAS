@@ -19,3 +19,4 @@ set Load saved results                = false
 set Start from steady temperature     = true
 set Temperature only                  = false
 set Approximate skin effect           = false
+set Use LF EM field                   = false
