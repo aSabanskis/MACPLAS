@@ -1,18 +1,18 @@
 set Electrical conductivity           = 100*10^(4.247-2924.0/T)
-set Emissivity                        = 0.57
-set Ambient temperature               = 0
-set Heat transfer coefficient         = 0
-set Reference temperature             = 1000
+set Emissivity                        = Ratnieks
+set Ambient temperature               = 300
+set Heat transfer coefficient         = 10
+set Reference temperature             = 300
 set Inductor position                 = 0.0404 + 0.39*t/12900
-set Inductor current                  = t<=12900 ? 33.5 + 73*t/12900 : 0
+set Inductor current                  = t<=12900 ? 34.2 + 68*t/12900 : 0
 set Initial temperature               = 1000
 set Max temperature change            = 1e-1
-set Output frequency                  = 30
-set Output time step                  = 0
-set Probe coordinates x               = 0, 0, 0
-set Probe coordinates z               = 0.067, 0.267, 0.467
-set Custom probes x relative to inductor = 0
-set Custom probes z relative to inductor = 0
+set Output frequency                  = 0
+set Output time step                  = 300
+set Probe coordinates x               = 0.01, 0.01
+set Probe coordinates z               = 0.41053, 0.43045
+set Custom probes x relative to inductor = 0.01, 0.01, 0.01, 0.01, 0.01, 0.01
+set Custom probes z relative to inductor = -0.0079, -0.00505, -0.0022, 0, 0.00505, -0.0038
 set Reference electrical conductivity = 5e4
 set Reference inductor position       = 0.26685
 set Load saved results                = false
