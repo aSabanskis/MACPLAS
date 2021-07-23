@@ -565,7 +565,8 @@ output_boundary_field_at_quadrature_points(const DoFHandler<dim> &dh,
 {
   try
     {
-      std::cout << "Saving to '" << file_name << "'\n";
+      Timer timer;
+      std::cout << "Saving to '" << file_name;
       std::ofstream output(file_name);
 
       const auto dims = coordinate_names(dim);
@@ -609,6 +610,7 @@ output_boundary_field_at_quadrature_points(const DoFHandler<dim> &dh,
                 }
             }
         }
+      std::cout << " " << format_time(timer) << "\n";
     }
   catch (std::exception &e)
     {

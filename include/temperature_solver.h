@@ -1185,6 +1185,8 @@ TemperatureSolver<dim>::output_boundary_values(const unsigned int id) const
       output << '\n';
     }
 
+  std::cout << " " << format_time(timer) << "\n";
+
 #ifdef DEBUG
   if (it_q_in != bc_rad_mixed_data.end())
     {
@@ -1202,8 +1204,6 @@ TemperatureSolver<dim>::output_boundary_values(const unsigned int id) const
                                                    std::to_string(id) + ".dat");
     }
 #endif
-
-  std::cout << " " << format_time(timer) << "\n";
 }
 
 template <int dim>
