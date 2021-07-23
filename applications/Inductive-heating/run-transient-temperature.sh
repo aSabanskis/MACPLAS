@@ -15,9 +15,11 @@ fi
 
 clean_results
 
+mkdir -p "$r"
+
 cp parameters/*.prm .
 
-mkdir -p "$r"
+setup_parameters
 
 sed -Ei "s|(set Temperature only *= *).*|\1 true|" problem.prm
 sed -Ei "s|(set Time step *= *).*|\1 2|" temperature.prm
