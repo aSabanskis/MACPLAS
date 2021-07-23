@@ -576,6 +576,16 @@ TemperatureSolver<dim>::TemperatureSolver(const unsigned int order,
                     Patterns::Bool(),
                     "Report final achieved convergence of linear solver");
 
+  prm.declare_entry("Number of cell quadrature points",
+                    "0",
+                    Patterns::Integer(0),
+                    "Number of QGauss<dim> quadrature points (0: order+1)");
+
+  prm.declare_entry("Number of face quadrature points",
+                    "0",
+                    Patterns::Integer(0),
+                    "Number of QGauss<dim-1> quadrature points (0: order+1)");
+
   prm.declare_entry("Number of threads",
                     "0",
                     Patterns::Integer(0),
@@ -668,12 +678,25 @@ TemperatureSolver<dim>::initialize_parameters()
 
   add_output("nNewton");
 
+  const long int n_q_default = fe.degree + 1;
+
+  if (prm.get_integer("Number of cell quadrature points") == 0)
+    prm.set("Number of cell quadrature points", n_q_default);
+
+  if (prm.get_integer("Number of face quadrature points") == 0)
+    prm.set("Number of face quadrature points", n_q_default);
+
   std::cout << "  done\n";
 
   std::cout << "rho=" << m_rho_expression << "\n"
             << "c_p=" << m_c_p_expression << "\n"
             << "lambda=" << m_lambda_expression << "\n"
             << "derivative_lambda=" << m_derivative_lambda_expression << "\n";
+
+  std::cout << "n_q_cell=" << prm.get("Number of cell quadrature points")
+            << "\n"
+            << "n_q_face=" << prm.get("Number of face quadrature points")
+            << "\n";
 
   std::cout << "n_cores=" << MultithreadInfo::n_cores() << "\n"
             << "n_threads=" << MultithreadInfo::n_threads() << "\n";
@@ -1190,8 +1213,9 @@ TemperatureSolver<dim>::output_boundary_values(const unsigned int id) const
 #ifdef DEBUG
   if (it_q_in != bc_rad_mixed_data.end())
     {
-      const QGauss<dim - 1> face_quadrature(fe.degree + 1);
-      FEFaceValues<dim>     fe_face_values(
+      const QGauss<dim - 1> face_quadrature(
+        prm.get_integer("Number of face quadrature points"));
+      FEFaceValues<dim> fe_face_values(
         fe, face_quadrature, update_quadrature_points | update_values);
 
       output_boundary_field_at_quadrature_points(get_dof_handler(),
@@ -1462,9 +1486,10 @@ TemperatureSolver<dim>::assemble_system()
 
   std::cout << solver_name() << "  Assembling system";
 
-  // TODO: introduce parameter
-  const QGauss<dim>     quadrature(fe.degree + 1);
-  const QGauss<dim - 1> face_quadrature(fe.degree + 1);
+  const QGauss<dim> quadrature(
+    prm.get_integer("Number of cell quadrature points"));
+  const QGauss<dim - 1> face_quadrature(
+    prm.get_integer("Number of face quadrature points"));
 
   system_matrix = 0;
   system_rhs    = 0;
