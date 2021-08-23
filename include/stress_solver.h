@@ -273,10 +273,28 @@ private:
   double
   calc_alpha(const double T) const;
 
+  /** Recover stress at DOFs via extrapolation from quadrature points.
+   * Called by \c calculate_stress.
+   */
+  void
+  recover_stress_extrapolation();
+
+  /** Recover stress at DOFs via global projection.
+   * Called by \c calculate_stress.
+   */
+  void
+  recover_stress_global();
+
   /** Calculate the stresses from the displacement field
    */
   void
   calculate_stress();
+
+  /** Calculate stress invariants
+   * Called by \c calculate_stress.
+   */
+  void
+  calculate_stress_invariants();
 
   /** Get stiffness tensor
    */
@@ -346,6 +364,10 @@ private:
   /** Stress deviator \f$S_{ij}\f$, Pa
    */
   BlockVector<double> stress_deviator;
+
+  /** Elastic strain \f$\varepsilon^e_{ij}\f$, dimensionless
+   */
+  BlockVector<double> strain_e;
 
   /** Creep strain \f$\varepsilon^c_{ij}\f$, dimensionless
    */
@@ -451,6 +473,11 @@ StressSolver<dim>::StressSolver(const unsigned int order,
                     "1685",
                     Patterns::Double(0),
                     "Reference temperature T_ref in K");
+
+  prm.declare_entry("Stress recovery method",
+                    "extrapolation",
+                    Patterns::Selection("extrapolation|global"),
+                    "Method for stress postprocessing");
 
   prm.declare_entry("Linear solver type",
                     "minres",
@@ -1171,12 +1198,8 @@ StressSolver<dim>::calc_alpha(const double T) const
 
 template <int dim>
 void
-StressSolver<dim>::calculate_stress()
+StressSolver<dim>::recover_stress_extrapolation()
 {
-  Timer timer;
-
-  std::cout << solver_name() << "  Postprocessing results";
-
   const QGauss<dim> quadrature(fe.degree + 1);
 
   FEValues<dim> fe_values_temp(fe_temp, quadrature, update_values);
@@ -1190,9 +1213,6 @@ StressSolver<dim>::calculate_stress()
   const unsigned int n_q_points         = quadrature.size();
 
   stress.reinit(n_components, n_dofs_temp);
-  stress_hydrostatic.reinit(n_dofs_temp);
-  stress_von_Mises.reinit(n_dofs_temp);
-  stress_J_2.reinit(n_dofs_temp);
 
   std::vector<unsigned int> count(n_dofs_temp, 0);
 
@@ -1293,6 +1313,199 @@ StressSolver<dim>::calculate_stress()
           stress.block(k)[i] /= count[i];
         }
     }
+}
+
+template <int dim>
+void
+StressSolver<dim>::recover_stress_global()
+{
+  const QGauss<dim> quadrature(fe.degree + 1);
+
+  FEValues<dim> fe_values_temp(fe_temp, quadrature, update_values);
+  FEValues<dim> fe_values(fe,
+                          quadrature,
+                          update_quadrature_points | update_values |
+                            update_gradients | update_JxW_values);
+
+  const unsigned int n_dofs_temp        = dh_temp.n_dofs();
+  const unsigned int dofs_per_cell_temp = fe_temp.dofs_per_cell;
+  const unsigned int n_q_points         = quadrature.size();
+
+  stress.reinit(n_components, n_dofs_temp);
+  strain_e.reinit(n_components, n_dofs_temp);
+
+  // prepare the global mass matrix and RHS
+  SparseMatrix<double> global_matrix;
+  BlockVector<double>  global_rhs(n_components, n_dofs_temp);
+
+  DynamicSparsityPattern dsp(n_dofs_temp);
+  DoFTools::make_sparsity_pattern(dh_temp, dsp);
+
+  SparsityPattern sp;
+  sp.copy_from(dsp);
+  global_matrix.reinit(sp);
+
+  FullMatrix<double>  cell_matrix(dofs_per_cell_temp, dofs_per_cell_temp);
+  BlockVector<double> cell_rhs(n_components, dofs_per_cell_temp);
+
+  // assemble the system for elastic strains
+  std::vector<Vector<double>> displacement_q(n_q_points, Vector<double>(dim));
+
+  std::vector<std::vector<Tensor<1, dim>>> grad_displacement_q(
+    n_q_points, std::vector<Tensor<1, dim>>(dim));
+
+  std::vector<types::global_dof_index> local_dof_indices(dofs_per_cell_temp);
+
+  Tensor<1, n_components> epsilon_e_q;
+
+  typename DoFHandler<dim>::active_cell_iterator cell_temp =
+                                                   dh_temp.begin_active(),
+                                                 cell = dh.begin_active(),
+                                                 endc = dh.end();
+  for (; cell != endc; ++cell_temp, ++cell)
+    {
+      cell_matrix.reinit(dofs_per_cell_temp, dofs_per_cell_temp);
+      cell_rhs.reinit(n_components, dofs_per_cell_temp);
+
+      fe_values_temp.reinit(cell_temp);
+      fe_values.reinit(cell);
+
+      fe_values.get_function_values(displacement, displacement_q);
+
+      fe_values.get_function_gradients(displacement, grad_displacement_q);
+
+      for (unsigned int q = 0; q < n_q_points; ++q)
+        {
+          get_strain(fe_values.quadrature_point(q),
+                     displacement_q[q],
+                     grad_displacement_q[q],
+                     epsilon_e_q);
+
+          const double weight =
+            dim == 2 ? fe_values.JxW(q) * fe_values.quadrature_point(q)[0] :
+                       fe_values.JxW(q);
+
+          for (unsigned int i = 0; i < dofs_per_cell_temp; ++i)
+            {
+              for (unsigned int j = 0; j < dofs_per_cell_temp; ++j)
+                {
+                  cell_matrix(i, j) += fe_values_temp.shape_value(i, q) *
+                                       fe_values_temp.shape_value(j, q) *
+                                       weight;
+                }
+
+              for (unsigned int k = 0; k < n_components; ++k)
+                cell_rhs.block(k)(i) +=
+                  fe_values_temp.shape_value(i, q) * epsilon_e_q[k] * weight;
+            }
+        }
+
+      cell_temp->get_dof_indices(local_dof_indices);
+
+      for (unsigned int i = 0; i < local_dof_indices.size(); ++i)
+        {
+          for (unsigned int j = 0; j < local_dof_indices.size(); ++j)
+            global_matrix.add(local_dof_indices[i],
+                              local_dof_indices[j],
+                              cell_matrix(i, j));
+          for (unsigned int k = 0; k < n_components; ++k)
+            global_rhs.block(k)(local_dof_indices[i]) += cell_rhs.block(k)(i);
+        }
+    }
+
+  // solve the linear systems
+  const std::string  solver_type = prm.get("Linear solver type");
+  const unsigned int solver_iterations =
+    prm.get_integer("Linear solver iterations");
+  const double solver_tolerance = prm.get_double("Linear solver tolerance");
+
+  const bool log_history = prm.get_bool("Log convergence full");
+  const bool log_result  = prm.get_bool("Log convergence final");
+
+  if (log_history || log_result)
+    std::cout << "\n";
+
+  IterationNumberControl control(solver_iterations,
+                                 solver_tolerance,
+                                 log_history,
+                                 log_result);
+
+  SolverSelector<> solver;
+  solver.select(solver_type);
+  solver.set_control(control);
+
+  const std::string preconditioner_type = prm.get("Preconditioner type");
+  const double      preconditioner_relaxation =
+    prm.get_double("Preconditioner relaxation");
+
+  PreconditionSelector<> preconditioner(preconditioner_type,
+                                        preconditioner_relaxation);
+  preconditioner.use_matrix(global_matrix);
+
+  for (unsigned int k = 0; k < n_components; ++k)
+    solver.solve(global_matrix,
+                 strain_e.block(k),
+                 global_rhs.block(k),
+                 preconditioner);
+
+  // calculate the stresses from strains
+  Tensor<1, n_components> epsilon_i, epsilon_T_i;
+
+  for (unsigned int i = 0; i < n_dofs_temp; ++i)
+    {
+      const SymmetricTensor<2, n_components> stiffness =
+        get_stiffness_tensor(temperature[i]);
+
+      get_strain(temperature[i], epsilon_T_i);
+
+      for (unsigned int k = 0; k < n_components; ++k)
+        {
+          epsilon_i[k] =
+            strain_e.block(k)[i] - epsilon_T_i[k] - strain_c.block(k)[i];
+        }
+
+      const Tensor<1, n_components> s = stiffness * epsilon_i;
+
+      for (unsigned int k = 0; k < n_components; ++k)
+        {
+          stress.block(k)[i] = s[k];
+        }
+    }
+}
+
+template <int dim>
+void
+StressSolver<dim>::calculate_stress()
+{
+  Timer timer;
+
+  std::cout << solver_name() << "  Postprocessing results";
+
+  const std::string method = prm.get("Stress recovery method");
+
+  if (method == "extrapolation")
+    recover_stress_extrapolation();
+  else if (method == "global")
+    recover_stress_global();
+  else
+    AssertThrow(false,
+                ExcMessage("calculate_stress: stress recovery method '" +
+                           method + "' not supported."));
+
+  calculate_stress_invariants();
+
+  std::cout << " " << format_time(timer) << "\n";
+}
+
+template <int dim>
+void
+StressSolver<dim>::calculate_stress_invariants()
+{
+  const unsigned int n_dofs_temp = dh_temp.n_dofs();
+
+  stress_hydrostatic.reinit(n_dofs_temp);
+  stress_von_Mises.reinit(n_dofs_temp);
+  stress_J_2.reinit(n_dofs_temp);
 
   for (unsigned int i = 0; i < n_dofs_temp; ++i)
     {
@@ -1315,8 +1528,6 @@ StressSolver<dim>::calculate_stress()
   stress_deviator.block(0) -= stress_hydrostatic;
   stress_deviator.block(1) -= stress_hydrostatic;
   stress_deviator.block(2) -= stress_hydrostatic;
-
-  std::cout << " " << format_time(timer) << "\n";
 }
 
 template <int dim>

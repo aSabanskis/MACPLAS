@@ -56,7 +56,7 @@ Problem<dim>::run()
   ss << "result-" << dim << "d-order"
      << solver.get_dof_handler().get_fe().degree << "-x.dat";
   const std::string file_name = ss.str();
-  std::cout << "Saving postprocessed results to '" << file_name << "'";
+  std::cout << "Saving postprocessed results to '" << file_name << "'\n";
 
   const Vector<double> &     temperature = solver.get_temperature();
   const BlockVector<double> &stress      = solver.get_stress();
