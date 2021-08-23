@@ -71,6 +71,8 @@ private:
   bool
   with_dislocation() const;
 
+  Timer timer;
+
   TemperatureSolver<dim> temperature_solver;
   DislocationSolver<dim> dislocation_solver;
 
@@ -307,6 +309,8 @@ Problem<dim>::run()
     {
       solve_temperature_dislocation();
     }
+
+  std::cout << "Finished in " << timer.wall_time() << " s\n";
 }
 
 template <int dim>
@@ -781,7 +785,8 @@ Problem<dim>::measure_T()
         inductor_probe_file << "# probe " << i << ":\t" << inductor_probes[i]
                             << "\n";
 
-      inductor_probe_file << "t[s]\tdt[s]\tz[m]\tI[A]\tT_min[K]\tT_max[K]";
+      inductor_probe_file
+        << "t[s]\tdt[s]\twall_time[s]\tz[m]\tI[A]\tT_min[K]\tT_max[K]";
 
       for (unsigned int i = 0; i < inductor_probes.size(); ++i)
         inductor_probe_file << "\tT_" << i << "[K]";
@@ -806,8 +811,13 @@ Problem<dim>::measure_T()
 
   const auto limits_T = minmax(temperature);
 
-  inductor_probe_file << t << '\t' << dt << '\t' << z_ind << '\t' << I_ind
-                      << '\t' << limits_T.first << '\t' << limits_T.second;
+  const int precision =
+    temperature_solver.get_parameters().get_integer("Output precision");
+  inductor_probe_file << std::setprecision(precision);
+
+  inductor_probe_file << t << '\t' << dt << '\t' << timer.wall_time() << '\t'
+                      << z_ind << '\t' << I_ind << '\t' << limits_T.first
+                      << '\t' << limits_T.second;
 
   for (const auto &v : values_T)
     inductor_probe_file << '\t' << v;
