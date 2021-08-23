@@ -249,6 +249,11 @@ private:
   double
   get_time_step_max() const;
 
+  /** Number of time substeps, 1 (no substeps) or more
+   */
+  int
+  get_time_substeps() const;
+
   /** Time stepping: limit time step according to minimum and maximum values
    */
   void
@@ -601,6 +606,18 @@ DislocationSolver<dim>::DislocationSolver(const unsigned int order,
                     "0",
                     Patterns::Double(0),
                     "Maximum time step in seconds (optional, 0 - disabled)");
+
+  prm.declare_entry(
+    "Time substep",
+    "0",
+    Patterns::Double(0),
+    "Time substep for integration in seconds (optional, 0 - disabled)");
+
+  prm.declare_entry(
+    "Max time substeps",
+    "0",
+    Patterns::Integer(0),
+    "Maximum number of time substeps (optional, 0 - unlimited)");
 
   prm.declare_entry(
     "Max relative time step increase",
@@ -1292,6 +1309,7 @@ template <int dim>
 void
 DislocationSolver<dim>::initialize_dt_output()
 {
+  add_output("substeps", 1);
   add_output("max_dt_v[s]");
   for (unsigned int i = 0; i < StressSolver<dim>::n_components; ++i)
     add_output("max_dt_dot_strain_c_" + std::to_string(i) + "[s]");
@@ -1310,6 +1328,22 @@ double
 DislocationSolver<dim>::get_time_step_max() const
 {
   return prm.get_double("Max time step");
+}
+
+template <int dim>
+int
+DislocationSolver<dim>::get_time_substeps() const
+{
+  const double dt        = get_time_step();
+  const double dt_sub    = prm.get_double("Time substep");
+  const int    n_sub_max = prm.get_integer("Max time substeps");
+
+  if (dt_sub <= 0 || dt_sub >= dt)
+    return 1;
+
+  const int n_sub = std::round(dt / dt_sub);
+
+  return n_sub_max > 0 ? std::min(n_sub, n_sub_max) : n_sub;
 }
 
 template <int dim>
@@ -1884,9 +1918,6 @@ template <int dim>
 void
 DislocationSolver<dim>::integrate_Euler()
 {
-  // Implementation of explicit time integration. In future, consider using
-  // deal.II functionality (TimeStepping::RungeKutta)
-
   Vector<double> &     N_m       = get_dislocation_density();
   BlockVector<double> &epsilon_c = get_strain_c();
 
@@ -1894,19 +1925,23 @@ DislocationSolver<dim>::integrate_Euler()
   const Vector<double> &     J_2 = get_stress_J_2();
   const BlockVector<double> &S   = get_stress_deviator();
 
-  const unsigned int N  = N_m.size();
-  const double       dt = get_time_step();
+  const unsigned int N     = N_m.size();
+  const int          n_sub = get_time_substeps();
+  const double       dt    = get_time_step() / n_sub;
 
-  for (unsigned int i = 0; i < N; ++i)
-    {
-      // update strains
-      for (unsigned int j = 0; j < epsilon_c.n_blocks(); ++j)
-        epsilon_c.block(j)[i] +=
-          derivative_strain(N_m[i], J_2[i], T[i], S.block(j)[i]) * dt;
+  add_output("substeps", n_sub);
 
-      // update N_m
-      N_m[i] += derivative_N_m(N_m[i], J_2[i], T[i]) * dt;
-    }
+  for (unsigned int n = 0; n < n_sub; ++n)
+    for (unsigned int i = 0; i < N; ++i)
+      {
+        // update strains
+        for (unsigned int j = 0; j < epsilon_c.n_blocks(); ++j)
+          epsilon_c.block(j)[i] +=
+            derivative_strain(N_m[i], J_2[i], T[i], S.block(j)[i]) * dt;
+
+        // update N_m
+        N_m[i] += derivative_N_m(N_m[i], J_2[i], T[i]) * dt;
+      }
 
   stress_solver.solve();
 }
@@ -1924,6 +1959,11 @@ DislocationSolver<dim>::integrate_midpoint()
 
   const unsigned int N  = N_m.size();
   const double       dt = get_time_step();
+
+  const int n_sub = get_time_substeps();
+  AssertThrow(n_sub == 1,
+              ExcMessage("integrate_midpoint: n_sub=" + std::to_string(n_sub) +
+                         " is not supported"));
 
   // save values at the beginning of time step
   Vector<double>      N_m_0       = N_m;
@@ -1971,26 +2011,30 @@ DislocationSolver<dim>::integrate_linearized_N_m()
   const Vector<double> &     J_2 = get_stress_J_2();
   const BlockVector<double> &S   = get_stress_deviator();
 
-  const unsigned int N  = N_m.size();
-  const double       dt = get_time_step();
+  const unsigned int N     = N_m.size();
+  const int          n_sub = get_time_substeps();
+  const double       dt    = get_time_step() / n_sub;
 
-  for (unsigned int i = 0; i < N; ++i)
-    {
-      // linearize dot_N_m = a + b * (N_m-N_m_0)
-      const double a = derivative_N_m(N_m[i], J_2[i], T[i]);
-      const double b = derivative2_N_m_N_m(N_m[i], J_2[i], T[i]);
+  add_output("substeps", n_sub);
 
-      // integrate analytically, assuming constant stresses
-      const double d_N_m = dx_analytical(a, b, dt);
+  for (unsigned int n = 0; n < n_sub; ++n)
+    for (unsigned int i = 0; i < N; ++i)
+      {
+        // linearize dot_N_m = a + b * (N_m-N_m_0)
+        const double a = derivative_N_m(N_m[i], J_2[i], T[i]);
+        const double b = derivative2_N_m_N_m(N_m[i], J_2[i], T[i]);
 
-      // update N_m
-      N_m[i] += d_N_m;
+        // integrate analytically, assuming constant stresses
+        const double d_N_m = dx_analytical(a, b, dt);
 
-      // update strains
-      for (unsigned int j = 0; j < epsilon_c.n_blocks(); ++j)
-        epsilon_c.block(j)[i] +=
-          derivative_strain(N_m[i], J_2[i], T[i], S.block(j)[i]) * dt;
-    }
+        // update N_m
+        N_m[i] += d_N_m;
+
+        // update strains
+        for (unsigned int j = 0; j < epsilon_c.n_blocks(); ++j)
+          epsilon_c.block(j)[i] +=
+            derivative_strain(N_m[i], J_2[i], T[i], S.block(j)[i]) * dt;
+      }
 
   stress_solver.solve();
 }
@@ -2009,9 +2053,14 @@ DislocationSolver<dim>::integrate_linearized_N_m_midpoint()
   const unsigned int N  = N_m.size();
   const double       dt = get_time_step();
 
+  const int n_sub = get_time_substeps();
+  AssertThrow(n_sub == 1,
+              ExcMessage("integrate_linearized_N_m_midpoint: n_sub=" +
+                         std::to_string(n_sub) + " is not supported"));
+
   // save values at the beginning of time step
-  Vector<double>      N_m_0       = N_m;
-  BlockVector<double> epsilon_c_0 = epsilon_c;
+  const Vector<double>      N_m_0       = N_m;
+  const BlockVector<double> epsilon_c_0 = epsilon_c;
 
   // first, take a half step
   for (unsigned int i = 0; i < N; ++i)
@@ -2066,9 +2115,14 @@ DislocationSolver<dim>::integrate_implicit()
   const unsigned int N  = N_m.size();
   const double       dt = get_time_step();
 
+  const int n_sub = get_time_substeps();
+  AssertThrow(n_sub == 1,
+              ExcMessage("integrate_implicit: n_sub=" + std::to_string(n_sub) +
+                         " is not supported"));
+
   // save values at the beginning of time step
-  Vector<double>      N_m_0       = N_m;
-  BlockVector<double> epsilon_c_0 = epsilon_c;
+  const Vector<double>      N_m_0       = N_m;
+  const BlockVector<double> epsilon_c_0 = epsilon_c;
 
   // get number of fixed-point iterations
   const std::vector<std::string> tmp =
