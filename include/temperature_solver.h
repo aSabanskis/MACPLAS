@@ -107,7 +107,7 @@ public:
    * @returns \c true if the final time has been reached
    */
   bool
-  solve();
+  solve(const bool skip_time_advance = false);
 
   /** Get mesh
    */
@@ -361,7 +361,8 @@ private:
   copy_local_to_global(const AssemblyCopyData &copy_data);
 
 
-  /** Time stepping: advance time \f$t \to t + \Delta t\f$
+  /** Time stepping: advance time \f$t \to t + \Delta t\f$ and update previous
+   * temperature field
    */
   void
   advance_time();
@@ -711,7 +712,7 @@ TemperatureSolver<dim>::solver_name() const
 
 template <int dim>
 bool
-TemperatureSolver<dim>::solve()
+TemperatureSolver<dim>::solve(const bool skip_time_advance)
 {
   if (!probes_header_written)
     {
@@ -720,19 +721,13 @@ TemperatureSolver<dim>::solve()
       probes_header_written = true;
     }
 
-  double &     dt     = get_time_step();
-  const double t_prev = get_time();
-  const double t_max  = get_max_time();
+  // needed so that solve() could be called multiple times at the same t
+  if (!skip_time_advance)
+    advance_time();
 
-  // stop exactly at max time
-  if (t_prev + (1 + 1e-4) * dt >= t_max)
-    dt = t_max - t_prev;
-
-  advance_time();
-
-  const double t = get_time();
-
-  temperature_prev = temperature;
+  const double t     = get_time();
+  const double dt    = get_time_step();
+  const double t_max = get_max_time();
 
   for (int i = 1;; ++i)
     {
@@ -1722,7 +1717,17 @@ template <int dim>
 void
 TemperatureSolver<dim>::advance_time()
 {
+  double &     dt     = get_time_step();
+  const double t_prev = get_time();
+  const double t_max  = get_max_time();
+
+  // stop exactly at max time
+  if (t_prev + (1 + 1e-4) * dt >= t_max)
+    dt = t_max - t_prev;
+
   get_time() += get_time_step();
+
+  temperature_prev = temperature;
 }
 
 template <int dim>

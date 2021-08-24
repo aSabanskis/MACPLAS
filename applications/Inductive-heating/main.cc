@@ -193,6 +193,11 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     Patterns::Bool(),
                     "Calculate the steady-state temperature field at t=0");
 
+  prm.declare_entry(
+    "Outer temperature iterations",
+    "1",
+    Patterns::Integer(1),
+    "Number of outer temperature iterations (needed for EM BC update)");
 
   prm.declare_entry(
     "Approximate skin effect",
@@ -446,8 +451,15 @@ Problem<dim>::solve_temperature_dislocation()
 
       temperature_solver.get_time_step() = dislocation_solver.get_time_step();
 
-      apply_q_em();
-      const bool keep_going_temp = temperature_solver.solve();
+      const int n_outer = prm.get_integer("Outer temperature iterations");
+
+      bool keep_going_temp = false;
+
+      for (int n = 0; n < n_outer; ++n)
+        {
+          apply_q_em();
+          keep_going_temp = temperature_solver.solve(n > 0);
+        }
 
       dislocation_solver.get_temperature() =
         temperature_solver.get_temperature();
@@ -484,8 +496,15 @@ Problem<dim>::solve_temperature()
     {
       const bool output_enabled = update_output_time_step(i);
 
-      apply_q_em();
-      const bool keep_going_temp = temperature_solver.solve();
+      const int n_outer = prm.get_integer("Outer temperature iterations");
+
+      bool keep_going_temp = false;
+
+      for (int n = 0; n < n_outer; ++n)
+        {
+          apply_q_em();
+          keep_going_temp = temperature_solver.solve(n > 0);
+        }
 
       postprocess_T();
 
