@@ -20,3 +20,5 @@ set Peierls potential               = 2.17
 set Strain hardening factor         = 4.3
 set Time scheme                     = Linearized N_m
 set Time step                       = 10
+set Time substep                    = 0
+set Max time substeps               = 0
