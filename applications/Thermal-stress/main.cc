@@ -55,6 +55,7 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
         std::ofstream of("problem-default.prm");
         prm.print_parameters(of, ParameterHandler::Text);
       }
+  prm.print_parameters(std::cout, ParameterHandler::Text);
 
   m_T.initialize(FunctionParser<dim>::default_variable_names(),
                  prm.get("Temperature"),

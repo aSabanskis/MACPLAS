@@ -260,6 +260,7 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
         std::ofstream of("problem-default.prm");
         prm.print_parameters(of, ParameterHandler::Text);
       }
+  prm.print_parameters(std::cout, ParameterHandler::Text);
 
   initialize_function(inductor_position, prm.get("Inductor position"));
 
