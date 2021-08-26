@@ -1045,6 +1045,16 @@ DislocationSolver<dim>::output_vtk() const
     D[i] = calc_D(T[i]);
   data_out.add_data_vector(D, "D");
 
+  Vector<double> E(T.size());
+  for (unsigned int i = 0; i < T.size(); ++i)
+    E[i] = stress_solver.calc_E(T[i]);
+  data_out.add_data_vector(E, "E");
+
+  Vector<double> alpha(T.size());
+  for (unsigned int i = 0; i < T.size(); ++i)
+    alpha[i] = stress_solver.calc_alpha(T[i]);
+  data_out.add_data_vector(alpha, "alpha");
+
   const BlockVector<double> &displacement = get_displacement();
   for (unsigned int i = 0; i < displacement.n_blocks(); ++i)
     {

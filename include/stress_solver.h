@@ -119,6 +119,17 @@ public:
   BlockVector<double> &
   get_strain_c();
 
+  /** Calculate the temperature-dependent Young's modulus \f$E\f$, Pa
+   */
+  double
+  calc_E(const double T) const;
+
+  /** Calculate the temperature-dependent thermal expansion coefficient
+   * \f$\alpha\f$, K<sup>-1</sup>
+   */
+  double
+  calc_alpha(const double T) const;
+
   /** Initialize fields
    */
   void
@@ -244,11 +255,6 @@ private:
   void
   solve_system();
 
-  /** Calculate the temperature-dependent Young's modulus \f$E\f$, Pa
-   */
-  double
-  calc_E(const double T) const;
-
   /** Calculate the second-order elastic constant (stiffness) \f$C_{11} =
    * E (1 - \nu) / ((1 + \nu) (1 - 2 \nu))\f$, Pa
    */
@@ -266,12 +272,6 @@ private:
    */
   double
   calc_C_44(const double T) const;
-
-  /** Calculate the temperature-dependent thermal expansion coefficient
-   * \f$\alpha\f$, K<sup>-1</sup>
-   */
-  double
-  calc_alpha(const double T) const;
 
   /** Recover stress at DOFs via extrapolation from quadrature points.
    * Called by \c calculate_stress.

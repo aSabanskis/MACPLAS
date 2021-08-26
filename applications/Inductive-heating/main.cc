@@ -618,6 +618,8 @@ Problem<dim>::initialize_temperature()
   interpolate_q_em(z);
   previous_inductor_position = z;
 
+  temperature_solver.output_parameter_table();
+
   if (prm.get_bool("Load saved results"))
     {
       temperature_solver.load_data();
@@ -632,6 +634,8 @@ Problem<dim>::initialize_dislocation()
   // initialize dislocations and stresses
   dislocation_solver.initialize();
   dislocation_solver.get_temperature() = temperature_solver.get_temperature();
+
+  dislocation_solver.output_parameter_table();
 
   if (prm.get_bool("Load saved results"))
     {
