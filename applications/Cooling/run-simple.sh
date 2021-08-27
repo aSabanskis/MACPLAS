@@ -76,13 +76,15 @@ sed -Ei "s|(set Initial temperature *= *).*|\1 1683|" problem.prm
 sed -Ei "s|(set Reference temperature *= *).*|\1 280|" stress.prm
 sed -Ei "s|(set Poisson's ratio *= *).*|\1 0.25|" stress.prm
 sed -Ei "s|(set Young's modulus *= *).*|\1 1.7e11-2.771e4*T^2|" stress.prm
+# The averaged expansion coefficient has to be provided instead of differential!
 sed -Ei "s|(set Thermal expansion coefficient *= *).*|\1 3.479503e-06*(1-exp(-3.264259e-03*(T+57.2677)))+3.691665e-10*T|" stress.prm
 
-sed -Ei "s|(set Average Schmid factor *= *).*|\1 0.56984471569|" dislocation.prm
-sed -Ei "s|(set Average Taylor factor *= *).*|\1 1.7782388291|" dislocation.prm
+sed -Ei "s|(set Average Schmid factor *= *).*|\1 0.56984471569  # =0.329*sqrt(3)|" dislocation.prm
+sed -Ei "s|(set Average Taylor factor *= *).*|\1 1.7782388291   # =3.08/sqrt(3)|" dislocation.prm
 sed -Ei "s|(set Burgers vector *= *).*|\1 3.83e-10|" dislocation.prm
 sed -Ei "s|(set Material constant k_0 *= *).*|\1 8.58e-4|" dislocation.prm
 sed -Ei "s|(set Peierls potential *= *).*|\1 2.185+0.1*atan((T-1347.5)/100)|" dislocation.prm
+# D = alpha*G*b
 sed -Ei "s|(set Strain hardening factor *= *).*|\1 2.0*0.4*(1.7e11-2.771e4*T^2)*3.83e-10|" dislocation.prm
 
 calculate 1-elastic

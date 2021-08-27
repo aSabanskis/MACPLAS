@@ -1,5 +1,5 @@
-set Average Schmid factor       = 0.56984471569
-set Average Taylor factor       = 1.7782388291
+set Average Schmid factor       = 0.56984471569  # =0.329*sqrt(3)
+set Average Taylor factor       = 1.7782388291   # =3.08/sqrt(3)
 set Boltzmann constant          = 8.629e-5
 set Burgers vector              = 3.83e-10
 set Initial dislocation density = 1e9
