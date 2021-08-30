@@ -615,8 +615,12 @@ Problem<dim>::initialize_temperature()
 
   const double t = temperature_solver.get_time();
   const double z = inductor_position->value(Point<1>(t));
+  const double I = inductor_current->value(Point<1>(t));
   interpolate_q_em(z);
   previous_inductor_position = z;
+
+  temperature_solver.add_output("I[A]", I);
+  temperature_solver.add_output("z[m]", z);
 
   temperature_solver.output_parameter_table();
 
@@ -634,6 +638,13 @@ Problem<dim>::initialize_dislocation()
   // initialize dislocations and stresses
   dislocation_solver.initialize();
   dislocation_solver.get_temperature() = temperature_solver.get_temperature();
+
+  const double t = dislocation_solver.get_time();
+  const double z = inductor_position->value(Point<1>(t));
+  const double I = inductor_current->value(Point<1>(t));
+
+  dislocation_solver.add_output("I[A]", I);
+  dislocation_solver.add_output("z[m]", z);
 
   dislocation_solver.output_parameter_table();
 
@@ -654,10 +665,16 @@ Problem<dim>::apply_q_em()
   const double t =
     temperature_solver.get_time() + temperature_solver.get_time_step();
 
-  const Vector<double> &temperature = temperature_solver.get_temperature();
-
   const double z = inductor_position->value(Point<1>(t));
+  const double I = inductor_current->value(Point<1>(t));
+
   temperature_solver.add_output("z[m]", z);
+  temperature_solver.add_output("I[A]", I);
+  if (with_dislocation())
+    {
+      dislocation_solver.add_output("z[m]", z);
+      dislocation_solver.add_output("I[A]", I);
+    }
 
   if (std::abs(z - previous_inductor_position) < 1e-12)
     std::cout << "z=const, skipping EM field interpolation\n";
@@ -669,15 +686,6 @@ Problem<dim>::apply_q_em()
 
   Vector<double> q = q0;
 
-  const double I = inductor_current->value(Point<1>(t));
-  temperature_solver.add_output("I[A]", I);
-
-  if (with_dislocation())
-    {
-      dislocation_solver.add_output("z[m]", z);
-      dislocation_solver.add_output("I[A]", I);
-    }
-
   if (prm.get_bool("Use LF EM field"))
     {
       q = 0;
@@ -686,6 +694,8 @@ Problem<dim>::apply_q_em()
   else
     {
       // apply the current and temperature-dependent electrical conductivity
+      const Vector<double> &temperature = temperature_solver.get_temperature();
+
       const double I2 = sqr(I);
       for (unsigned int i = 0; i < q.size(); ++i)
         {

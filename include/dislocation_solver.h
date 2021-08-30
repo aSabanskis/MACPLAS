@@ -965,6 +965,10 @@ template <int dim>
 void
 DislocationSolver<dim>::add_output(const std::string &name, const double value)
 {
+    if (get_time() > 0 && additional_output.find(name) == additional_output.end())
+    throw std::runtime_error(solver_name() + "  add_output: cannot add '" +
+                             name + "' which was not present at t=0");
+
   additional_output[name] = value;
 }
 
@@ -1325,6 +1329,7 @@ DislocationSolver<dim>::initialize_dt_output()
   for (unsigned int i = 0; i < StressSolver<dim>::n_components; ++i)
     add_output("max_dt_dot_strain_c_" + std::to_string(i) + "[s]");
   add_output("max_dt_dot_N_m_rel[s]");
+  add_output("max_dt_dot_tau_eff_rel[s]");
 }
 
 template <int dim>

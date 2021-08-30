@@ -990,6 +990,10 @@ template <int dim>
 void
 TemperatureSolver<dim>::add_output(const std::string &name, const double value)
 {
+  if (get_time() > 0 && additional_output.find(name) == additional_output.end())
+    throw std::runtime_error(solver_name() + "  add_output: cannot add '" +
+                             name + "' which was not present at t=0");
+
   additional_output[name] = value;
 }
 
