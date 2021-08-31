@@ -251,7 +251,7 @@ private:
 
   /** Number of time substeps, 1 (no substeps) or more
    */
-  int
+  unsigned int
   get_time_substeps() const;
 
   /** Time stepping: limit time step according to minimum and maximum values
@@ -965,7 +965,7 @@ template <int dim>
 void
 DislocationSolver<dim>::add_output(const std::string &name, const double value)
 {
-    if (get_time() > 0 && additional_output.find(name) == additional_output.end())
+  if (get_time() > 0 && additional_output.find(name) == additional_output.end())
     throw std::runtime_error(solver_name() + "  add_output: cannot add '" +
                              name + "' which was not present at t=0");
 
@@ -1347,7 +1347,7 @@ DislocationSolver<dim>::get_time_step_max() const
 }
 
 template <int dim>
-int
+unsigned int
 DislocationSolver<dim>::get_time_substeps() const
 {
   const double dt        = get_time_step();
@@ -1942,7 +1942,7 @@ DislocationSolver<dim>::integrate_Euler()
   const BlockVector<double> &S   = get_stress_deviator();
 
   const unsigned int N     = N_m.size();
-  const int          n_sub = get_time_substeps();
+  const unsigned int n_sub = get_time_substeps();
   const double       dt    = get_time_step() / n_sub;
 
   add_output("substeps", n_sub);
@@ -1976,7 +1976,7 @@ DislocationSolver<dim>::integrate_midpoint()
   const unsigned int N  = N_m.size();
   const double       dt = get_time_step();
 
-  const int n_sub = get_time_substeps();
+  const unsigned int n_sub = get_time_substeps();
   AssertThrow(n_sub == 1,
               ExcMessage("integrate_midpoint: n_sub=" + std::to_string(n_sub) +
                          " is not supported"));
@@ -2028,7 +2028,7 @@ DislocationSolver<dim>::integrate_linearized_N_m()
   const BlockVector<double> &S   = get_stress_deviator();
 
   const unsigned int N     = N_m.size();
-  const int          n_sub = get_time_substeps();
+  const unsigned int n_sub = get_time_substeps();
   const double       dt    = get_time_step() / n_sub;
 
   add_output("substeps", n_sub);
@@ -2069,7 +2069,7 @@ DislocationSolver<dim>::integrate_linearized_N_m_midpoint()
   const unsigned int N  = N_m.size();
   const double       dt = get_time_step();
 
-  const int n_sub = get_time_substeps();
+  const unsigned int n_sub = get_time_substeps();
   AssertThrow(n_sub == 1,
               ExcMessage("integrate_linearized_N_m_midpoint: n_sub=" +
                          std::to_string(n_sub) + " is not supported"));
@@ -2131,7 +2131,7 @@ DislocationSolver<dim>::integrate_implicit()
   const unsigned int N  = N_m.size();
   const double       dt = get_time_step();
 
-  const int n_sub = get_time_substeps();
+  const unsigned int n_sub = get_time_substeps();
   AssertThrow(n_sub == 1,
               ExcMessage("integrate_implicit: n_sub=" + std::to_string(n_sub) +
                          " is not supported"));
