@@ -418,6 +418,11 @@ private:
   void
   integrate_implicit();
 
+  /** Check if \c solve produced finite values at all DOFs
+   */
+  bool
+  has_converged() const;
+
   /** Helper method for creating output file name
    *
    * @returns \c "-<dim>d-order<order>-t<time>"
@@ -717,6 +722,11 @@ DislocationSolver<dim>::solve(const bool stress_only)
   std::cout << solver_name() << "  Time " << t << " s"
             << " step " << dt << " s\n";
 
+  StressSolver<dim> &ss = get_stress_solver();
+  // Save fields at the previous time
+  const Vector<double>      N_m          = get_dislocation_density();
+  const BlockVector<double> displacement = ss.get_displacement();
+  const BlockVector<double> strain_c     = ss.get_strain_c();
 
   if (time_scheme == "Euler")
     integrate_Euler();
@@ -733,6 +743,18 @@ DislocationSolver<dim>::solve(const bool stress_only)
     AssertThrow(false, ExcNotImplemented());
 
   output_probes();
+
+  if (!has_converged())
+    {
+      std::cout << solver_name() << "  Simulation diverged, stopping.\n";
+      // The fields are now unusable, restore the ones at the previous time
+      get_time() -= get_time_step();
+      get_dislocation_density() = N_m;
+      ss.get_displacement()     = displacement;
+      ss.get_strain_c()         = strain_c;
+      ss.solve();
+      return false;
+    }
 
   update_time_step();
 
@@ -2167,6 +2189,25 @@ DislocationSolver<dim>::integrate_implicit()
 
       stress_solver.solve();
     }
+}
+
+template <int dim>
+bool
+DislocationSolver<dim>::has_converged() const
+{
+  for (const auto &n : get_dislocation_density())
+    {
+      if (!std::isfinite(n))
+        return false;
+    }
+
+  for (const auto &n : get_stress_J_2())
+    {
+      if (!std::isfinite(n))
+        return false;
+    }
+
+  return true;
 }
 
 template <int dim>
