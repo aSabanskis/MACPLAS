@@ -2,6 +2,7 @@ set Average Schmid factor           = 1.0
 set Average Taylor factor           = 1.0
 set Boltzmann constant              = 8.617e-5
 set Burgers vector                  = 3.8e-10
+set Critical stress                 = 0
 set Initial dislocation density     = 0e6
 set Material constant K             = 3.1e-4
 set Material constant k_0           = 8.6e-4

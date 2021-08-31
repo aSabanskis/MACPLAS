@@ -292,8 +292,16 @@ private:
   double
   calc_D(const double T) const;
 
+  /** Calculate the temperature-dependent critical stress
+   * \f$\tau_\mathrm{crit}\f$
+   */
+  double
+  calc_tau_crit(const double T) const;
+
   /** Calculate the effective stress \f$\tau_\mathrm{eff} =
-   * \left\langle S \sqrt{J_2} - D \sqrt{N_m} \right\rangle\f$
+   * \left\langle
+   * S \sqrt{J_2} - D \sqrt{N_m} - \tau_\mathrm{crit}
+   * \right\rangle\f$
    */
   double
   tau_eff(const double N_m, const double J_2, const double T) const;
@@ -482,6 +490,10 @@ private:
    */
   FunctionParser<1> m_D;
 
+  /** Critical stress \f$\tau_\mathrm{crit}\f$ (temperature function), Pa
+   */
+  FunctionParser<1> m_tau_crit;
+
   /** Magnitude of Burgers vector \f$b\f$, m
    */
   double m_b;
@@ -554,6 +566,11 @@ DislocationSolver<dim>::DislocationSolver(const unsigned int order,
                     "4.3",
                     Patterns::Anything(),
                     "Strain hardening factor D in N/m" + info_T);
+
+  prm.declare_entry("Critical stress",
+                    "0",
+                    Patterns::Anything(),
+                    "Critical stress tau_crit in Pa" + info_T);
 
   prm.declare_entry("Material constant K",
                     "3.1e-4",
@@ -1071,6 +1088,11 @@ DislocationSolver<dim>::output_vtk() const
     D[i] = calc_D(T[i]);
   data_out.add_data_vector(D, "D");
 
+  Vector<double> tau_crit(T.size());
+  for (unsigned int i = 0; i < T.size(); ++i)
+    tau_crit[i] = calc_tau_crit(T[i]);
+  data_out.add_data_vector(tau_crit, "tau_crit");
+
   Vector<double> E(T.size());
   for (unsigned int i = 0; i < T.size(); ++i)
     E[i] = stress_solver.calc_E(T[i]);
@@ -1290,13 +1312,15 @@ DislocationSolver<dim>::output_parameter_table(const double       T1,
 
   output << "T[K]\t"
          << "Q[eV]\t"
-         << "D[Nm^-1]\n";
+         << "D[Nm^-1]\t"
+         << "tau_crit[Pa]\n";
 
   for (unsigned int i = 0; i < n; ++i)
     {
       const double T = T1 + (T2 - T1) * i / (n - 1);
 
-      output << T << '\t' << calc_Q(T) << '\t' << calc_D(T) << '\n';
+      output << T << '\t' << calc_Q(T) << '\t' << calc_D(T) << '\t'
+             << calc_tau_crit(T) << '\n';
     }
 
   stress_solver.output_parameter_table(T1, T2, n);
@@ -1313,6 +1337,11 @@ DislocationSolver<dim>::initialize_parameters()
 
   const std::string m_D_expression = prm.get("Strain hardening factor");
   m_D.initialize("T", m_D_expression, typename FunctionParser<1>::ConstMap());
+
+  const std::string m_tau_crit_expression = prm.get("Critical stress");
+  m_tau_crit.initialize("T",
+                        m_tau_crit_expression,
+                        typename FunctionParser<1>::ConstMap());
 
   m_b   = prm.get_double("Burgers vector");
   m_K   = prm.get_double("Material constant K");
@@ -1332,6 +1361,7 @@ DislocationSolver<dim>::initialize_parameters()
   std::cout << "b=" << m_b << "\n"
             << "Q=" << m_Q_expression << "\n"
             << "D=" << m_D_expression << "\n"
+            << "tau_crit=" << m_tau_crit_expression << "\n"
             << "K=" << m_K << "\n"
             << "k_0=" << m_k_0 << "\n"
             << "l=" << m_l << "\n"
@@ -1748,11 +1778,20 @@ DislocationSolver<dim>::calc_D(const double T) const
 
 template <int dim>
 double
+DislocationSolver<dim>::calc_tau_crit(const double T) const
+{
+  return m_tau_crit.value(Point<1>(T));
+}
+
+template <int dim>
+double
 DislocationSolver<dim>::tau_eff(const double N_m,
                                 const double J_2,
                                 const double T) const
 {
-  return std::max(m_S * std::sqrt(J_2) - calc_D(T) * std::sqrt(N_m), 0.0);
+  return std::max(m_S * std::sqrt(J_2) - calc_D(T) * std::sqrt(N_m) -
+                    calc_tau_crit(T),
+                  0.0);
 }
 
 template <int dim>
