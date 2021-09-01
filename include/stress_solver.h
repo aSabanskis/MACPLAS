@@ -1415,39 +1415,50 @@ StressSolver<dim>::recover_stress_global()
     }
 
   // solve the linear systems
-  const std::string  solver_type = prm.get("Linear solver type");
-  const unsigned int solver_iterations =
-    prm.get_integer("Linear solver iterations");
-  const double solver_tolerance = prm.get_double("Linear solver tolerance");
+  const std::string solver_type = prm.get("Linear solver type");
+  if (solver_type == "UMFPACK")
+    {
+      SparseDirectUMFPACK A;
+      A.initialize(global_matrix);
 
-  const bool log_history = prm.get_bool("Log convergence full");
-  const bool log_result  = prm.get_bool("Log convergence final");
+      for (unsigned int k = 0; k < n_components; ++k)
+        A.vmult(strain_e.block(k), global_rhs.block(k));
+    }
+  else
+    {
+      const unsigned int solver_iterations =
+        prm.get_integer("Linear solver iterations");
+      const double solver_tolerance = prm.get_double("Linear solver tolerance");
 
-  if (log_history || log_result)
-    std::cout << "\n";
+      const bool log_history = prm.get_bool("Log convergence full");
+      const bool log_result  = prm.get_bool("Log convergence final");
 
-  IterationNumberControl control(solver_iterations,
-                                 solver_tolerance,
-                                 log_history,
-                                 log_result);
+      if (log_history || log_result)
+        std::cout << "\n";
 
-  SolverSelector<> solver;
-  solver.select(solver_type);
-  solver.set_control(control);
+      IterationNumberControl control(solver_iterations,
+                                     solver_tolerance,
+                                     log_history,
+                                     log_result);
 
-  const std::string preconditioner_type = prm.get("Preconditioner type");
-  const double      preconditioner_relaxation =
-    prm.get_double("Preconditioner relaxation");
+      SolverSelector<> solver;
+      solver.select(solver_type);
+      solver.set_control(control);
 
-  PreconditionSelector<> preconditioner(preconditioner_type,
-                                        preconditioner_relaxation);
-  preconditioner.use_matrix(global_matrix);
+      const std::string preconditioner_type = prm.get("Preconditioner type");
+      const double      preconditioner_relaxation =
+        prm.get_double("Preconditioner relaxation");
 
-  for (unsigned int k = 0; k < n_components; ++k)
-    solver.solve(global_matrix,
-                 strain_e.block(k),
-                 global_rhs.block(k),
-                 preconditioner);
+      PreconditionSelector<> preconditioner(preconditioner_type,
+                                            preconditioner_relaxation);
+      preconditioner.use_matrix(global_matrix);
+
+      for (unsigned int k = 0; k < n_components; ++k)
+        solver.solve(global_matrix,
+                     strain_e.block(k),
+                     global_rhs.block(k),
+                     preconditioner);
+    }
 
   // calculate the stresses from strains
   Tensor<1, n_components> epsilon_i, epsilon_T_i;
