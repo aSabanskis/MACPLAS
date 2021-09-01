@@ -105,18 +105,32 @@ public:
   const BlockVector<double> &
   get_stress_deviator() const;
 
+  /** Get mean (hydrostatic) stress \f$\sigma_\mathrm{ave}\f$, Pa.
+   * Calls \c StressSolver::get_stress_hydrostatic
+   */
+  const Vector<double> &
+  get_stress_hydrostatic() const;
+
   /** Get second invariant of deviatoric stress \f$J_2\f$, Pa<sup>2</sup>.
    * Calls \c StressSolver::get_stress_J_2
    */
   const Vector<double> &
   get_stress_J_2() const;
 
-  /** Get creep strain \f$\varepsilon^c_{ij}\f$, dimensionless
+  /** Get elastic strain \f$\varepsilon^e_{ij}\f$, dimensionless.
+   * Calls \c StressSolver::get_strain_e
+   */
+  const BlockVector<double> &
+  get_strain_e() const;
+
+  /** Get creep strain \f$\varepsilon^c_{ij}\f$, dimensionless.
+   * Calls \c StressSolver::get_strain_c
    */
   const BlockVector<double> &
   get_strain_c() const;
 
-  /** Get creep strain \f$\varepsilon^c_{ij}\f$, dimensionless
+  /** Get creep strain \f$\varepsilon^c_{ij}\f$, dimensionless.
+   * Calls \c StressSolver::get_strain_c
    */
   BlockVector<double> &
   get_strain_c();
@@ -853,9 +867,23 @@ DislocationSolver<dim>::get_stress_deviator() const
 
 template <int dim>
 const Vector<double> &
+DislocationSolver<dim>::get_stress_hydrostatic() const
+{
+  return stress_solver.get_stress_hydrostatic();
+}
+
+template <int dim>
+const Vector<double> &
 DislocationSolver<dim>::get_stress_J_2() const
 {
   return stress_solver.get_stress_J_2();
+}
+
+template <int dim>
+const BlockVector<double> &
+DislocationSolver<dim>::get_strain_e() const
+{
+  return stress_solver.get_strain_e();
 }
 
 template <int dim>
@@ -1049,7 +1077,9 @@ DislocationSolver<dim>::output_data() const
   write_data(get_displacement(), "displacement" + s);
   write_data(get_stress(), "stress" + s);
   write_data(get_stress_deviator(), "stress_deviator" + s);
+  write_data(get_stress_hydrostatic(), "stress_hydrostatic" + s);
   write_data(get_stress_J_2(), "stress_J_2" + s);
+  write_data(get_strain_e(), "strain_e" + s);
   write_data(get_strain_c(), "strain_c" + s);
 
   std::cout << " " << format_time(timer) << "\n";
@@ -1124,12 +1154,22 @@ DislocationSolver<dim>::output_vtk() const
       data_out.add_data_vector(stress_deviator.block(i), name);
     }
 
+  const BlockVector<double> &epsilon_e = get_strain_e();
+  for (unsigned int i = 0; i < epsilon_e.n_blocks(); ++i)
+    {
+      const std::string name = "epsilon_e_" + std::to_string(i);
+      data_out.add_data_vector(epsilon_e.block(i), name);
+    }
+
   const BlockVector<double> &epsilon_c = get_strain_c();
   for (unsigned int i = 0; i < epsilon_c.n_blocks(); ++i)
     {
       const std::string name = "epsilon_c_" + std::to_string(i);
       data_out.add_data_vector(epsilon_c.block(i), name);
     }
+
+  const Vector<double> &stress_hydrostatic = get_stress_hydrostatic();
+  data_out.add_data_vector(stress_hydrostatic, "stress_hydrostatic");
 
   const Vector<double> &stress_J_2 = get_stress_J_2();
 
@@ -1203,9 +1243,11 @@ DislocationSolver<dim>::output_boundary_values(const unsigned int id) const
 
   const Vector<double> &     T   = get_temperature();
   const Vector<double> &     N_m = get_dislocation_density();
+  const Vector<double> &     hyd = get_stress_hydrostatic();
   const Vector<double> &     J_2 = get_stress_J_2();
   const BlockVector<double> &s   = get_stress();
   const BlockVector<double> &S   = get_stress_deviator();
+  const BlockVector<double> &e_e = get_strain_e();
   const BlockVector<double> &e_c = get_strain_c();
 
   const auto dims = coordinate_names(dim);
@@ -1220,13 +1262,17 @@ DislocationSolver<dim>::output_boundary_values(const unsigned int id) const
   for (unsigned int k = 0; k < s.n_blocks(); ++k)
     output << "stress_" << k << "[Pa]\t";
 
-  for (unsigned int k = 0; k < S.n_blocks(); ++k)
+  for (unsigned int k = 0; k < e_e.n_blocks(); ++k)
+    output << "strain_e_" << k << "[-]\t";
+
+  for (unsigned int k = 0; k < e_c.n_blocks(); ++k)
     output << "strain_c_" << k << "[-]\t";
 
   for (unsigned int k = 0; k < e_c.n_blocks(); ++k)
     output << "dot_strain_c_" << k << "[s^-1]\t";
 
   output << "tau_eff[Pa]\t"
+         << "stress_hydrostatic[Pa]\t"
          << "stress_J_2[Pa^2]";
 
   for (const auto &it : additional_fields)
@@ -1254,15 +1300,18 @@ DislocationSolver<dim>::output_boundary_values(const unsigned int id) const
       for (unsigned int k = 0; k < s.n_blocks(); ++k)
         output << s.block(k)[i] << '\t';
 
-      for (unsigned int k = 0; k < S.n_blocks(); ++k)
-        output << derivative_strain(N_m[i], J_2[i], T[i], S.block(k)[i])
-               << '\t';
+      for (unsigned int k = 0; k < e_e.n_blocks(); ++k)
+        output << e_e.block(k)[i] << '\t';
+
+      for (unsigned int k = 0; k < e_c.n_blocks(); ++k)
+        output << e_c.block(k)[i] << '\t';
 
       for (unsigned int k = 0; k < e_c.n_blocks(); ++k)
         output << derivative_strain(N_m[i], J_2[i], T[i], S.block(k)[i])
                << '\t';
 
-      output << tau_eff(N_m[i], J_2[i], T[i]) << '\t' << J_2[i];
+      output << tau_eff(N_m[i], J_2[i], T[i]) << '\t' << hyd[i] << '\t'
+             << J_2[i];
 
       for (const auto &it : additional_fields)
         {

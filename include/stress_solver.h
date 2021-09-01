@@ -103,11 +103,22 @@ public:
   const BlockVector<double> &
   get_stress_deviator() const;
 
+  /** Get mean (hydrostatic) stress \f$\sigma_\mathrm{ave} =
+   * \frac{1}{3} \sigma_{kk}\f$, Pa
+   */
+  const Vector<double> &
+  get_stress_hydrostatic() const;
+
   /** Get second invariant of deviatoric stress \f$J_2 =
    * \frac{1}{2} S_{ij} S_{ij}\f$, Pa<sup>2</sup>
    */
   const Vector<double> &
   get_stress_J_2() const;
+
+  /** Get elastic strain \f$\varepsilon^e_{ij}\f$, dimensionless
+   */
+  const BlockVector<double> &
+  get_strain_e() const;
 
   /** Get creep strain \f$\varepsilon^c_{ij}\f$, dimensionless
    */
@@ -703,9 +714,23 @@ StressSolver<dim>::get_stress_deviator() const
 
 template <int dim>
 const Vector<double> &
+StressSolver<dim>::get_stress_hydrostatic() const
+{
+  return stress_hydrostatic;
+}
+
+template <int dim>
+const Vector<double> &
 StressSolver<dim>::get_stress_J_2() const
 {
   return stress_J_2;
+}
+
+template <int dim>
+const BlockVector<double> &
+StressSolver<dim>::get_strain_e() const
+{
+  return strain_e;
 }
 
 template <int dim>
@@ -809,7 +834,9 @@ StressSolver<dim>::output_data() const
   write_data(get_displacement(), "displacement" + s);
   write_data(get_stress(), "stress" + s);
   write_data(get_stress_deviator(), "stress_deviator" + s);
+  write_data(get_stress_hydrostatic(), "stress_hydrostatic" + s);
   write_data(get_stress_J_2(), "stress_J_2" + s);
+  write_data(get_strain_e(), "strain_e" + s);
   write_data(get_strain_c(), "strain_c" + s);
 
   std::cout << " " << format_time(timer) << "\n";
@@ -869,6 +896,17 @@ StressSolver<dim>::output_vtk() const
     {
       const std::string name = "stress_deviator_" + std::to_string(i);
       data_out.add_data_vector(stress_deviator.block(i), name);
+    }
+
+  for (unsigned int i = 0; i < strain_e.n_blocks(); ++i)
+    {
+      const std::string name = "epsilon_e_" + std::to_string(i);
+      data_out.add_data_vector(strain_e.block(i), name);
+    }
+  for (unsigned int i = 0; i < strain_c.n_blocks(); ++i)
+    {
+      const std::string name = "epsilon_c_" + std::to_string(i);
+      data_out.add_data_vector(strain_c.block(i), name);
     }
 
   data_out.add_data_vector(stress_hydrostatic, "stress_hydrostatic");
