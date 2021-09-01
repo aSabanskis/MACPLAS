@@ -273,24 +273,30 @@ private:
   double
   calc_C_44(const double T) const;
 
-  /** Recover stress at DOFs via extrapolation from quadrature points.
+  /** Recover strain at DOFs via extrapolation from quadrature points.
    * Called by \c calculate_stress.
    */
   void
-  recover_stress_extrapolation();
+  recover_strain_extrapolation();
 
-  /** Recover stress at DOFs via global projection.
+  /** Recover strain at DOFs via global projection.
    * Called by \c calculate_stress.
    */
   void
-  recover_stress_global();
+  recover_strain_global();
 
-  /** Calculate the stresses from the displacement field
+  /** Calculate stress from the displacement field
    */
   void
   calculate_stress();
 
-  /** Calculate stress invariants
+  /** Helper function to calculate stress from strain.
+   * Called by \c calculate_stress.
+   */
+  void
+  calculate_stress_from_strain();
+
+  /** Helper function to calculate stress invariants.
    * Called by \c calculate_stress.
    */
   void
@@ -690,7 +696,10 @@ StressSolver<dim>::initialize()
   displacement.reinit(dim, n_dofs_temp);
   stress.reinit(n_components, n_dofs_temp);
   stress_deviator.reinit(n_components, n_dofs_temp);
+  strain_e.reinit(n_components, n_dofs_temp);
   strain_c.reinit(n_components, n_dofs_temp);
+  stress_hydrostatic.reinit(n_dofs_temp);
+  stress_von_Mises.reinit(n_dofs_temp);
   stress_J_2.reinit(n_dofs_temp);
 
   std::cout << " " << format_time(timer) << "\n";
@@ -1199,11 +1208,11 @@ StressSolver<dim>::calc_alpha(const double T) const
 
 template <int dim>
 void
-StressSolver<dim>::recover_stress_extrapolation()
+StressSolver<dim>::recover_strain_extrapolation()
 {
   const QGauss<dim> quadrature(fe.degree + 1);
 
-  FEValues<dim> fe_values_temp(fe_temp, quadrature, update_values);
+  FEValues<dim> fe_values_temp(fe_temp, quadrature, update_default);
   FEValues<dim> fe_values(fe,
                           quadrature,
                           update_quadrature_points | update_values |
@@ -1213,7 +1222,7 @@ StressSolver<dim>::recover_stress_extrapolation()
   const unsigned int dofs_per_cell_temp = fe_temp.dofs_per_cell;
   const unsigned int n_q_points         = quadrature.size();
 
-  stress.reinit(n_components, n_dofs_temp);
+  strain_e.reinit(n_components, n_dofs_temp);
 
   std::vector<unsigned int> count(n_dofs_temp, 0);
 
@@ -1221,25 +1230,21 @@ StressSolver<dim>::recover_stress_extrapolation()
   FETools::compute_projection_from_quadrature_points_matrix(
     fe_temp, quadrature, quadrature, qpoint_to_dof_matrix);
 
-  std::vector<double> T_q(n_q_points);
-
-  std::vector<std::vector<double>> epsilon_c_q(n_components,
-                                               std::vector<double>(n_q_points));
-
+  // recover elastic strains
   std::vector<Vector<double>> displacement_q(n_q_points, Vector<double>(dim));
 
   std::vector<std::vector<Tensor<1, dim>>> grad_displacement_q(
     n_q_points, std::vector<Tensor<1, dim>>(dim));
 
-  std::vector<Vector<double>> stress_q(n_components,
+  std::vector<Vector<double>> strain_q(n_components,
                                        Vector<double>(n_q_points));
 
-  std::vector<Vector<double>> stress_cell(n_components,
+  std::vector<Vector<double>> strain_cell(n_components,
                                           Vector<double>(dofs_per_cell_temp));
 
   std::vector<types::global_dof_index> local_dof_indices(dofs_per_cell_temp);
 
-  Tensor<1, n_components> epsilon_T_q, epsilon_e_q;
+  Tensor<1, n_components> epsilon_e_q;
 
   typename DoFHandler<dim>::active_cell_iterator cell_temp =
                                                    dh_temp.begin_active(),
@@ -1250,43 +1255,26 @@ StressSolver<dim>::recover_stress_extrapolation()
       fe_values_temp.reinit(cell_temp);
       fe_values.reinit(cell);
 
-      fe_values_temp.get_function_values(temperature, T_q);
-
       fe_values.get_function_values(displacement, displacement_q);
 
       fe_values.get_function_gradients(displacement, grad_displacement_q);
 
-      for (unsigned int i = 0; i < n_components; ++i)
-        fe_values_temp.get_function_values(strain_c.block(i), epsilon_c_q[i]);
-
       for (unsigned int q = 0; q < n_q_points; ++q)
         {
-          const SymmetricTensor<2, n_components> stiffness =
-            get_stiffness_tensor(T_q[q]);
-
-          get_strain(T_q[q], epsilon_T_q);
           get_strain(fe_values.quadrature_point(q),
                      displacement_q[q],
                      grad_displacement_q[q],
                      epsilon_e_q);
 
-          // sum of thermal and creep strain
-          Tensor<1, n_components> epsilon_T_c_q = epsilon_T_q;
-          for (unsigned int i = 0; i < n_components; ++i)
-            epsilon_T_c_q[i] += epsilon_c_q[i][q];
-
-          const Tensor<1, n_components> s =
-            stiffness * (epsilon_e_q - epsilon_T_c_q);
-
           for (unsigned int k = 0; k < n_components; ++k)
             {
-              stress_q[k][q] = s[k];
+              strain_q[k][q] = epsilon_e_q[k];
             }
         }
 
       for (unsigned int k = 0; k < n_components; ++k)
         {
-          qpoint_to_dof_matrix.vmult(stress_cell[k], stress_q[k]);
+          qpoint_to_dof_matrix.vmult(strain_cell[k], strain_q[k]);
         }
 
       cell_temp->get_dof_indices(local_dof_indices);
@@ -1297,7 +1285,7 @@ StressSolver<dim>::recover_stress_extrapolation()
 
           for (unsigned int k = 0; k < n_components; ++k)
             {
-              stress.block(k)[local_dof_indices[i]] += stress_cell[k][i];
+              strain_e.block(k)[local_dof_indices[i]] += strain_cell[k][i];
             }
         }
     }
@@ -1311,14 +1299,14 @@ StressSolver<dim>::recover_stress_extrapolation()
                                  "]=" + std::to_string(count[i]) +
                                  ", positive value expected"));
 
-          stress.block(k)[i] /= count[i];
+          strain_e.block(k)[i] /= count[i];
         }
     }
 }
 
 template <int dim>
 void
-StressSolver<dim>::recover_stress_global()
+StressSolver<dim>::recover_strain_global()
 {
   const QGauss<dim> quadrature(fe.degree + 1);
 
@@ -1332,8 +1320,7 @@ StressSolver<dim>::recover_stress_global()
   const unsigned int dofs_per_cell_temp = fe_temp.dofs_per_cell;
   const unsigned int n_q_points         = quadrature.size();
 
-  stress.reinit(n_components, n_dofs_temp);
-  strain_e.reinit(n_components, n_dofs_temp);
+  strain_e.reinit(n_components, n_dofs_temp, true);
 
   // prepare the global mass matrix and RHS
   SparseMatrix<double> global_matrix;
@@ -1459,8 +1446,16 @@ StressSolver<dim>::recover_stress_global()
                      global_rhs.block(k),
                      preconditioner);
     }
+}
 
-  // calculate the stresses from strains
+template <int dim>
+void
+StressSolver<dim>::calculate_stress_from_strain()
+{
+  const unsigned int n_dofs_temp = dh_temp.n_dofs();
+
+  stress.reinit(n_components, n_dofs_temp, true);
+
   Tensor<1, n_components> epsilon_i, epsilon_T_i;
 
   for (unsigned int i = 0; i < n_dofs_temp; ++i)
@@ -1491,19 +1486,20 @@ StressSolver<dim>::calculate_stress()
 {
   Timer timer;
 
-  std::cout << solver_name() << "  Postprocessing results";
-
   const std::string method = prm.get("Stress recovery method");
 
+  std::cout << solver_name() << "  Postprocessing results (" << method << ")";
+
   if (method == "extrapolation")
-    recover_stress_extrapolation();
+    recover_strain_extrapolation();
   else if (method == "global")
-    recover_stress_global();
+    recover_strain_global();
   else
     AssertThrow(false,
                 ExcMessage("calculate_stress: stress recovery method '" +
                            method + "' not supported."));
 
+  calculate_stress_from_strain();
   calculate_stress_invariants();
 
   std::cout << " " << format_time(timer) << "\n";
@@ -1515,9 +1511,9 @@ StressSolver<dim>::calculate_stress_invariants()
 {
   const unsigned int n_dofs_temp = dh_temp.n_dofs();
 
-  stress_hydrostatic.reinit(n_dofs_temp);
-  stress_von_Mises.reinit(n_dofs_temp);
-  stress_J_2.reinit(n_dofs_temp);
+  stress_hydrostatic.reinit(n_dofs_temp, true);
+  stress_von_Mises.reinit(n_dofs_temp, true);
+  stress_J_2.reinit(n_dofs_temp, true);
 
   for (unsigned int i = 0; i < n_dofs_temp; ++i)
     {
