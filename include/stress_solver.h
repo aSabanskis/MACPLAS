@@ -480,10 +480,52 @@ StressSolver<dim>::StressSolver(const unsigned int order,
                     Patterns::Double(0),
                     "Reference temperature T_ref in K");
 
-  prm.declare_entry("Stress recovery method",
-                    "extrapolation",
-                    Patterns::Selection("extrapolation|global"),
-                    "Method for stress postprocessing");
+  prm.enter_subsection("Stress recovery");
+  {
+    prm.declare_entry("Method",
+                      "extrapolation",
+                      Patterns::Selection("extrapolation|global"),
+                      "Method for stress postprocessing"
+                      " (extrapolation requires no additional parameters)");
+
+    prm.declare_entry("Linear solver type",
+                      "minres",
+                      Patterns::Selection("UMFPACK|" +
+                                          SolverSelector<>::get_solver_names()),
+                      "Name of linear solver");
+
+    prm.declare_entry("Linear solver iterations",
+                      "1000",
+                      Patterns::Integer(0),
+                      "Maximum number of iterations of linear solver");
+
+    prm.declare_entry("Linear solver tolerance",
+                      "1e-8",
+                      Patterns::Double(0),
+                      "Tolerance (maximum residual norm) of linear solver");
+
+    prm.declare_entry("Preconditioner type",
+                      "jacobi",
+                      Patterns::Selection(
+                        PreconditionSelector<>::get_precondition_names()),
+                      "Name of preconditioner");
+
+    prm.declare_entry("Preconditioner relaxation",
+                      "1.0",
+                      Patterns::Double(0),
+                      "Relaxation factor of preconditioner");
+
+    prm.declare_entry("Log convergence full",
+                      "false",
+                      Patterns::Bool(),
+                      "Report convergence progress of linear solver");
+
+    prm.declare_entry("Log convergence final",
+                      "true",
+                      Patterns::Bool(),
+                      "Report final achieved convergence of linear solver");
+  }
+  prm.leave_subsection();
 
   prm.declare_entry("Linear solver type",
                     "minres",
@@ -1402,6 +1444,7 @@ StressSolver<dim>::recover_strain_global()
     }
 
   // solve the linear systems
+  prm.enter_subsection("Stress recovery");
   const std::string solver_type = prm.get("Linear solver type");
   if (solver_type == "UMFPACK")
     {
@@ -1435,6 +1478,7 @@ StressSolver<dim>::recover_strain_global()
       const std::string preconditioner_type = prm.get("Preconditioner type");
       const double      preconditioner_relaxation =
         prm.get_double("Preconditioner relaxation");
+      prm.leave_subsection();
 
       PreconditionSelector<> preconditioner(preconditioner_type,
                                             preconditioner_relaxation);
@@ -1486,7 +1530,9 @@ StressSolver<dim>::calculate_stress()
 {
   Timer timer;
 
-  const std::string method = prm.get("Stress recovery method");
+  prm.enter_subsection("Stress recovery");
+  const std::string method = prm.get("Method");
+  prm.leave_subsection();
 
   std::cout << solver_name() << "  Postprocessing results (" << method << ")";
 

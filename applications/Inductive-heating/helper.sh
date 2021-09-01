@@ -8,6 +8,7 @@ clean_prm(){
     do
         echo "$f"
         sed -Ei "/^#/d" "$f"
+        sed -Ei "/ *#/d" "$f"
         sed -Ei "/^$/d" "$f"
     done
 }
