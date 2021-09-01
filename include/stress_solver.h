@@ -1484,6 +1484,7 @@ StressSolver<dim>::recover_strain_global()
   // solve the linear systems
   prm.enter_subsection("Stress recovery");
   const std::string solver_type = prm.get("Linear solver type");
+
   if (solver_type == "UMFPACK")
     {
       SparseDirectUMFPACK A;
@@ -1516,7 +1517,6 @@ StressSolver<dim>::recover_strain_global()
       const std::string preconditioner_type = prm.get("Preconditioner type");
       const double      preconditioner_relaxation =
         prm.get_double("Preconditioner relaxation");
-      prm.leave_subsection();
 
       PreconditionSelector<> preconditioner(preconditioner_type,
                                             preconditioner_relaxation);
@@ -1528,6 +1528,7 @@ StressSolver<dim>::recover_strain_global()
                      global_rhs.block(k),
                      preconditioner);
     }
+  prm.leave_subsection();
 }
 
 template <int dim>
