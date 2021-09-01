@@ -90,7 +90,8 @@ private:
 
   std::ofstream inductor_probe_file;
 
-  constexpr static unsigned int boundary_id = 0;
+  constexpr static unsigned int boundary_id_surf = 0;
+  constexpr static unsigned int boundary_id_axis = 1;
 
   std::unique_ptr<Function<1>> inductor_position;
   std::unique_ptr<Function<1>> inductor_current;
@@ -653,6 +654,9 @@ Problem<dim>::initialize_dislocation()
       dislocation_solver.load_data();
     }
 
+  if (dim == 2)
+    dislocation_solver.get_stress_solver().set_bc1(boundary_id_axis, 0, 0);
+
   dislocation_solver.solve(true);
 
   previous_time_step = temperature_solver.get_time_step();
@@ -730,7 +734,7 @@ Problem<dim>::apply_q_em()
     return e_0 * (t < 0.593 || t > 1 ? 0.0 : -0.96 / T_0);
   };
 
-  temperature_solver.set_bc_rad_mixed(boundary_id,
+  temperature_solver.set_bc_rad_mixed(boundary_id_surf,
                                       q,
                                       e_T ? emissivity_T : emissivity_const,
                                       e_T ? emissivity_deriv_T :
@@ -740,7 +744,7 @@ Problem<dim>::apply_q_em()
   const double h     = prm.get_double("Heat transfer coefficient");
   const double T_ref = prm.get_double("Reference temperature");
 
-  temperature_solver.set_bc_convective(boundary_id, h, T_ref);
+  temperature_solver.set_bc_convective(boundary_id_surf, h, T_ref);
 }
 
 template <int dim>
@@ -749,7 +753,9 @@ Problem<dim>::interpolate_q_em(const double z)
 {
   std::vector<Point<dim>> points;
   std::vector<bool>       boundary_dofs;
-  temperature_solver.get_boundary_points(boundary_id, points, boundary_dofs);
+  temperature_solver.get_boundary_points(boundary_id_surf,
+                                         points,
+                                         boundary_dofs);
 
   const double z0 = prm.get_double("Reference inductor position");
   const double dz = z0 - z;
@@ -869,7 +875,7 @@ Problem<dim>::approximate_LF_EM()
 
   std::vector<Point<dim>> points;
   std::vector<bool>       markers;
-  temperature_solver.get_boundary_points(boundary_id, points, markers);
+  temperature_solver.get_boundary_points(boundary_id_surf, points, markers);
 
   // calculate the radius
   double R = 0;
