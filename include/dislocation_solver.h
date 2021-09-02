@@ -661,6 +661,11 @@ DislocationSolver<dim>::DislocationSolver(const unsigned int order,
     Patterns::Integer(0),
     "Maximum number of time substeps (optional, 0 - unlimited)");
 
+  prm.declare_entry("Refresh stress for substeps",
+                    "true",
+                    Patterns::Bool(),
+                    "Fast update of stress during time substeps");
+
   prm.declare_entry(
     "Max relative time step increase",
     "1",
@@ -2077,19 +2082,26 @@ DislocationSolver<dim>::integrate_Euler()
   const unsigned int n_sub = get_time_substeps();
   const double       dt    = get_time_step() / n_sub;
 
+  const bool update_stress = prm.get_bool("Refresh stress for substeps");
+
   add_output("substeps", n_sub);
 
   for (unsigned int n = 0; n < n_sub; ++n)
-    for (unsigned int i = 0; i < N; ++i)
-      {
-        // update strains
-        for (unsigned int j = 0; j < epsilon_c.n_blocks(); ++j)
-          epsilon_c.block(j)[i] +=
-            derivative_strain(N_m[i], J_2[i], T[i], S.block(j)[i]) * dt;
+    {
+      for (unsigned int i = 0; i < N; ++i)
+        {
+          // update strains
+          for (unsigned int j = 0; j < epsilon_c.n_blocks(); ++j)
+            epsilon_c.block(j)[i] +=
+              derivative_strain(N_m[i], J_2[i], T[i], S.block(j)[i]) * dt;
 
-        // update N_m
-        N_m[i] += derivative_N_m(N_m[i], J_2[i], T[i]) * dt;
-      }
+          // update N_m
+          N_m[i] += derivative_N_m(N_m[i], J_2[i], T[i]) * dt;
+        }
+
+      if (update_stress && n + 1 < n_sub)
+        stress_solver.solve(true);
+    }
 
   stress_solver.solve();
 }
@@ -2163,26 +2175,33 @@ DislocationSolver<dim>::integrate_linearized_N_m()
   const unsigned int n_sub = get_time_substeps();
   const double       dt    = get_time_step() / n_sub;
 
+  const bool update_stress = prm.get_bool("Refresh stress for substeps");
+
   add_output("substeps", n_sub);
 
   for (unsigned int n = 0; n < n_sub; ++n)
-    for (unsigned int i = 0; i < N; ++i)
-      {
-        // linearize dot_N_m = a + b * (N_m-N_m_0)
-        const double a = derivative_N_m(N_m[i], J_2[i], T[i]);
-        const double b = derivative2_N_m_N_m(N_m[i], J_2[i], T[i]);
+    {
+      for (unsigned int i = 0; i < N; ++i)
+        {
+          // linearize dot_N_m = a + b * (N_m-N_m_0)
+          const double a = derivative_N_m(N_m[i], J_2[i], T[i]);
+          const double b = derivative2_N_m_N_m(N_m[i], J_2[i], T[i]);
 
-        // integrate analytically, assuming constant stresses
-        const double d_N_m = dx_analytical(a, b, dt);
+          // integrate analytically, assuming constant stresses
+          const double d_N_m = dx_analytical(a, b, dt);
 
-        // update N_m
-        N_m[i] += d_N_m;
+          // update N_m
+          N_m[i] += d_N_m;
 
-        // update strains
-        for (unsigned int j = 0; j < epsilon_c.n_blocks(); ++j)
-          epsilon_c.block(j)[i] +=
-            derivative_strain(N_m[i], J_2[i], T[i], S.block(j)[i]) * dt;
-      }
+          // update strains
+          for (unsigned int j = 0; j < epsilon_c.n_blocks(); ++j)
+            epsilon_c.block(j)[i] +=
+              derivative_strain(N_m[i], J_2[i], T[i], S.block(j)[i]) * dt;
+        }
+
+      if (update_stress && n + 1 < n_sub)
+        stress_solver.solve(true);
+    }
 
   stress_solver.solve();
 }

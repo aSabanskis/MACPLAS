@@ -57,10 +57,12 @@ public:
   std::string
   solver_name() const;
 
-  /** Calculate the stresses
+  /** Calculate the stress field.
+   * Only postprocesses the existing displacement field is \c postprocess_only
+   * is enabled (faster).
    */
   void
-  solve();
+  solve(const bool postprocess_only = false);
 
   /** Get mesh
    */
@@ -666,11 +668,14 @@ StressSolver<dim>::solver_name() const
 
 template <int dim>
 void
-StressSolver<dim>::solve()
+StressSolver<dim>::solve(const bool postprocess_only)
 {
-  prepare_for_solve();
-  assemble_system();
-  solve_system();
+  if (!postprocess_only)
+    {
+      prepare_for_solve();
+      assemble_system();
+      solve_system();
+    }
   calculate_stress();
 }
 
