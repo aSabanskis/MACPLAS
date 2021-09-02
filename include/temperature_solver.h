@@ -164,17 +164,17 @@ public:
   double
   get_max_time() const;
 
-  /** Get parameters \c prm
+  /** Get parameters TemperatureSolver::prm
    */
   const ParameterHandler &
   get_parameters() const;
 
-  /** Get parameters \c prm
+  /** Get parameters TemperatureSolver::prm
    */
   ParameterHandler &
   get_parameters();
 
-  /** Initialize fields
+  /** Initialize DOF handler and fields
    */
   void
   initialize();
@@ -388,8 +388,7 @@ private:
   std::vector<double>
   get_field_at_probes(const Vector<double> &source) const;
 
-  /** Helper method for creating output file name
-   *
+  /** Helper method for creating output file name.
    * @returns \c "-<dim>d-order<order>-t<time>"
    */
   std::string

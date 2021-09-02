@@ -71,7 +71,6 @@ inline std::vector<std::string>
 coordinate_names(const unsigned int dim);
 
 /** Save data (\c Vector, \c BlockVector) to disk.
- *
  * Internally calls \c block_write
  */
 template <typename T>
@@ -79,7 +78,6 @@ inline void
 write_data(const T &data, const std::string &file_name);
 
 /** Load data (\c Vector, \c BlockVector) from disk.
- *
  * Internally calls \c block_read
  */
 template <typename T>

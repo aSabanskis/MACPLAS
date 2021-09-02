@@ -45,7 +45,7 @@ public:
   solver_name() const;
 
   /** Advance time and calculate the dislocation density and creep strain.
-   * Calls \c DislocationSolver::advance_time unless \c stress_only is enabled,
+   * Calls DislocationSolver::advance_time unless \c stress_only is enabled,
    * then only the stress is calculated.
    */
   bool
@@ -82,55 +82,55 @@ public:
   get_dislocation_density();
 
   /** Get displacement \f$\mathbf{u}\f$, m.
-   * Calls \c StressSolver::get_displacement
+   * Calls StressSolver::get_displacement
    */
   const BlockVector<double> &
   get_displacement() const;
 
   /** Get displacement \f$\mathbf{u}\f$, m.
-   * Calls \c StressSolver::get_displacement
+   * Calls StressSolver::get_displacement
    */
   BlockVector<double> &
   get_displacement();
 
   /** Get stress \f$\sigma_{ij}\f$, Pa.
-   * Calls \c StressSolver::get_stress
+   * Calls StressSolver::get_stress
    */
   const BlockVector<double> &
   get_stress() const;
 
   /** Get stress deviator \f$S_{ij}\f$, Pa.
-   * Calls \c StressSolver::get_stress_deviator
+   * Calls StressSolver::get_stress_deviator
    */
   const BlockVector<double> &
   get_stress_deviator() const;
 
   /** Get mean (hydrostatic) stress \f$\sigma_\mathrm{ave}\f$, Pa.
-   * Calls \c StressSolver::get_stress_hydrostatic
+   * Calls StressSolver::get_stress_hydrostatic
    */
   const Vector<double> &
   get_stress_hydrostatic() const;
 
   /** Get second invariant of deviatoric stress \f$J_2\f$, Pa<sup>2</sup>.
-   * Calls \c StressSolver::get_stress_J_2
+   * Calls StressSolver::get_stress_J_2
    */
   const Vector<double> &
   get_stress_J_2() const;
 
   /** Get elastic strain \f$\varepsilon^e_{ij}\f$, dimensionless.
-   * Calls \c StressSolver::get_strain_e
+   * Calls StressSolver::get_strain_e
    */
   const BlockVector<double> &
   get_strain_e() const;
 
   /** Get creep strain \f$\varepsilon^c_{ij}\f$, dimensionless.
-   * Calls \c StressSolver::get_strain_c
+   * Calls StressSolver::get_strain_c
    */
   const BlockVector<double> &
   get_strain_c() const;
 
   /** Get creep strain \f$\varepsilon^c_{ij}\f$, dimensionless.
-   * Calls \c StressSolver::get_strain_c
+   * Calls StressSolver::get_strain_c
    */
   BlockVector<double> &
   get_strain_c();
@@ -155,13 +155,13 @@ public:
                       const std::vector<Point<dim>> &points) const;
 
   /** Get finite element degree.
-   * Calls \c StressSolver::get_degree
+   * Calls StressSolver::get_degree
    */
   unsigned int
   get_degree() const;
 
   /** Get degrees of freedom for temperature.
-   * Calls \c StressSolver::get_dof_handler
+   * Calls StressSolver::get_dof_handler
    */
   const DoFHandler<dim> &
   get_dof_handler() const;
@@ -196,7 +196,7 @@ public:
   double
   get_max_time() const;
 
-  /** Initialize fields
+  /** Initialize DOF handler and fields
    */
   void
   initialize();
@@ -282,7 +282,7 @@ private:
 
   /** Time stepping: adjust time step according to user-specified settings.
    * Considers maximum \f$v \Delta t\f$, \f$\Delta \varepsilon^c\f$ and relative
-   * \f$\Delta N_m\f$, calls \c DislocationSolver::limit_time_step.
+   * \f$\Delta N_m\f$, calls DislocationSolver::limit_time_step.
    */
   void
   update_time_step();
@@ -447,21 +447,20 @@ private:
   void
   integrate_implicit();
 
-  /** Check if \c solve produced finite values at all DOFs
+  /** Check if DislocationSolver::solve produced finite values at all DOFs
    */
   bool
   has_converged() const;
 
-  /** Helper method for creating output file name
-   *
+  /** Helper method for creating output file name.
    * @returns \c "-<dim>d-order<order>-t<time>"
    */
   std::string
   output_name_suffix() const;
 
   /** Stress solver.
-   *  To avoid redundancy, mesh, finite element, degree handler and temperature
-   *  field is not stored in \c DislocationSolver but in \c StressSolver
+   * To avoid redundancy, the mesh, finite element, DOF handler, as well as
+   * temperature and creep strain fields are stored in StressSolver
    */
   StressSolver<dim> stress_solver;
 

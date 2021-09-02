@@ -141,7 +141,7 @@ public:
   double
   calc_alpha(const double T) const;
 
-  /** Initialize fields
+  /** Initialize DOF handler and fields
    */
   void
   initialize();
@@ -209,12 +209,14 @@ private:
   void
   initialize_parameters();
 
-  /** Initialize data before calculation
+  /** Initialize data before calculation.
+   * Called by StressSolver::solve.
    */
   void
   prepare_for_solve();
 
-  /** Assemble the system matrix and right-hand-side vector (multithreaded)
+  /** Assemble the system matrix and right-hand-side vector (multithreaded).
+   * Called by StressSolver::solve.
    */
   void
   assemble_system();
@@ -266,7 +268,8 @@ private:
   void
   copy_local_to_global(const AssemblyCopyData &copy_data);
 
-  /** Solve the system of linear equations
+  /** Solve the system of linear equations.
+   * Called by StressSolver::solve.
    */
   void
   solve_system();
@@ -290,30 +293,31 @@ private:
   calc_C_44(const double T) const;
 
   /** Recover strain at DOFs via extrapolation from quadrature points.
-   * Called by \c calculate_stress.
+   * Called by StressSolver::calculate_stress.
    */
   void
   recover_strain_extrapolation();
 
   /** Recover strain at DOFs via global projection.
-   * Called by \c calculate_stress.
+   * Called by StressSolver::calculate_stress.
    */
   void
   recover_strain_global();
 
-  /** Calculate stress from the displacement field
+  /** Calculate stress from the displacement field.
+   * Called by StressSolver::solve.
    */
   void
   calculate_stress();
 
   /** Helper function to calculate stress from strain.
-   * Called by \c calculate_stress.
+   * Called by StressSolver::calculate_stress.
    */
   void
   calculate_stress_from_strain();
 
   /** Helper function to calculate stress invariants.
-   * Called by \c calculate_stress.
+   * Called by StressSolver::calculate_stress.
    */
   void
   calculate_stress_invariants();
@@ -344,8 +348,7 @@ private:
              const std::vector<Tensor<1, dim>> &grad_displacement,
              Tensor<1, n_components> &          strain) const;
 
-  /** Helper method for creating output file name
-   *
+  /** Helper method for creating output file name.
    * @returns \c "-<dim>d-order<order>"
    */
   std::string
