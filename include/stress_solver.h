@@ -589,6 +589,11 @@ StressSolver<dim>::StressSolver(const unsigned int order,
                     Patterns::Integer(1),
                     "Precision of double variables for output of field data");
 
+  prm.declare_entry("Output subdivisions",
+                    "0",
+                    Patterns::Integer(0),
+                    "Number of cell subdivisions for vtk output (0: order)");
+
   if (use_default_prm)
     {
       std::ofstream of("stress.prm");
@@ -632,6 +637,11 @@ StressSolver<dim>::initialize_parameters()
   const auto n_threads = prm.get_integer("Number of threads");
   MultithreadInfo::set_thread_limit(n_threads > 0 ? n_threads :
                                                     MultithreadInfo::n_cores());
+
+  const long int n_vtk_default = get_degree();
+
+  if (prm.get_integer("Output subdivisions") == 0)
+    prm.set("Output subdivisions", n_vtk_default);
 
   std::cout << "  done\n";
 
@@ -925,7 +935,7 @@ StressSolver<dim>::output_vtk() const
   data_out.add_data_vector(stress_von_Mises, "stress_von_Mises");
   data_out.add_data_vector(stress_J_2, "stress_J_2");
 
-  data_out.build_patches(fe.degree);
+  data_out.build_patches(prm.get_integer("Output subdivisions"));
 
   std::ofstream output(file_name);
 

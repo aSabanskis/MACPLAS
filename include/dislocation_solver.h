@@ -707,6 +707,11 @@ DislocationSolver<dim>::DislocationSolver(const unsigned int order,
                     Patterns::Integer(1),
                     "Precision of double variables for output of field data");
 
+  prm.declare_entry("Output subdivisions",
+                    "0",
+                    Patterns::Integer(0),
+                    "Number of cell subdivisions for vtk output (0: order)");
+
   if (use_default_prm)
     {
       std::ofstream of("dislocation.prm");
@@ -1105,8 +1110,7 @@ DislocationSolver<dim>::output_vtk() const
 {
   Timer timer;
 
-  const DoFHandler<dim> &   dh = get_dof_handler();
-  const FiniteElement<dim> &fe = dh.get_fe();
+  const DoFHandler<dim> &dh = get_dof_handler();
 
   const std::string file_name =
     "result-dislocation" + output_name_suffix() + ".vtk";
@@ -1214,7 +1218,7 @@ DislocationSolver<dim>::output_vtk() const
         data_out.add_data_vector(it.second, it.first);
     }
 
-  data_out.build_patches(fe.degree);
+  data_out.build_patches(prm.get_integer("Output subdivisions"));
 
   std::ofstream output(file_name);
 
@@ -1418,6 +1422,11 @@ DislocationSolver<dim>::initialize_parameters()
   time_scheme = prm.get("Time scheme");
 
   get_time_step() = previous_time_step = prm.get_double("Time step");
+
+  const long int n_vtk_default = get_degree();
+
+  if (prm.get_integer("Output subdivisions") == 0)
+    prm.set("Output subdivisions", n_vtk_default);
 
   std::cout << "  done\n";
 
