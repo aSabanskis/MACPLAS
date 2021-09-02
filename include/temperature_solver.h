@@ -198,6 +198,11 @@ public:
   get_field_at_points(const Vector<double> &         source,
                       const std::vector<Point<dim>> &points) const;
 
+  /** Get finite element degree
+   */
+  unsigned int
+  get_degree() const;
+
   /** Get degrees of freedom for temperature
    */
   const DoFHandler<dim> &
@@ -680,7 +685,7 @@ TemperatureSolver<dim>::initialize_parameters()
 
   add_output("nNewton");
 
-  const long int n_q_default = fe.degree + 1;
+  const long int n_q_default = get_degree() + 1;
 
   if (prm.get_integer("Number of cell quadrature points") == 0)
     prm.set("Number of cell quadrature points", n_q_default);
@@ -938,6 +943,13 @@ TemperatureSolver<dim>::get_field_at_points(
     }
 
   return values;
+}
+
+template <int dim>
+unsigned int
+TemperatureSolver<dim>::get_degree() const
+{
+  return fe.degree;
 }
 
 template <int dim>
@@ -1321,7 +1333,7 @@ TemperatureSolver<dim>::output_name_suffix() const
 {
   std::stringstream ss;
   ss << std::setprecision(8);
-  ss << "-" << dim << "d-order" << fe.degree << "-t" << get_time();
+  ss << "-" << dim << "d-order" << get_degree() << "-t" << get_time();
   return ss.str();
 }
 

@@ -151,6 +151,11 @@ public:
   void
   get_support_points(std::vector<Point<dim>> &points) const;
 
+  /** Get finite element degree
+   */
+  unsigned int
+  get_degree() const;
+
   /** Get degrees of freedom for temperature
    */
   const DoFHandler<dim> &
@@ -800,6 +805,13 @@ StressSolver<dim>::set_bc1(const unsigned int id,
 }
 
 template <int dim>
+unsigned int
+StressSolver<dim>::get_degree() const
+{
+  return fe_temp.degree;
+}
+
+template <int dim>
 const DoFHandler<dim> &
 StressSolver<dim>::get_dof_handler() const
 {
@@ -1040,7 +1052,7 @@ StressSolver<dim>::assemble_system()
 
   std::cout << solver_name() << "  Assembling system";
 
-  const QGauss<dim> quadrature(fe.degree + 1);
+  const QGauss<dim> quadrature(get_degree() + 1);
 
   system_matrix = 0;
   system_rhs    = 0;
@@ -1290,7 +1302,7 @@ template <int dim>
 void
 StressSolver<dim>::recover_strain_extrapolation()
 {
-  const QGauss<dim> quadrature(fe.degree + 1);
+  const QGauss<dim> quadrature(get_degree() + 1);
 
   FEValues<dim> fe_values_temp(fe_temp, quadrature, update_default);
   FEValues<dim> fe_values(fe,
@@ -1388,7 +1400,7 @@ template <int dim>
 void
 StressSolver<dim>::recover_strain_global()
 {
-  const QGauss<dim> quadrature(fe.degree + 1);
+  const QGauss<dim> quadrature(get_degree() + 1);
 
   FEValues<dim> fe_values_temp(fe_temp, quadrature, update_values);
   FEValues<dim> fe_values(fe,
@@ -1724,7 +1736,7 @@ std::string
 StressSolver<dim>::output_name_suffix() const
 {
   std::stringstream ss;
-  ss << "-" << dim << "d-order" << fe.degree;
+  ss << "-" << dim << "d-order" << get_degree();
   return ss.str();
 }
 

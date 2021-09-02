@@ -154,7 +154,14 @@ public:
   get_field_at_points(const Vector<double> &         source,
                       const std::vector<Point<dim>> &points) const;
 
-  /** Get degrees of freedom for temperature
+  /** Get finite element degree.
+   * Calls \c StressSolver::get_degree
+   */
+  unsigned int
+  get_degree() const;
+
+  /** Get degrees of freedom for temperature.
+   * Calls \c StressSolver::get_dof_handler
    */
   const DoFHandler<dim> &
   get_dof_handler() const;
@@ -958,6 +965,13 @@ DislocationSolver<dim>::get_field_at_points(
     }
 
   return values;
+}
+
+template <int dim>
+unsigned int
+DislocationSolver<dim>::get_degree() const
+{
+  return stress_solver.get_degree();
 }
 
 template <int dim>
@@ -2304,8 +2318,7 @@ DislocationSolver<dim>::output_name_suffix() const
 {
   std::stringstream ss;
   ss << std::setprecision(8);
-  ss << "-" << dim << "d-order" << get_dof_handler().get_fe().degree << "-t"
-     << get_time();
+  ss << "-" << dim << "d-order" << get_degree() << "-t" << get_time();
   return ss.str();
 }
 
