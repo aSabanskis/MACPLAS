@@ -310,7 +310,7 @@ private:
    * Called by StressSolver::solve.
    */
   void
-  calculate_stress();
+  calculate_stress(const bool skip_recovery = false);
 
   /** Helper function to calculate stress from strain.
    * Called by StressSolver::calculate_stress.
@@ -670,12 +670,15 @@ template <int dim>
 void
 StressSolver<dim>::solve(const bool postprocess_only)
 {
-  if (!postprocess_only)
+  if (postprocess_only)
     {
-      prepare_for_solve();
-      assemble_system();
-      solve_system();
+      calculate_stress(true);
+      return;
     }
+
+  prepare_for_solve();
+  assemble_system();
+  solve_system();
   calculate_stress();
 }
 
@@ -1595,24 +1598,30 @@ StressSolver<dim>::calculate_stress_from_strain()
 
 template <int dim>
 void
-StressSolver<dim>::calculate_stress()
+StressSolver<dim>::calculate_stress(const bool skip_recovery)
 {
   Timer timer;
 
-  prm.enter_subsection("Stress recovery");
-  const std::string method = prm.get("Method");
-  prm.leave_subsection();
+  if (!skip_recovery)
+    {
+      prm.enter_subsection("Stress recovery");
+      const std::string method = prm.get("Method");
+      prm.leave_subsection();
 
-  std::cout << solver_name() << "  Postprocessing results (" << method << ")";
+      std::cout << solver_name() << "  Postprocessing results (" << method
+                << ")";
 
-  if (method == "extrapolation")
-    recover_strain_extrapolation();
-  else if (method == "global")
-    recover_strain_global();
+      if (method == "extrapolation")
+        recover_strain_extrapolation();
+      else if (method == "global")
+        recover_strain_global();
+      else
+        AssertThrow(false,
+                    ExcMessage("calculate_stress: stress recovery method '" +
+                               method + "' not supported."));
+    }
   else
-    AssertThrow(false,
-                ExcMessage("calculate_stress: stress recovery method '" +
-                           method + "' not supported."));
+    std::cout << solver_name() << "  Postprocessing results (w/o recovery)";
 
   calculate_stress_from_strain();
   calculate_stress_invariants();
