@@ -323,23 +323,29 @@ private:
    * \left\langle
    * S \sqrt{J_2} - D \sqrt{N_m} - \tau_\mathrm{crit}
    * \right\rangle\f$
+   * @param with_tau_crit enables \f$\tau_\mathrm{crit}\f$ term
    */
   double
-  tau_eff(const double N_m, const double J_2, const double T) const;
+  tau_eff(const double N_m,
+          const double J_2,
+          const double T,
+          const bool   with_tau_crit = true) const;
 
   /** Same as above, for \c vector arguments
    */
   std::vector<double>
   tau_eff(const std::vector<double> &N_m,
           const std::vector<double> &J_2,
-          const std::vector<double> &T) const;
+          const std::vector<double> &T,
+          const bool                 with_tau_crit = true) const;
 
   /** Same as above, for \c Vector arguments
    */
   Vector<double>
   tau_eff(const Vector<double> &N_m,
           const Vector<double> &J_2,
-          const Vector<double> &T) const;
+          const Vector<double> &T,
+          const bool            with_tau_crit = true) const;
 
   /** Calculate the partial derivative
    * \f$\partial \tau_\mathrm{eff} / \partial N_m\f$
@@ -514,6 +520,11 @@ private:
    */
   FunctionParser<1> m_tau_crit;
 
+  /** Swith that enables \f$\tau_\mathrm{crit}\f$ in \f$\tau_\mathrm{eff}^l\f$
+   * term of the time derivative of dislocation density \f$\dot{N_m}\f$
+   */
+  bool dot_N_m_with_tau_crit_l;
+
   /** Magnitude of Burgers vector \f$b\f$, m
    */
   double m_b;
@@ -591,6 +602,12 @@ DislocationSolver<dim>::DislocationSolver(const unsigned int order,
                     "0",
                     Patterns::Anything(),
                     "Critical stress tau_crit in Pa" + info_T);
+
+  prm.declare_entry("Include tau_crit for tau_eff^l",
+                    "true",
+                    Patterns::Bool(),
+                    "Enable tau_crit in tau_eff^l term "
+                    "of the dislocation density time derivative");
 
   prm.declare_entry("Material constant K",
                     "3.1e-4",
@@ -1423,6 +1440,8 @@ DislocationSolver<dim>::initialize_parameters()
   m_F   = prm.get_double("Average Taylor factor");
   m_k_B = prm.get_double("Boltzmann constant");
 
+  dot_N_m_with_tau_crit_l = prm.get_bool("Include tau_crit for tau_eff^l");
+
   time_scheme = prm.get("Time scheme");
 
   get_time_step() = previous_time_step = prm.get_double("Time step");
@@ -1869,10 +1888,11 @@ template <int dim>
 double
 DislocationSolver<dim>::tau_eff(const double N_m,
                                 const double J_2,
-                                const double T) const
+                                const double T,
+                                const bool   with_tau_crit) const
 {
   return std::max(m_S * std::sqrt(J_2) - calc_D(T) * std::sqrt(N_m) -
-                    calc_tau_crit(T),
+                    with_tau_crit * calc_tau_crit(T),
                   0.0);
 }
 
@@ -1880,14 +1900,15 @@ template <int dim>
 std::vector<double>
 DislocationSolver<dim>::tau_eff(const std::vector<double> &N_m,
                                 const std::vector<double> &J_2,
-                                const std::vector<double> &T) const
+                                const std::vector<double> &T,
+                                const bool                 with_tau_crit) const
 {
   const unsigned int N = N_m.size();
 
   std::vector<double> result(N);
 
   for (unsigned int i = 0; i < N; ++i)
-    result[i] = tau_eff(N_m[i], J_2[i], T[i]);
+    result[i] = tau_eff(N_m[i], J_2[i], T[i], with_tau_crit);
 
   return result;
 }
@@ -1896,14 +1917,15 @@ template <int dim>
 Vector<double>
 DislocationSolver<dim>::tau_eff(const Vector<double> &N_m,
                                 const Vector<double> &J_2,
-                                const Vector<double> &T) const
+                                const Vector<double> &T,
+                                const bool            with_tau_crit) const
 {
   const unsigned int N = N_m.size();
 
   Vector<double> result(N);
 
   for (unsigned int i = 0; i < N; ++i)
-    result[i] = tau_eff(N_m[i], J_2[i], T[i]);
+    result[i] = tau_eff(N_m[i], J_2[i], T[i], with_tau_crit);
 
   return result;
 }
@@ -1928,9 +1950,10 @@ DislocationSolver<dim>::derivative_N_m(const double N_m,
                                        const double J_2,
                                        const double T) const
 {
-  const double tau = tau_eff(N_m, J_2, T);
+  const double tau_p = tau_eff(N_m, J_2, T);
+  const double tau_l = tau_eff(N_m, J_2, T, dot_N_m_with_tau_crit_l);
 
-  return m_K * m_k_0 * std::pow(tau, m_p + m_l) *
+  return m_K * m_k_0 * std::pow(tau_p, m_p) * std::pow(tau_l, m_l) *
          std::exp(-calc_Q(T) / (m_k_B * T)) * N_m;
 }
 
@@ -1972,12 +1995,18 @@ DislocationSolver<dim>::derivative2_N_m_N_m(const double N_m,
                                             const double J_2,
                                             const double T) const
 {
-  const double tau = tau_eff(N_m, J_2, T);
+  const double tau_p = tau_eff(N_m, J_2, T);
+  const double tau_l = tau_eff(N_m, J_2, T, dot_N_m_with_tau_crit_l);
 
   return m_K * m_k_0 * std::exp(-calc_Q(T) / (m_k_B * T)) *
-         (std::pow(tau, m_p + m_l) - (m_p + m_l) *
-                                       std::pow(tau, m_p + m_l - 1) *
-                                       std::sqrt(N_m) * calc_D(T) / 2);
+         (                                                           //
+           std::pow(tau_p, m_p) * std::pow(tau_l, m_l) -             //
+           (                                                         //
+             m_p * std::pow(tau_p, m_p - 1) * std::pow(tau_l, m_l) + //
+             m_l * std::pow(tau_l, m_l - 1) * std::pow(tau_p, m_p)   //
+             ) *                                                     //
+             (std::sqrt(N_m) * calc_D(T) / 2)                        //
+         );
 }
 
 template <int dim>
