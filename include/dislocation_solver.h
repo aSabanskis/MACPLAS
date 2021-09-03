@@ -1727,6 +1727,9 @@ DislocationSolver<dim>::output_probes() const
           for (unsigned int j = 0; j < s.n_blocks(); ++j)
             output << "\tstress_" << j << "_" << i << "[Pa]";
 
+          for (unsigned int j = 0; j < S.n_blocks(); ++j)
+            output << "\tstress_deviator_" << j << "_" << i << "[Pa]";
+
           for (unsigned int j = 0; j < e_c.n_blocks(); ++j)
             output << "\tstrain_c_" << j << "_" << i << "[-]";
 
@@ -1817,6 +1820,9 @@ DislocationSolver<dim>::output_probes() const
 
       for (unsigned int j = 0; j < s.n_blocks(); ++j)
         output << '\t' << values_s[j][i];
+
+      for (unsigned int j = 0; j < S.n_blocks(); ++j)
+        output << '\t' << values_S[j][i];
 
       for (unsigned int j = 0; j < e_c.n_blocks(); ++j)
         output << '\t' << values_e_c[j][i];
