@@ -6,6 +6,7 @@
 #include <fstream>
 
 #include "../../include/temperature_solver.h"
+#include "../../include/utilities.h"
 
 using namespace dealii;
 
@@ -69,7 +70,11 @@ Problem<dim>::make_grid()
 
   const auto bounds = triangulation.get_boundary_ids();
   for (const auto &b : bounds)
-    std::cout << "Boundary no. " << (int)b << "\n";
+    {
+      const auto &points = get_boundary_points(triangulation, b);
+      std::cout << "Boundary No. " << (int)b << " : " << points.size()
+                << " points\n";
+    }
 }
 
 template <int dim>

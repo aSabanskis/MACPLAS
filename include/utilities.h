@@ -84,6 +84,13 @@ template <typename T>
 inline void
 read_data(T &data, const std::string &file_name);
 
+/** Extract mesh points with a specified boundary id
+ */
+template <int dim>
+inline std::map<unsigned int, Point<dim>>
+get_boundary_points(const Triangulation<dim> &mesh,
+                    const unsigned int        boundary_id);
+
 /** Write coordinates and field values at quadrature points to disk
  */
 template <int dim>
@@ -551,6 +558,35 @@ read_data(T &data, const std::string &file_name)
     {
       std::cout << e.what() << "\n";
     }
+}
+
+template <int dim>
+std::map<unsigned int, Point<dim>>
+get_boundary_points(const Triangulation<dim> &mesh,
+                    const unsigned int        boundary_id)
+{
+  std::map<unsigned int, Point<dim>> points;
+
+  typename Triangulation<dim>::active_cell_iterator cell = mesh.begin_active(),
+                                                    endc = mesh.end();
+
+  for (; cell != endc; ++cell)
+    {
+      for (unsigned int i = 0; i < GeometryInfo<dim>::faces_per_cell; ++i)
+        {
+          const auto &face = cell->face(i);
+
+          if (face->at_boundary() && face->boundary_id() == boundary_id)
+            {
+              for (unsigned int j = 0; j < GeometryInfo<dim>::vertices_per_face;
+                   ++j)
+                {
+                  points[face->vertex_index(j)] = face->vertex(j);
+                }
+            }
+        }
+    }
+  return points;
 }
 
 template <int dim>
