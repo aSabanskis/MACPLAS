@@ -24,11 +24,21 @@ private:
   make_grid();
 
   void
+  deform_grid();
+
+  void
   initialize_temperature();
 
   TemperatureSolver<dim> temperature_solver;
 
   Triangulation<dim> triangulation;
+
+  // crystallization interface
+  constexpr static unsigned int boundary_id_interface = 0;
+  // crystal side surface
+  constexpr static unsigned int boundary_id_surface = 1;
+  // crystal axis
+  constexpr static unsigned int boundary_id_axis = 2;
 
   ParameterHandler prm;
 };
@@ -50,7 +60,18 @@ Problem<dim>::run()
   make_grid();
   initialize_temperature();
 
-  temperature_solver.output_vtk();
+  // proof of concept
+  while (true)
+    {
+      deform_grid();
+
+      bool keep_going_temp = temperature_solver.solve();
+
+      temperature_solver.output_vtk();
+
+      if (!keep_going_temp)
+        break;
+    };
 }
 
 template <int dim>
@@ -79,6 +100,26 @@ Problem<dim>::make_grid()
 
 template <int dim>
 void
+Problem<dim>::deform_grid()
+{
+  const unsigned int id = boundary_id_interface;
+
+  auto boundary_points = get_boundary_points(triangulation, id);
+
+  for (auto &it : boundary_points)
+    {
+      // TODO: remove hardcoded values
+      it.second += Point<dim>(0, -1e-4);
+    }
+
+  update_boundary_points(triangulation, boundary_points);
+
+  temperature_solver.get_mesh().clear();
+  temperature_solver.get_mesh().copy_triangulation(triangulation);
+}
+
+template <int dim>
+void
 Problem<dim>::initialize_temperature()
 {
   temperature_solver.initialize(); // sets T=0
@@ -88,6 +129,8 @@ Problem<dim>::initialize_temperature()
 
   temperature_solver.output_mesh();
   temperature_solver.output_parameter_table();
+
+  temperature_solver.output_vtk();
 }
 
 int

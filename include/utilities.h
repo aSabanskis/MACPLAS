@@ -91,6 +91,13 @@ inline std::map<unsigned int, Point<dim>>
 get_boundary_points(const Triangulation<dim> &mesh,
                     const unsigned int        boundary_id);
 
+/** Update mesh boundary points
+ */
+template <int dim>
+inline void
+update_boundary_points(const Triangulation<dim> &                mesh,
+                       const std::map<unsigned int, Point<dim>> &new_points);
+
 /** Write coordinates and field values at quadrature points to disk
  */
 template <int dim>
@@ -587,6 +594,36 @@ get_boundary_points(const Triangulation<dim> &mesh,
         }
     }
   return points;
+}
+
+template <int dim>
+void
+update_boundary_points(const Triangulation<dim> &                mesh,
+                       const std::map<unsigned int, Point<dim>> &new_points)
+{
+  typename Triangulation<dim>::active_cell_iterator cell = mesh.begin_active(),
+                                                    endc = mesh.end();
+
+  for (; cell != endc; ++cell)
+    {
+      for (unsigned int i = 0; i < GeometryInfo<dim>::faces_per_cell; ++i)
+        {
+          const auto &face = cell->face(i);
+
+          if (face->at_boundary())
+            {
+              for (unsigned int j = 0; j < GeometryInfo<dim>::vertices_per_face;
+                   ++j)
+                {
+                  const unsigned int k  = face->vertex_index(j);
+                  const auto         it = new_points.find(k);
+
+                  if (it != new_points.end())
+                    face->vertex(j) = it->second;
+                }
+            }
+        }
+    }
 }
 
 template <int dim>
