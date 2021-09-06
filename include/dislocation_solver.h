@@ -191,6 +191,16 @@ public:
   double &
   get_time_step();
 
+  /** Minimum time step \f$\Delta t_\min\f$, s
+   */
+  double
+  get_time_step_min() const;
+
+  /** Maximum time step \f$\Delta t_\max\f$, s
+   */
+  double
+  get_time_step_max() const;
+
   /** Final time, s
    */
   double
@@ -259,16 +269,6 @@ private:
    */
   void
   initialize_dt_output();
-
-  /** Minimum time step \f$\Delta t_\min\f$, s
-   */
-  double
-  get_time_step_min() const;
-
-  /** Maximum time step \f$\Delta t_\max\f$, s
-   */
-  double
-  get_time_step_max() const;
 
   /** Number of time substeps, 1 (no substeps) or more
    */

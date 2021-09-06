@@ -33,10 +33,18 @@ private:
   void
   interpolate_q_em(const double z);
 
+  /** Reduces the current time step when the inductor position starts to change
+   */
+  void
+  update_dz_ind_time_step();
+
   /** Checks whether the results need to be outputted at the end of the current
    * time step, and adjusts it if necessary */
   bool
   update_output_time_step(const unsigned int time_step_index = 0);
+
+  void
+  set_time_step(const double dt);
 
   void
   solve_steady_temperature();
@@ -321,6 +329,58 @@ Problem<dim>::run()
 }
 
 template <int dim>
+void
+Problem<dim>::update_dz_ind_time_step()
+{
+  const double dt_min = dislocation_solver.get_time_step_min();
+
+  if (!with_dislocation() || dt_min == 0)
+    return;
+
+  const double t  = dislocation_solver.get_time();
+  const double dt = dislocation_solver.get_time_step();
+
+  const double z0 = inductor_position->value(Point<1>(t - dt));
+  const double z1 = inductor_position->value(Point<1>(t));
+  const double z2 = inductor_position->value(Point<1>(t + dt));
+
+  const bool was_const   = std::abs(z1 - z0) < 1e-12;
+  const bool is_changing = std::abs(z2 - z1) > 1e-12;
+
+  if (was_const && is_changing)
+    {
+      // bisection method to find the time when z actually starts to change
+      double dt_a = dt_min;
+      double dt_b = dt;
+
+      double z_a = inductor_position->value(Point<1>(t + dt_a));
+      double z_b = z2;
+
+      while (dt_b - dt_a > dt_min / 2)
+        {
+          const double dt_c = (dt_a + dt_b) / 2;
+          const double z_c  = inductor_position->value(Point<1>(t + dt_c));
+          if (std::abs(z_c - z_a) < 1e-12)
+            {
+              dt_a = dt_c;
+              z_a  = z_c;
+            }
+          else
+            {
+              dt_b = dt_c;
+              z_b  = z_c;
+            }
+        }
+
+      set_time_step(dt_a);
+
+      std::cout << "dt changed from " << dt << " to "
+                << temperature_solver.get_time_step()
+                << " s due to inductor position change\n";
+    }
+}
+
+template <int dim>
 bool
 Problem<dim>::update_output_time_step(const unsigned int time_step_index)
 {
@@ -346,9 +406,7 @@ Problem<dim>::update_output_time_step(const unsigned int time_step_index)
     }
 
   // output time is specified and the time step has to be adjusted
-
-  dislocation_solver.get_time_step() = temperature_solver.get_time_step() =
-    next_output_time - t;
+  set_time_step(next_output_time - t);
 
   std::cout << "dt changed from " << dt << " to "
             << temperature_solver.get_time_step()
@@ -357,6 +415,14 @@ Problem<dim>::update_output_time_step(const unsigned int time_step_index)
   next_output_time += dt_output;
 
   return true;
+}
+
+template <int dim>
+void
+Problem<dim>::set_time_step(const double dt)
+{
+  temperature_solver.get_time_step() = dt;
+  dislocation_solver.get_time_step() = dt;
 }
 
 template <int dim>
@@ -449,9 +515,11 @@ Problem<dim>::solve_temperature_dislocation()
 
   for (unsigned int i = 1;; ++i)
     {
+      update_dz_ind_time_step();
+
       const bool output_enabled = update_output_time_step(i);
 
-      temperature_solver.get_time_step() = dislocation_solver.get_time_step();
+      set_time_step(dislocation_solver.get_time_step());
 
       const int n_outer = prm.get_integer("Outer temperature iterations");
 
@@ -478,8 +546,7 @@ Problem<dim>::solve_temperature_dislocation()
           output_results(false);
 
           std::cout << "Restoring previous dt=" << previous_time_step << "s\n";
-          dislocation_solver.get_time_step() =
-            temperature_solver.get_time_step() = previous_time_step;
+          set_time_step(previous_time_step);
         }
     };
 
@@ -518,8 +585,7 @@ Problem<dim>::solve_temperature()
           output_results(false);
 
           std::cout << "Restoring previous dt=" << previous_time_step << "s\n";
-          dislocation_solver.get_time_step() =
-            temperature_solver.get_time_step() = previous_time_step;
+          set_time_step(previous_time_step);
         }
     };
 
