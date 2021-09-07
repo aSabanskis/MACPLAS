@@ -584,6 +584,11 @@ StressSolver<dim>::StressSolver(const unsigned int order,
                     Patterns::Bool(),
                     "Report final achieved convergence of linear solver");
 
+  prm.declare_entry("Number of cell quadrature points",
+                    "0",
+                    Patterns::Integer(0),
+                    "Number of QGauss<dim> quadrature points (0: order+1)");
+
   prm.declare_entry("Number of threads",
                     "0",
                     Patterns::Integer(0),
@@ -643,6 +648,11 @@ StressSolver<dim>::initialize_parameters()
   MultithreadInfo::set_thread_limit(n_threads > 0 ? n_threads :
                                                     MultithreadInfo::n_cores());
 
+  const long int n_q_default = get_degree() + 1;
+
+  if (prm.get_integer("Number of cell quadrature points") == 0)
+    prm.set("Number of cell quadrature points", n_q_default);
+
   const long int n_vtk_default = get_degree();
 
   if (prm.get_integer("Output subdivisions") == 0)
@@ -654,6 +664,9 @@ StressSolver<dim>::initialize_parameters()
             << "alpha=" << m_alpha_expression << "\n"
             << "nu=" << m_nu << "\n"
             << "T_ref=" << m_T_ref << "\n";
+
+  std::cout << "n_q_cell=" << prm.get("Number of cell quadrature points")
+            << "\n";
 
   std::cout << "n_cores=" << MultithreadInfo::n_cores() << "\n"
             << "n_threads=" << MultithreadInfo::n_threads() << "\n";
@@ -1073,7 +1086,8 @@ StressSolver<dim>::assemble_system()
 
   std::cout << solver_name() << "  Assembling system";
 
-  const QGauss<dim> quadrature(get_degree() + 1);
+  const QGauss<dim> quadrature(
+    prm.get_integer("Number of cell quadrature points"));
 
   system_matrix = 0;
   system_rhs    = 0;
@@ -1323,7 +1337,8 @@ template <int dim>
 void
 StressSolver<dim>::recover_strain_extrapolation()
 {
-  const QGauss<dim> quadrature(get_degree() + 1);
+  const QGauss<dim> quadrature(
+    prm.get_integer("Number of cell quadrature points"));
 
   FEValues<dim> fe_values_temp(fe_temp, quadrature, update_default);
   FEValues<dim> fe_values(fe,
@@ -1421,7 +1436,8 @@ template <int dim>
 void
 StressSolver<dim>::recover_strain_global()
 {
-  const QGauss<dim> quadrature(get_degree() + 1);
+  const QGauss<dim> quadrature(
+    prm.get_integer("Number of cell quadrature points"));
 
   FEValues<dim> fe_values_temp(fe_temp, quadrature, update_values);
   FEValues<dim> fe_values(fe,
