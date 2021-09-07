@@ -36,5 +36,14 @@ initialize(){
 setup_parameters(){
     sed -Ei "s|(set Use LF EM field *= *).*|\1 false|" problem.prm
 
+    sed -Ei "s|(set Number of threads *= *).*|\1 0|" stress.prm
+    sed -Ei "s|(set Number of threads *= *).*|\1 0|" temperature.prm
+
+    sed -Ei "s|(set Number of cell quadrature points *= *).*|\1 0|" stress
+    sed -Ei "s|(set Number of cell quadrature points *= *).*|\1 0|" temperature.prm
+    sed -Ei "s|(set Number of face quadrature points *= *).*|\1 0|" temperature.prm
+
     # custom code can be added
+    # sed -Ei "s|(set Inductor current *= *).*|\1 I.txt|" problem.prm
+    # sed -Ei "s|(set Inductor position *= *).*|\1 z.txt|" problem.prm
 }

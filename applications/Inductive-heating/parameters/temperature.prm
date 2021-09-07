@@ -10,6 +10,7 @@ set Number of cell quadrature points = 0
 set Number of face quadrature points = 0
 set Number of threads         = 0
 set Output precision          = 8
+set Output subdivisions       = 0
 set Preconditioner relaxation = 1.0
 set Preconditioner type       = jacobi
 set Specific heat capacity    = 1000
