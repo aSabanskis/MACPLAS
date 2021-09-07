@@ -47,6 +47,7 @@ public:
   /** Advance time and calculate the dislocation density and creep strain.
    * Calls DislocationSolver::advance_time unless \c stress_only is enabled,
    * then only the stress is calculated.
+   * @returns \c true if the final time has not been reached and simulation has converged
    */
   bool
   solve(const bool stress_only = false);
@@ -453,7 +454,8 @@ private:
   void
   integrate_implicit();
 
-  /** Check if DislocationSolver::solve produced finite values at all DOFs
+  /** Check if DislocationSolver::solve and StressSolver::solve produced finite
+   * values at all DOFs
    */
   bool
   has_converged() const;
@@ -773,8 +775,11 @@ DislocationSolver<dim>::solve(const bool stress_only)
       stress_solver.solve();
       update_time_step();
       output_probes();
-      return true;
+      return has_converged();
     }
+
+  if (!stress_solver.has_converged())
+    return false;
 
   advance_time();
   const double dt    = get_time_step();
@@ -816,7 +821,6 @@ DislocationSolver<dim>::solve(const bool stress_only)
       get_dislocation_density() = N_m;
       ss.get_displacement()     = displacement;
       ss.get_strain_c()         = strain_c;
-      ss.solve();
       return false;
     }
 
@@ -2359,6 +2363,9 @@ template <int dim>
 bool
 DislocationSolver<dim>::has_converged() const
 {
+  if (!stress_solver.has_converged())
+    return false;
+
   for (const auto &n : get_dislocation_density())
     {
       if (!std::isfinite(n))

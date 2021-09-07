@@ -64,6 +64,11 @@ public:
   void
   solve(const bool postprocess_only = false);
 
+  /** Check if the simulation has converged
+   */
+  bool
+  has_converged() const;
+
   /** Get mesh
    */
   const Triangulation<dim> &
@@ -426,6 +431,10 @@ private:
    */
   BlockVector<double> system_rhs;
 
+  /** Flag for checking simulation success
+   */
+  bool converged;
+
   /** Data for first-type BC
    */
   std::map<unsigned int, std::pair<unsigned int, double>> bc1_data;
@@ -462,6 +471,7 @@ StressSolver<dim>::StressSolver(const unsigned int order,
   , dh_temp(triangulation)
   , fe(FE_Q<dim>(order), dim)
   , dh(triangulation)
+  , converged(false)
 {
   std::cout << "Creating stress solver, order=" << order << ", dim=" << dim
             << " ("
@@ -683,6 +693,8 @@ template <int dim>
 void
 StressSolver<dim>::solve(const bool postprocess_only)
 {
+  converged = true;
+
   if (postprocess_only)
     {
       calculate_stress(true);
@@ -691,8 +703,29 @@ StressSolver<dim>::solve(const bool postprocess_only)
 
   prepare_for_solve();
   assemble_system();
-  solve_system();
+  try
+    {
+      solve_system();
+    }
+  catch (std::exception &e)
+    {
+      std::cout << '\n'
+                << solver_name()
+                << "  Error occured, outputting all data for diagnosis."
+                << e.what();
+      converged = false;
+      output_mesh();
+      output_data();
+      output_vtk();
+    }
   calculate_stress();
+}
+
+template <int dim>
+bool
+StressSolver<dim>::has_converged() const
+{
+  return converged;
 }
 
 template <int dim>
