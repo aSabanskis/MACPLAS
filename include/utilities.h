@@ -211,7 +211,7 @@ private:
 
 
 /** Class for interpolation of 3D surface fields from external data.
- * Used for interpolation of boundary conditions between different meshes.
+ * Used for interpolation of boundary conditions to the simulation mesh.
  * The source cell or point data are defined on a triangulated surface.
  */
 class SurfaceInterpolator3D
@@ -263,7 +263,7 @@ public:
               const std::vector<bool> &          markers,
               Vector<double> &                   target_values) const;
 
-  /** Convert between cell and point fields
+  /** Convert between cell and point fields.
    * If target_name is not specified it is set to source_name.
    */
   inline void
@@ -348,7 +348,7 @@ DeclException1(ExcInterpolationFailed,
                << "Interpolation at point " << arg1 << " failed.");
 
 /** Class for interpolation of 2D surface fields from external data.
- * Used for interpolation of boundary conditions between different meshes.
+ * Used for interpolation of boundary conditions to the simulation mesh.
  * The source point data are defined on a polyline.
  */
 class SurfaceInterpolator2D

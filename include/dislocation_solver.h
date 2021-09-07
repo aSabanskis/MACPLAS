@@ -52,22 +52,26 @@ public:
   bool
   solve(const bool stress_only = false);
 
-  /** Get mesh
+  /** Get mesh.
+   * Calls StressSolver::get_mesh
    */
   const Triangulation<dim> &
   get_mesh() const;
 
-  /** Get mesh
+  /** Get mesh.
+   * Calls StressSolver::get_mesh
    */
   Triangulation<dim> &
   get_mesh();
 
-  /** Get temperature \f$T\f$, K
+  /** Get temperature \f$T\f$, K.
+   * Calls StressSolver::get_temperature
    */
   const Vector<double> &
   get_temperature() const;
 
-  /** Get temperature \f$T\f$, K
+  /** Get temperature \f$T\f$, K.
+   * Calls StressSolver::get_temperature
    */
   Vector<double> &
   get_temperature();
@@ -207,7 +211,8 @@ public:
   double
   get_max_time() const;
 
-  /** Initialize DOF handler and fields
+  /** Initialize DOF handler and fields.
+   * Calls StressSolver::initialize
    */
   void
   initialize();
@@ -237,7 +242,8 @@ public:
   void
   output_data() const;
 
-  /** Save results to disk in \c vtk format
+  /** Save results to disk in \c vtk format.
+   * Does not call StressSolver::output_vtk but directly reuses stress fields.
    */
   void
   output_vtk() const;
@@ -468,7 +474,7 @@ private:
 
   /** Stress solver.
    * To avoid redundancy, the mesh, finite element, DOF handler, as well as
-   * temperature and creep strain fields are stored in StressSolver
+   * the temperature and creep strain fields are stored in StressSolver.
    */
   StressSolver<dim> stress_solver;
 
