@@ -377,10 +377,12 @@ Problem<dim>::update_dz_ind_time_step()
       double dt_b = dt;
 
       double z_a = inductor_position->value(Point<1>(t + dt_a));
-      double z_b = z2;
+
+      unsigned int i = 0;
 
       while (dt_b - dt_a > dt_min / 2)
         {
+          ++i;
           const double dt_c = (dt_a + dt_b) / 2;
           const double z_c  = inductor_position->value(Point<1>(t + dt_c));
           if (std::abs(z_c - z_a) < 1e-12)
@@ -391,7 +393,6 @@ Problem<dim>::update_dz_ind_time_step()
           else
             {
               dt_b = dt_c;
-              z_b  = z_c;
             }
         }
 
@@ -399,7 +400,8 @@ Problem<dim>::update_dz_ind_time_step()
 
       std::cout << "dt changed from " << dt << " to "
                 << temperature_solver.get_time_step()
-                << " s due to inductor position change\n";
+                << " s due to inductor position change"
+                << " (" << i << " iterations)\n";
     }
 }
 
