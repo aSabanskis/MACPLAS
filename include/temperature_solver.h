@@ -652,7 +652,6 @@ TemperatureSolver<dim>::TemperatureSolver(const unsigned int order,
         std::ofstream of("temperature-default.prm");
         prm.print_parameters(of, ParameterHandler::Text);
       }
-  prm.print_parameters(std::cout, ParameterHandler::Text);
 
   initialize_parameters();
 }

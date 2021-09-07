@@ -269,7 +269,30 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
         std::ofstream of("problem-default.prm");
         prm.print_parameters(of, ParameterHandler::Text);
       }
+
+  // print all problem-specific and solver parameters
+  std::cout << "# ---------------------\n"
+            << "# Problem\n";
   prm.print_parameters(std::cout, ParameterHandler::Text);
+
+  std::cout << "# ---------------------\n"
+            << "# " << temperature_solver.solver_name() << '\n';
+  temperature_solver.get_parameters().print_parameters(std::cout,
+                                                       ParameterHandler::Text);
+
+  if (with_dislocation())
+    {
+      std::cout << "# ---------------------\n"
+                << "# " << dislocation_solver.solver_name() << '\n';
+      dislocation_solver.get_parameters().print_parameters(
+        std::cout, ParameterHandler::Text);
+
+      std::cout << "# ---------------------\n"
+                << "# " << dislocation_solver.get_stress_solver().solver_name()
+                << '\n';
+      dislocation_solver.get_stress_solver().get_parameters().print_parameters(
+        std::cout, ParameterHandler::Text);
+    }
 
   initialize_function(inductor_position, prm.get("Inductor position"));
 

@@ -211,6 +211,16 @@ public:
   double
   get_max_time() const;
 
+  /** Get parameters DislocationSolver::prm
+   */
+  const ParameterHandler &
+  get_parameters() const;
+
+  /** Get parameters DislocationSolver::prm
+   */
+  ParameterHandler &
+  get_parameters();
+
   /** Initialize DOF handler and fields.
    * Calls StressSolver::initialize
    */
@@ -758,7 +768,6 @@ DislocationSolver<dim>::DislocationSolver(const unsigned int order,
         std::ofstream of("dislocation-default.prm");
         prm.print_parameters(of, ParameterHandler::Text);
       }
-  prm.print_parameters(std::cout, ParameterHandler::Text);
 
   initialize_parameters();
   initialize_dt_output();
@@ -1057,6 +1066,20 @@ double
 DislocationSolver<dim>::get_max_time() const
 {
   return prm.get_double("Max time");
+}
+
+template <int dim>
+const ParameterHandler &
+DislocationSolver<dim>::get_parameters() const
+{
+  return prm;
+}
+
+template <int dim>
+ParameterHandler &
+DislocationSolver<dim>::get_parameters()
+{
+  return prm;
 }
 
 template <int dim>

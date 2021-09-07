@@ -148,6 +148,16 @@ public:
   double
   calc_alpha(const double T) const;
 
+  /** Get parameters StressSolver::prm
+   */
+  const ParameterHandler &
+  get_parameters() const;
+
+  /** Get parameters StressSolver::prm
+   */
+  ParameterHandler &
+  get_parameters();
+
   /** Initialize DOF handler and fields
    */
   void
@@ -631,7 +641,6 @@ StressSolver<dim>::StressSolver(const unsigned int order,
         std::ofstream of("stress-default.prm");
         prm.print_parameters(of, ParameterHandler::Text);
       }
-  prm.print_parameters(std::cout, ParameterHandler::Text);
 
   initialize_parameters();
 }
@@ -817,6 +826,20 @@ BlockVector<double> &
 StressSolver<dim>::get_strain_c()
 {
   return strain_c;
+}
+
+template <int dim>
+const ParameterHandler &
+StressSolver<dim>::get_parameters() const
+{
+  return prm;
+}
+
+template <int dim>
+ParameterHandler &
+StressSolver<dim>::get_parameters()
+{
+  return prm;
 }
 
 template <int dim>
