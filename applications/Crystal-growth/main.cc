@@ -1,6 +1,7 @@
 #include <deal.II/base/logstream.h>
 
 #include <deal.II/grid/grid_in.h>
+#include <deal.II/grid/grid_tools.h>
 #include <deal.II/grid/tria.h>
 
 #include <fstream>
@@ -102,17 +103,21 @@ template <int dim>
 void
 Problem<dim>::deform_grid()
 {
-  const unsigned int id = boundary_id_interface;
+  const auto points_axis = get_boundary_points(triangulation, boundary_id_axis);
+  const auto points_interface =
+    get_boundary_points(triangulation, boundary_id_interface);
 
-  auto boundary_points = get_boundary_points(triangulation, id);
+  auto points_new = points_axis;
 
-  for (auto &it : boundary_points)
+  for (const auto &it : points_interface)
     {
       // TODO: remove hardcoded values
-      it.second += Point<dim>(0, -1e-4);
+      points_new[it.first] = it.second + Point<dim>(0, -1e-3);
     }
 
-  update_boundary_points(triangulation, boundary_points);
+  // update_boundary_points(triangulation, points_new);
+
+  GridTools::laplace_transform(points_new, triangulation);
 
   temperature_solver.get_mesh().clear();
   temperature_solver.get_mesh().copy_triangulation(triangulation);
