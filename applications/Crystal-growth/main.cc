@@ -109,10 +109,17 @@ Problem<dim>::deform_grid()
 
   auto points_new = points_axis;
 
+  auto shift_point = [](const Point<dim> &p) {
+    Point<dim> p_new = p;
+    // TODO: remove hardcoded values
+    p_new[0] += 1e-3 * std::sin(p[0] * 200);
+    p_new[dim - 1] += -1e-3 * std::cos(p[0] * 50);
+    return p_new;
+  };
+
   for (const auto &it : points_interface)
     {
-      // TODO: remove hardcoded values
-      points_new[it.first] = it.second + Point<dim>(0, -1e-3);
+      points_new[it.first] = shift_point(it.second);
     }
 
   // update_boundary_points(triangulation, points_new);
