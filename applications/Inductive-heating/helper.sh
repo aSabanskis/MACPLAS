@@ -30,16 +30,22 @@ initialize(){
         order=$2
     fi
 
+    # Number of threads (0: automatic)
+    threads=0
+    if [[ "$#" -ge 3 ]]; then
+        threads=$3
+    fi
+
     probes=probes-temperature-${dim}d.txt
 }
 
 setup_parameters(){
     sed -Ei "s|(set Use LF EM field *= *).*|\1 false|" problem.prm
 
-    sed -Ei "s|(set Number of threads *= *).*|\1 0|" stress.prm
-    sed -Ei "s|(set Number of threads *= *).*|\1 0|" temperature.prm
+    sed -Ei "s|(set Number of threads *= *).*|\1 $threads|" stress.prm
+    sed -Ei "s|(set Number of threads *= *).*|\1 $threads|" temperature.prm
 
-    sed -Ei "s|(set Number of cell quadrature points *= *).*|\1 0|" stress
+    sed -Ei "s|(set Number of cell quadrature points *= *).*|\1 0|" stress.prm
     sed -Ei "s|(set Number of cell quadrature points *= *).*|\1 0|" temperature.prm
     sed -Ei "s|(set Number of face quadrature points *= *).*|\1 0|" temperature.prm
 

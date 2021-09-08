@@ -2,8 +2,8 @@
 
 source ./helper.sh
 
-# dim, order
-initialize
+# dim, order, threads
+initialize # 2 2 0
 
 r=results-transient
 

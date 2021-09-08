@@ -2,6 +2,9 @@
 
 source ./helper.sh
 
+# dim, order, threads
+initialize # 2 2 0
+
 clean_results
 
 cp parameters/*.prm .
@@ -16,9 +19,6 @@ sed -Ei "s|(set Inductor position *= *).*|\1 $z0|" problem.prm
 sed -Ei "s|(set Reference inductor position *= *).*|\1 $z0|" problem.prm
 sed -Ei "s|(set Probe coordinates x *= *).*|\1 0.01, 0.01|" problem.prm
 sed -Ei "s|(set Probe coordinates z *= *).*|\1 $z0, 0.26305|" problem.prm
-
-# dim, order
-initialize
 
 # Inductor currents, A
 arr_I=(30 35 40 45 50 55 60 65 70 75 80 85 90 95 100 105 110 115 120)
