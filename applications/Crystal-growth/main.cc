@@ -4,6 +4,7 @@
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/grid/tria.h>
 
+#include <algorithm>
 #include <fstream>
 
 #include "../../include/temperature_solver.h"
@@ -40,6 +41,8 @@ private:
   constexpr static unsigned int boundary_id_surface = 1;
   // crystal axis
   constexpr static unsigned int boundary_id_axis = 2;
+
+  unsigned int point_id_axis_z_min, point_id_axis_z_max, point_id_triple;
 
   ParameterHandler prm;
 };
@@ -93,21 +96,49 @@ Problem<dim>::make_grid()
   const auto bounds = triangulation.get_boundary_ids();
   for (const auto &b : bounds)
     {
-      const auto &points = get_boundary_points(triangulation, b);
+      const auto points = get_boundary_points(triangulation, b);
       std::cout << "Boundary No. " << (int)b << " : " << points.size()
                 << " points\n";
     }
+
+  // preprocess some point indices
+  auto cmp_z = [](const auto &it1, const auto &it2) {
+    return it1.second[dim - 1] < it2.second[dim - 1];
+  };
+
+  const auto points_axis = get_boundary_points(triangulation, boundary_id_axis),
+             points_surface =
+               get_boundary_points(triangulation, boundary_id_surface);
+  AssertThrow(!points_axis.empty(),
+              ExcMessage("No points on boundary No. " +
+                         std::to_string(boundary_id_axis) + " (axis) found"));
+  AssertThrow(!points_surface.empty(),
+              ExcMessage("No points on boundary No. " +
+                         std::to_string(boundary_id_surface) +
+                         " (side surface) found"));
+
+  point_id_axis_z_min =
+    std::min_element(points_axis.begin(), points_axis.end(), cmp_z)->first;
+  point_id_axis_z_max =
+    std::max_element(points_axis.begin(), points_axis.end(), cmp_z)->first;
+  point_id_triple =
+    std::min_element(points_surface.begin(), points_surface.end(), cmp_z)
+      ->first;
+
+  std::cout << "Axis lowest point = " << point_id_axis_z_min << '\n'
+            << "Axis highest point = " << point_id_axis_z_max << '\n'
+            << "Triple point = " << point_id_triple << '\n';
 }
 
 template <int dim>
 void
 Problem<dim>::deform_grid()
 {
-  const auto points_axis = get_boundary_points(triangulation, boundary_id_axis);
-  const auto points_interface =
-    get_boundary_points(triangulation, boundary_id_interface);
-
-  auto points_new = points_axis;
+  const auto points_axis = get_boundary_points(triangulation, boundary_id_axis),
+             points_surface =
+               get_boundary_points(triangulation, boundary_id_surface),
+             points_interface =
+               get_boundary_points(triangulation, boundary_id_interface);
 
   auto shift_point = [](const Point<dim> &p) {
     Point<dim> p_new = p;
@@ -116,6 +147,21 @@ Problem<dim>::deform_grid()
     p_new[dim - 1] += -1e-3 * std::cos(p[0] * 50);
     return p_new;
   };
+
+  const Point<dim> p1 = points_axis.at(point_id_axis_z_min),
+                   p2 = points_axis.at(point_id_axis_z_max);
+  const auto dp       = shift_point(p1) - p1;
+
+  auto points_new = points_axis;
+  for (auto &it : points_new)
+    {
+      it.second += dp * (it.second - p2).norm() / (p2 - p1).norm();
+    }
+
+  for (const auto &it : points_surface)
+    {
+      points_new[it.first] = it.second;
+    }
 
   for (const auto &it : points_interface)
     {
