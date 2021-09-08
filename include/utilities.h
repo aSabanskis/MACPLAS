@@ -364,6 +364,16 @@ public:
   inline void
   read_txt(const std::string &file_name);
 
+  /** Set mesh
+   */
+  inline void
+  set_points(const std::vector<Point<dim>> &new_points);
+
+  /** Get mesh
+   */
+  inline const std::vector<Point<dim>> &
+  get_points() const;
+
   /** Interpolate field to the specified points
    */
   inline void
@@ -379,6 +389,11 @@ public:
               const std::vector<Point<dim + 1>> &target_points,
               const std::vector<bool> &          markers,
               Vector<double> &                   target_values) const;
+
+  /** Project a specific point onto the mesh
+   */
+  inline Point<dim>
+  project(const Point<dim> &p) const;
 
 private:
   /** Points \c (x,y)
@@ -1555,6 +1570,20 @@ SurfaceInterpolator2D::read_txt(const std::string &file_name)
 }
 
 void
+SurfaceInterpolator2D::set_points(const std::vector<Point<dim>> &new_points)
+{
+  clear();
+  points = new_points;
+  info();
+}
+
+const std::vector<Point<SurfaceInterpolator2D::dim>> &
+SurfaceInterpolator2D::get_points() const
+{
+  return points;
+}
+
+void
 SurfaceInterpolator2D::interpolate(const std::string &            field_name,
                                    const std::vector<Point<dim>> &target_points,
                                    const std::vector<bool> &      markers,
@@ -1622,6 +1651,31 @@ SurfaceInterpolator2D::interpolate(
     }
 
   interpolate(field_name, points_2d, markers, target_values);
+}
+
+Point<SurfaceInterpolator2D::dim>
+SurfaceInterpolator2D::project(const Point<dim> &p) const
+{
+  const unsigned int n_points = points.size();
+
+  // same logic as in interpolate
+  Point<dim> p_found;
+  double     d2_min = -1;
+
+  // number of segments is n_points-1
+  for (unsigned int j = 0; j + 1 < n_points; ++j)
+    {
+      Point<dim> p_trial = closest_segment_point(p, points[j], points[j + 1]);
+
+      double d2 = (p_trial - p).norm();
+      if (d2 < d2_min || d2_min < 0)
+        {
+          d2_min  = d2;
+          p_found = p_trial;
+        }
+    }
+
+  return p_found;
 }
 
 const std::vector<double> &

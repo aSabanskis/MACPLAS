@@ -44,6 +44,8 @@ private:
 
   unsigned int point_id_axis_z_min, point_id_axis_z_max, point_id_triple;
 
+  SurfaceInterpolator2D surface_projector;
+
   ParameterHandler prm;
 };
 
@@ -129,6 +131,24 @@ Problem<dim>::make_grid()
             << "Axis highest point = " << point_id_axis_z_max << '\n'
             << "Triple point = " << point_id_triple << '\n';
 
+  // save the crystal side surface
+  std::vector<Point<dim>> points_sorted;
+  for (const auto &it : points_surface)
+    {
+      points_sorted.push_back(it.second);
+    }
+  std::sort(points_sorted.begin(),
+            points_sorted.end(),
+            [](const auto &p1, const auto &p2) {
+              // from highest to lowest, so that additional points can be added
+              return p1[dim - 1] > p2[dim - 1];
+            });
+#ifdef DEBUG
+  std::cout << "points_sorted.front = " << points_sorted.front()
+            << " points_sorted.back = " << points_sorted.back() << '\n';
+#endif
+  surface_projector.set_points(points_sorted);
+
   temperature_solver.add_output("R[m]", points_surface.at(point_id_triple)[0]);
 }
 
@@ -157,8 +177,9 @@ Problem<dim>::deform_grid()
     Point<dim> p_new;
 
     // TODO: remove hardcoded values
-    p_new[0]       = 0.2e-3 * (p[0] / R) * std::sin(t * 0.5);
-    p_new[dim - 1] = -1e-3 * std::cos(p[0] * 50);
+    p_new[0] = 0.2e-3 * (p[0] / R) * std::sin(t * 0.5);
+    p_new[dim - 1] =
+      -1e-3 * std::cos(p[0] * 50) * (1 + 0.5 * std::sin(t * 0.3));
 
     return p_new;
   };
@@ -172,6 +193,16 @@ Problem<dim>::deform_grid()
             << '\n';
 #endif
 
+  const auto p_triple_new = p_triple + dp_triple;
+  const auto p_triple_old = surface_projector.get_points().back();
+  if ((p_triple_new - p_triple_old).norm() > 1e-3)
+    {
+      // add new point
+      auto points = surface_projector.get_points();
+      points.push_back(p_triple_new);
+      surface_projector.set_points(points);
+    }
+
   auto points_new = points_axis;
   for (auto &it : points_new)
     {
@@ -183,11 +214,12 @@ Problem<dim>::deform_grid()
 
   for (const auto &it : points_surface)
     {
-      // TODO: use a better approach to preserve the initial crystal shape
       const auto dp = dp_triple * (p_axis_2 - it.second)[dim - 1] /
                       (p_axis_2 - p_triple)[dim - 1];
 
-      points_new[it.first] = it.second + dp;
+      const auto p = it.second + dp;
+
+      points_new[it.first] = surface_projector.project(p);
     }
 
   for (const auto &it : points_interface)
@@ -196,8 +228,6 @@ Problem<dim>::deform_grid()
 
       points_new[it.first] = it.second + dp;
     }
-
-  // update_boundary_points(triangulation, points_new);
 
   GridTools::laplace_transform(points_new, triangulation);
 
