@@ -128,56 +128,73 @@ Problem<dim>::make_grid()
   std::cout << "Axis lowest point = " << point_id_axis_z_min << '\n'
             << "Axis highest point = " << point_id_axis_z_max << '\n'
             << "Triple point = " << point_id_triple << '\n';
+
+  temperature_solver.add_output("R[m]", points_surface.at(point_id_triple)[0]);
 }
 
 template <int dim>
 void
 Problem<dim>::deform_grid()
 {
+  const auto &points = triangulation.get_vertices();
+
   const auto points_axis = get_boundary_points(triangulation, boundary_id_axis),
              points_surface =
                get_boundary_points(triangulation, boundary_id_surface),
              points_interface =
                get_boundary_points(triangulation, boundary_id_interface);
 
-  auto shift_point = [](const Point<dim> &p) {
-    Point<dim> p_new = p;
+  const Point<dim> p_axis_1 = points.at(point_id_axis_z_min),
+                   p_axis_2 = points.at(point_id_axis_z_max),
+                   p_triple = points.at(point_id_triple);
+
+  const double t = temperature_solver.get_time();
+  const double R = p_triple[0];
+
+  temperature_solver.add_output("R[m]", R);
+
+  auto calc_interface_displacement = [=](const Point<dim> &p) {
+    Point<dim> p_new;
+
     // TODO: remove hardcoded values
-    p_new[0] += 0.1e-3 * std::sin(p[0] * 200);
-    p_new[dim - 1] += -1e-3 * std::cos(p[0] * 50);
+    p_new[0]       = 0.2e-3 * (p[0] / R) * std::sin(t * 0.5);
+    p_new[dim - 1] = -1e-3 * std::cos(p[0] * 50);
+
     return p_new;
   };
 
-  const Point<dim> p1 = points_axis.at(point_id_axis_z_min),
-                   p2 = points_axis.at(point_id_axis_z_max);
-  const auto dp_axis  = shift_point(p1) - p1;
+  const auto dp_axis   = calc_interface_displacement(p_axis_1);
+  const auto dp_triple = calc_interface_displacement(p_triple);
+
 #ifdef DEBUG
-  std::cout << "p_axis = " << p1 << " dp_axis = " << dp_axis << '\n';
+  std::cout << "p_axis = " << p_axis_1 << " dp_axis = " << dp_axis << '\n'
+            << "p_triple = " << p_triple << " dp_triple = " << dp_triple
+            << '\n';
 #endif
 
   auto points_new = points_axis;
   for (auto &it : points_new)
     {
-      it.second += dp_axis * (p2 - it.second).norm() / (p2 - p1).norm();
-    }
+      const auto dp =
+        dp_axis * (p_axis_2 - it.second).norm() / (p_axis_2 - p_axis_1).norm();
 
-  const Point<dim> p_triple  = points_surface.at(point_id_triple);
-  const auto       dp_triple = shift_point(p_triple) - p_triple;
-#ifdef DEBUG
-  std::cout << "p_triple = " << p_triple << " dp_triple = " << dp_triple
-            << '\n';
-#endif
+      it.second += dp;
+    }
 
   for (const auto &it : points_surface)
     {
       // TODO: use a better approach to preserve the initial crystal shape
-      points_new[it.first] = it.second + dp_triple * (p2 - it.second).norm() /
-                                           (p2 - dp_triple).norm();
+      const auto dp = dp_triple * (p_axis_2 - it.second)[dim - 1] /
+                      (p_axis_2 - p_triple)[dim - 1];
+
+      points_new[it.first] = it.second + dp;
     }
 
   for (const auto &it : points_interface)
     {
-      points_new[it.first] = shift_point(it.second);
+      const auto dp = calc_interface_displacement(it.second);
+
+      points_new[it.first] = it.second + dp;
     }
 
   // update_boundary_points(triangulation, points_new);
