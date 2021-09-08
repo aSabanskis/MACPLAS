@@ -143,24 +143,36 @@ Problem<dim>::deform_grid()
   auto shift_point = [](const Point<dim> &p) {
     Point<dim> p_new = p;
     // TODO: remove hardcoded values
-    p_new[0] += 1e-3 * std::sin(p[0] * 200);
+    p_new[0] += 0.1e-3 * std::sin(p[0] * 200);
     p_new[dim - 1] += -1e-3 * std::cos(p[0] * 50);
     return p_new;
   };
 
   const Point<dim> p1 = points_axis.at(point_id_axis_z_min),
                    p2 = points_axis.at(point_id_axis_z_max);
-  const auto dp       = shift_point(p1) - p1;
+  const auto dp_axis  = shift_point(p1) - p1;
+#ifdef DEBUG
+  std::cout << "p_axis = " << p1 << " dp_axis = " << dp_axis << '\n';
+#endif
 
   auto points_new = points_axis;
   for (auto &it : points_new)
     {
-      it.second += dp * (it.second - p2).norm() / (p2 - p1).norm();
+      it.second += dp_axis * (p2 - it.second).norm() / (p2 - p1).norm();
     }
+
+  const Point<dim> p_triple  = points_surface.at(point_id_triple);
+  const auto       dp_triple = shift_point(p_triple) - p_triple;
+#ifdef DEBUG
+  std::cout << "p_triple = " << p_triple << " dp_triple = " << dp_triple
+            << '\n';
+#endif
 
   for (const auto &it : points_surface)
     {
-      points_new[it.first] = it.second;
+      // TODO: use a better approach to preserve the initial crystal shape
+      points_new[it.first] = it.second + dp_triple * (p2 - it.second).norm() /
+                                           (p2 - dp_triple).norm();
     }
 
   for (const auto &it : points_interface)
