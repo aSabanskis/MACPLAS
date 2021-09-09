@@ -46,6 +46,8 @@ private:
 
   SurfaceInterpolator2D surface_projector;
 
+  std::unique_ptr<Function<1>> crystal_radius;
+
   ParameterHandler prm;
 };
 
@@ -57,6 +59,41 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     "1000",
                     Patterns::Double(0),
                     "Initial temperature T_0 in K");
+
+  prm.declare_entry("Crystal radius",
+                    "0.01 + 0.5e-3 * sin(t * 0.5)",
+                    Patterns::Anything(),
+                    "Crystal radius R in m (time function or data file name)");
+
+  if (use_default_prm)
+    {
+      std::ofstream of("problem.prm");
+      prm.print_parameters(of, ParameterHandler::Text);
+    }
+  else
+    try
+      {
+        prm.parse_input("problem.prm");
+      }
+    catch (std::exception &e)
+      {
+        std::cout << e.what() << "\n";
+
+        std::ofstream of("problem-default.prm");
+        prm.print_parameters(of, ParameterHandler::Text);
+      }
+
+  // print all problem-specific and solver parameters
+  std::cout << "# ---------------------\n"
+            << "# Problem\n";
+  prm.print_parameters(std::cout, ParameterHandler::Text);
+
+  std::cout << "# ---------------------\n"
+            << "# " << temperature_solver.solver_name() << '\n';
+  temperature_solver.get_parameters().print_parameters(std::cout,
+                                                       ParameterHandler::Text);
+
+  initialize_function(crystal_radius, prm.get("Crystal radius"));
 }
 
 template <int dim>
@@ -149,7 +186,15 @@ Problem<dim>::make_grid()
 #endif
   surface_projector.set_points(points_sorted);
 
-  temperature_solver.add_output("R[m]", points_surface.at(point_id_triple)[0]);
+  const double R0 = crystal_radius->value(Point<1>());
+  const double R  = points_surface.at(point_id_triple)[0];
+
+  AssertThrow(std::fabs(R - R0) < 1e-4,
+              ExcMessage("The actual radius R = " + std::to_string(R) +
+                         " m differs from the expected R0 = " +
+                         std::to_string(R0) + " m"));
+
+  temperature_solver.add_output("R[m]", R);
 }
 
 template <int dim>
@@ -168,20 +213,20 @@ Problem<dim>::deform_grid()
                    p_axis_2 = points.at(point_id_axis_z_max),
                    p_triple = points.at(point_id_triple);
 
-  const double t = temperature_solver.get_time();
-  const double R = p_triple[0];
+  const double t  = temperature_solver.get_time();
+  const double R0 = crystal_radius->value(Point<1>(t));
+  const double R  = p_triple[0];
 
-  temperature_solver.add_output("R[m]", R);
+  temperature_solver.add_output("R[m]", R0);
 
   auto calc_interface_displacement = [=](const Point<dim> &p) {
-    Point<dim> p_new;
+    Point<dim> dp;
 
     // TODO: remove hardcoded values
-    p_new[0] = 0.2e-3 * (p[0] / R) * std::sin(t * 0.5);
-    p_new[dim - 1] =
-      -1e-3 * std::cos(p[0] * 50) * (1 + 0.5 * std::sin(t * 0.3));
+    dp[0]       = (R0 - R) * (p[0] / R);
+    dp[dim - 1] = -1e-3 * std::cos(p[0] * 50) * (1 + 0.5 * std::sin(t * 0.3));
 
-    return p_new;
+    return dp;
   };
 
   const auto dp_axis   = calc_interface_displacement(p_axis_1);
