@@ -445,7 +445,8 @@ private:
    */
   bool converged;
 
-  /** Data for first-type BC
+  /** Data for first-type BC.
+   * Map key: boundary id, value contains component and displacement.
    */
   std::map<unsigned int, std::pair<unsigned int, double>> bc1_data;
 
@@ -1157,12 +1158,16 @@ StressSolver<dim>::assemble_system()
                   AssemblyScratchData(quadrature, fe_temp, fe),
                   AssemblyCopyData());
 
-  // Apply boundary conditions for displacement
+  // Apply boundary conditions for displacement. Also check if BC was applied
+  // for all displacement components; if not, set displacement=0 at single DOF.
+  std::vector<bool> bc1_applied(dim, false);
+
   std::map<types::global_dof_index, double> boundary_values;
   for (auto const &it : bc1_data)
     {
       std::vector<bool> mask(dim, false);
-      mask[it.second.first] = true;
+      mask[it.second.first]        = true;
+      bc1_applied[it.second.first] = true;
 
       VectorTools::interpolate_boundary_values( // break line
         dh,
@@ -1170,6 +1175,18 @@ StressSolver<dim>::assemble_system()
         ConstantFunction<dim>(it.second.second, dim),
         boundary_values,
         mask);
+    }
+  for (unsigned int i = 0; i < bc1_applied.size(); ++i)
+    {
+      if (!bc1_applied[i])
+        {
+          boundary_values[i * temperature.size()] = 0;
+#ifdef DEBUG
+          std::cout << '\n'
+                    << solver_name() "  dislplacement=0 applied for dimension "
+                    << i;
+#endif
+        }
     }
 
   MatrixTools::apply_boundary_values(boundary_values,
