@@ -35,9 +35,9 @@ sed -Ei "s|(set Max relative dtau_eff *= *).*|\1 0.2|" dislocation.prm
 sed -Ei "s|(set Max relative time step increase *= *).*|\1 0.2|" dislocation.prm
 sed -Ei "s|(set Max v\*dt *= *).*|\1 5e-5|" dislocation.prm
 sed -Ei "s|(set Max time step *= *).*|\1 1|" dislocation.prm
-sed -Ei "s|(set Min time step *= *).*|\1 0.04|" dislocation.prm
-sed -Ei "s|(set Time substep *= *).*|\1 0.02|" dislocation.prm
-sed -Ei "s|(set Max time substeps *= *).*|\1 4|" dislocation.prm
+sed -Ei "s|(set Min time step *= *).*|\1 0.01|" dislocation.prm
+sed -Ei "s|(set Time substep *= *).*|\1 0.01|" dislocation.prm
+sed -Ei "s|(set Max time substeps *= *).*|\1 5|" dislocation.prm
 sed -Ei "s|(set Refresh stress for substeps *= *).*|\1 true|" dislocation.prm
 
 cp -- *.prm "$r"
