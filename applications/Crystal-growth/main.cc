@@ -46,6 +46,8 @@ private:
 
   SurfaceInterpolator2D surface_projector;
 
+  std::unique_ptr<Function<1>> pull_rate;
+
   std::unique_ptr<Function<1>> crystal_radius;
 
   ParameterHandler prm;
@@ -64,6 +66,12 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     "0.01 + 0.5e-3 * sin(t * 0.5)",
                     Patterns::Anything(),
                     "Crystal radius R in m (time function or data file name)");
+
+  prm.declare_entry(
+    "Pull rate",
+    "1e-5",
+    Patterns::Anything(),
+    "Crystal pull rate V in m/s (time function or data file name)");
 
   if (use_default_prm)
     {
@@ -94,6 +102,8 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                                                        ParameterHandler::Text);
 
   initialize_function(crystal_radius, prm.get("Crystal radius"));
+
+  initialize_function(pull_rate, prm.get("Pull rate"));
 }
 
 template <int dim>
@@ -214,17 +224,20 @@ Problem<dim>::deform_grid()
                    p_triple = points.at(point_id_triple);
 
   const double t  = temperature_solver.get_time();
+  const double dt = temperature_solver.get_time_step();
   const double R0 = crystal_radius->value(Point<1>(t));
   const double R  = p_triple[0];
+  const double V  = pull_rate->value(Point<1>(t));
 
   temperature_solver.add_output("R[m]", R0);
+  temperature_solver.add_output("V[m/s]", V);
 
   auto calc_interface_displacement = [=](const Point<dim> &p) {
     Point<dim> dp;
 
     // TODO: remove hardcoded values
     dp[0]       = (R0 - R) * (p[0] / R);
-    dp[dim - 1] = -1e-3 * std::cos(p[0] * 50) * (1 + 0.5 * std::sin(t * 0.3));
+    dp[dim - 1] = -1e-4 * std::cos(p[0] * 50) * std::sin(t * 0.3) - p[dim - 1];
 
     return dp;
   };
@@ -237,16 +250,6 @@ Problem<dim>::deform_grid()
             << "p_triple = " << p_triple << " dp_triple = " << dp_triple
             << '\n';
 #endif
-
-  const auto p_triple_new = p_triple + dp_triple;
-  const auto p_triple_old = surface_projector.get_points().back();
-  if ((p_triple_new - p_triple_old).norm() > 1e-3)
-    {
-      // add new point
-      auto points = surface_projector.get_points();
-      points.push_back(p_triple_new);
-      surface_projector.set_points(points);
-    }
 
   auto points_new = points_axis;
   for (auto &it : points_new)
@@ -275,6 +278,34 @@ Problem<dim>::deform_grid()
     }
 
   GridTools::laplace_transform(points_new, triangulation);
+
+  // shift the whole mesh according to the pull rate
+  Point<dim> dz;
+  dz[dim - 1] = V * dt;
+  GridTools::shift(dz, triangulation);
+
+  // update the precise crystal surface shape
+  const auto p_triple_new     = p_triple + dp_triple;
+  const auto p_triple_old     = surface_projector.get_points().back();
+  auto       projector_points = surface_projector.get_points();
+
+  // extend the surface by adding a new point
+  if ((p_triple_new - p_triple_old).norm() > 0.1e-3)
+    projector_points.push_back(p_triple_new);
+
+  // shift all points
+  for (auto &p : projector_points)
+    p += dz;
+
+  surface_projector.set_points(projector_points);
+
+#ifdef DEBUG
+  std::stringstream ss;
+  ss << std::setprecision(8) << "crystal-surface-t" << t << ".dat";
+  std::ofstream out(ss.str());
+  for (const auto &p : projector_points)
+    out << p << '\n';
+#endif
 
   temperature_solver.get_mesh().clear();
   temperature_solver.get_mesh().copy_triangulation(triangulation);
