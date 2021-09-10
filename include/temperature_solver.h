@@ -44,9 +44,11 @@ static const double sigma_SB = 5.67e-8;
 
 /** Data structure for thermal radiation and incoming heat flux density BC
  * \f$q = \sigma_\mathrm{SB} \varepsilon(T) (T^4 - T_\mathrm{amb}^4) -
- * q_\mathrm{in}\f$
+ * q_\mathrm{in}\f$.
+ * The temperature dependence of \f$\varepsilon\f$ is
+ * taken into account.
  */
-struct heat_flux_data
+struct radiation_heat_flux_data
 {
   /** Incoming heat flux density \f$q_\mathrm{in}\f$, W m<sup>-2</sup>
    */
@@ -247,7 +249,7 @@ public:
 
   /** Set thermal radiation and incoming heat flux density boundary condition
    * \f$q = \sigma_\mathrm{SB} \varepsilon(T) (T^4 - T_\mathrm{amb}^4) -
-   * q_\mathrm{in}\f$
+   * q_\mathrm{in}\f$, see radiation_heat_flux_data
    */
   void
   set_bc_rad_mixed(const unsigned int                  id,
@@ -257,7 +259,7 @@ public:
                    const double                        T_amb = 0);
 
   /** Set convective cooling boundary condition
-   * \f$q = h (T - T_\mathrm{ref})\f$
+   * \f$q = h (T - T_\mathrm{ref})\f$, see convective_cooling_data
    */
   void
   set_bc_convective(const unsigned int id, const double h, const double T_ref);
@@ -466,9 +468,9 @@ private:
   std::map<unsigned int, double> bc1_data;
 
   /** Data for thermal radiation and incoming heat flux density BC
-   * heat_flux_data
+   * radiation_heat_flux_data
    */
-  std::map<unsigned int, heat_flux_data> bc_rad_mixed_data;
+  std::map<unsigned int, radiation_heat_flux_data> bc_rad_mixed_data;
 
   /** Data for convective cooling BC convective_cooling_data
    */
