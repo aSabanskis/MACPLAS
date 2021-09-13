@@ -345,7 +345,7 @@ private:
     std::vector<double>         dot_q_q;
     std::vector<Tensor<1, dim>> grad_T_q;
     std::vector<double>         T_face_q;
-    std::vector<double>         heat_flux_in_face_q;
+    std::vector<double>         q_in_face_q;
   };
 
   /** Structure that holds local contributions
@@ -1484,7 +1484,7 @@ TemperatureSolver<dim>::AssemblyScratchData::AssemblyScratchData(
   , dot_q_q(quadrature.size())
   , grad_T_q(quadrature.size())
   , T_face_q(face_quadrature.size())
-  , heat_flux_in_face_q(face_quadrature.size())
+  , q_in_face_q(face_quadrature.size())
 {}
 
 template <int dim>
@@ -1501,7 +1501,7 @@ TemperatureSolver<dim>::AssemblyScratchData::AssemblyScratchData(
   , dot_q_q(scratch_data.dot_q_q)
   , grad_T_q(scratch_data.grad_T_q)
   , T_face_q(scratch_data.T_face_q)
-  , heat_flux_in_face_q(scratch_data.heat_flux_in_face_q)
+  , q_in_face_q(scratch_data.q_in_face_q)
 {}
 
 template <int dim>
@@ -1642,21 +1642,20 @@ TemperatureSolver<dim>::local_assemble_system(
       if (it == bc_rad_mixed_data.end())
         continue;
 
-      std::vector<double> &T_face_q = scratch_data.T_face_q;
-      std::vector<double> &heat_flux_in_face_q =
-        scratch_data.heat_flux_in_face_q;
+      std::vector<double> &T_face_q    = scratch_data.T_face_q;
+      std::vector<double> &q_in_face_q = scratch_data.q_in_face_q;
 
       fe_face_values.reinit(cell, face_number);
 
       fe_face_values.get_function_values(temperature, T_face_q);
-      fe_face_values.get_function_values(it->second.q_in, heat_flux_in_face_q);
+      fe_face_values.get_function_values(it->second.q_in, q_in_face_q);
 
       for (unsigned int q = 0; q < n_face_q_points; ++q)
         {
           const double net_heat_flux =
             sigma_SB * it->second.emissivity(T_face_q[q]) *
               (std::pow(T_face_q[q], 4) - std::pow(it->second.T_amb, 4)) -
-            heat_flux_in_face_q[q];
+            q_in_face_q[q];
 
           const double weight =
             dim == 2 ?
