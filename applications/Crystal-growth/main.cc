@@ -50,6 +50,8 @@ private:
 
   std::unique_ptr<Function<1>> crystal_radius;
 
+  FunctionParser<2> interface_shape;
+
   ParameterHandler prm;
 };
 
@@ -62,16 +64,21 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     Patterns::Double(0),
                     "Initial temperature T_0 in K");
 
-  prm.declare_entry("Crystal radius",
-                    "0.01 + 0.5e-3 * sin(t * 0.5)",
-                    Patterns::Anything(),
-                    "Crystal radius R in m (time function or data file name)");
-
   prm.declare_entry(
     "Pull rate",
     "1e-5",
     Patterns::Anything(),
     "Crystal pull rate V in m/s (time function or data file name)");
+
+  prm.declare_entry("Crystal radius",
+                    "0.01 + 0.5e-3 * sin(t * 0.5)",
+                    Patterns::Anything(),
+                    "Crystal radius R in m (time function or data file name)");
+
+  prm.declare_entry("Interface shape",
+                    "-5e-4 * cos(r * 500) * sin(t * 0.1)",
+                    Patterns::Anything(),
+                    "Crystallization interface shape z(r, t)");
 
   if (use_default_prm)
     {
@@ -101,9 +108,13 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
   temperature_solver.get_parameters().print_parameters(std::cout,
                                                        ParameterHandler::Text);
 
+  initialize_function(pull_rate, prm.get("Pull rate"));
+
   initialize_function(crystal_radius, prm.get("Crystal radius"));
 
-  initialize_function(pull_rate, prm.get("Pull rate"));
+  interface_shape.initialize("r,t",
+                             prm.get("Interface shape"),
+                             typename FunctionParser<2>::ConstMap());
 }
 
 template <int dim>
@@ -232,12 +243,13 @@ Problem<dim>::deform_grid()
   temperature_solver.add_output("R[m]", R0);
   temperature_solver.add_output("V[m/s]", V);
 
-  auto calc_interface_displacement = [=](const Point<dim> &p) {
+  auto calc_interface_displacement = [&](const Point<dim> &p) {
     Point<dim> dp;
 
-    // TODO: remove hardcoded values
-    dp[0]       = (R0 - R) * (p[0] / R);
-    dp[dim - 1] = -1e-4 * std::cos(p[0] * 50) * std::sin(t * 0.3) - p[dim - 1];
+    // scale radially
+    dp[0] = (R0 - R) * (p[0] / R);
+    // shift vertically
+    dp[dim - 1] = interface_shape.value(Point<2>(p[0], t)) - p[dim - 1];
 
     return dp;
   };
