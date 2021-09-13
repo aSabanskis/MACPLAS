@@ -1183,8 +1183,8 @@ StressSolver<dim>::assemble_system()
           boundary_values[i * temperature.size()] = 0;
 #ifdef DEBUG
           std::cout << '\n'
-                    << solver_name() "  dislplacement=0 applied for dimension "
-                    << i;
+                    << solver_name()
+                    << "  dislplacement=0 applied for dimension " << i;
 #endif
         }
     }
