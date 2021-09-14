@@ -33,7 +33,8 @@ private:
 
   TemperatureSolver<dim> temperature_solver;
 
-  Triangulation<dim> triangulation;
+  // for testing
+  Vector<double> f_test;
 
   // crystallization interface
   constexpr static unsigned int boundary_id_interface = 0;
@@ -142,12 +143,12 @@ template <int dim>
 void
 Problem<dim>::make_grid()
 {
+  Triangulation<dim> &triangulation = temperature_solver.get_mesh();
+
   GridIn<dim> gi;
   gi.attach_triangulation(triangulation);
   std::ifstream f("mesh-" + std::to_string(dim) + "d.msh");
   gi.read_msh(f);
-
-  temperature_solver.get_mesh().copy_triangulation(triangulation);
 
   // print info
   std::cout << "Number of cells: " << triangulation.n_cells() << "\n"
@@ -222,6 +223,10 @@ template <int dim>
 void
 Problem<dim>::deform_grid()
 {
+  // the mesh will be modified, make a copy
+  Triangulation<dim> triangulation;
+  triangulation.copy_triangulation(temperature_solver.get_mesh());
+
   const auto &points = triangulation.get_vertices();
 
   const auto points_axis = get_boundary_points(triangulation, boundary_id_axis),
@@ -289,7 +294,34 @@ Problem<dim>::deform_grid()
       points_new[it.first] = it.second + dp;
     }
 
+  // evaluate gradients at the previous mesh
+  std::vector<Point<dim>> support_points_prev;
+  temperature_solver.get_support_points(support_points_prev);
+
+  DoFGradientEvaluation<dim> grad_eval;
+
+  grad_eval.add_field("f", f_test);
+  grad_eval.attach_dof_handler(temperature_solver.get_dof_handler());
+  grad_eval.calculate();
+  const auto &grad = grad_eval.get_gradient("f");
+
+  // update the mesh and obtain displacements for all DoFs
   GridTools::laplace_transform(points_new, triangulation);
+
+  temperature_solver.get_mesh().clear();
+  temperature_solver.get_mesh().copy_triangulation(triangulation);
+
+  std::vector<Point<dim>> support_points;
+  temperature_solver.get_support_points(support_points);
+
+  std::vector<Tensor<1, dim>> dr(f_test.size());
+  for (unsigned int i = 0; i < f_test.size(); ++i)
+    {
+      dr[i] = support_points[i] - support_points_prev[i];
+      f_test[i] += dr[i] * grad[i];
+    }
+
+  temperature_solver.add_field("f", f_test);
 
   // shift the whole mesh according to the pull rate
   Point<dim> dz;
@@ -331,6 +363,15 @@ Problem<dim>::initialize_temperature()
 
   Vector<double> &temperature = temperature_solver.get_temperature();
   temperature.add(prm.get_double("Initial temperature"));
+
+  // manually construct a field for testing
+  std::vector<Point<dim>> points;
+  temperature_solver.get_support_points(points);
+
+  f_test.reinit(temperature.size());
+  for (unsigned int i = 0; i < f_test.size(); ++i)
+    f_test[i] = 2 * sqr(points[i][0] - 0.005) + sqr(points[i][dim - 1] - 0.005);
+  temperature_solver.add_field("f", f_test);
 
   temperature_solver.output_mesh();
   temperature_solver.output_parameter_table();
