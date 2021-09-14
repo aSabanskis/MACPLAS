@@ -7,6 +7,8 @@
 #include <deal.II/base/timer.h>
 #include <deal.II/base/utilities.h>
 
+#include <deal.II/fe/fe_tools.h>
+
 #include <deal.II/lac/vector.h>
 
 #include <array>
@@ -418,6 +420,51 @@ private:
    */
   inline void
   info() const;
+};
+
+
+/** Class for calculating field gradients
+ */
+template <int dim>
+class DoFGradientEvaluation
+{
+public:
+  /** Add a FE field
+   */
+  void
+  add_field(const std::string &name, const Vector<double> &field);
+
+  /** Attach a DoF handler corresponding to the added FE fields
+   */
+  void
+  attach_dof_handler(const DoFHandler<dim> &dof_handler);
+
+  /** Calculate gradients of all fields.
+   * Currently only extrapolation from quadrature points is implemented
+   * (see StressSolver::recover_strain_extrapolation).
+   * @param n_quadrature_points number of QGauss quadrature points. The default
+   * value of 0 corresponds to order+1.
+   */
+  void
+  calculate(const unsigned int n_quadrature_points = 0);
+
+  /** Get calculated gradients by field name
+   */
+  const std::vector<Tensor<1, dim>> &
+  get_gradient(const std::string &name) const;
+
+private:
+  /** All FE fields
+   */
+  std::map<std::string, Vector<double>> fields;
+
+  /** All calculated gradients
+   */
+  std::map<std::string, std::vector<Tensor<1, dim>>> gradients;
+
+  /** DoF handler
+   */
+  SmartPointer<const DoFHandler<dim>> dh;
 };
 
 
@@ -1703,6 +1750,123 @@ SurfaceInterpolator2D::info() const
 
   for (const auto &it : fields)
     std::cout << "PointData " << it.first << " " << it.second.size() << "\n";
+}
+
+// DoFGradientEvaluation
+
+template <int dim>
+void
+DoFGradientEvaluation<dim>::add_field(const std::string &   name,
+                                      const Vector<double> &field)
+{
+  fields[name] = field;
+  gradients.erase(name);
+}
+
+template <int dim>
+void
+DoFGradientEvaluation<dim>::attach_dof_handler(
+  const DoFHandler<dim> &dof_handler)
+{
+  dh = &dof_handler;
+}
+
+template <int dim>
+void
+DoFGradientEvaluation<dim>::calculate(const unsigned int n_quadrature_points)
+{
+  const auto &      fe = dh->get_fe();
+  const QGauss<dim> quadrature(n_quadrature_points == 0 ? fe.degree + 1 :
+                                                          n_quadrature_points);
+
+  const unsigned int n_dofs        = dh->n_dofs();
+  const unsigned int dofs_per_cell = fe.dofs_per_cell;
+  const unsigned int n_q_points    = quadrature.size();
+
+  FEValues<dim> fe_values(fe, quadrature, update_gradients);
+
+  std::vector<unsigned int> count(n_dofs, 0);
+
+  FullMatrix<double> qpoint_to_dof_matrix(dofs_per_cell, n_q_points);
+  FETools::compute_projection_from_quadrature_points_matrix(
+    fe, quadrature, quadrature, qpoint_to_dof_matrix);
+
+  // gradient at quadrature points
+  std::vector<Tensor<1, dim>> grad_q(n_q_points, Tensor<1, dim>());
+
+  // gradient components at quadrature points and DoFs
+  Vector<double> grad_component_q(n_q_points);
+  Vector<double> grad_component_cell(dofs_per_cell);
+
+  std::vector<types::global_dof_index> local_dof_indices(dofs_per_cell);
+
+  // check data sizes and initialize gradients with zeros
+  for (auto &it : fields)
+    {
+      const auto &s = it.first;
+      const auto  n = fields[s].size();
+      AssertThrow(n == n_dofs,
+                  ExcMessage("DoFGradientEvaluation: field '" + s + "' size " +
+                             std::to_string(n) + " does not match n_dofs = " +
+                             std::to_string(n_dofs)));
+
+      gradients[s] = std::vector<Tensor<1, dim>>(n, Tensor<1, dim>());
+    }
+
+  typename DoFHandler<dim>::active_cell_iterator cell = dh->begin_active(),
+                                                 endc = dh->end();
+  for (; cell != endc; ++cell)
+    {
+      fe_values.reinit(cell);
+
+      cell->get_dof_indices(local_dof_indices);
+
+      for (unsigned int i = 0; i < dofs_per_cell; ++i)
+        count[local_dof_indices[i]] += 1;
+
+      for (auto &it : fields)
+        {
+          // calculate gradient at quadrature points for each field
+          fe_values.get_function_gradients(it.second, grad_q);
+
+          std::vector<Tensor<1, dim>> &grad = gradients.at(it.first);
+
+          for (unsigned int k = 0; k < dim; ++k)
+            {
+              // setup a vector of k-th gradient component for each dimension
+              for (unsigned int q = 0; q < n_q_points; ++q)
+                grad_component_q[q] = grad_q[q][k];
+
+              // extrapolate from quadrature points to DoFs
+              qpoint_to_dof_matrix.vmult(grad_component_cell, grad_component_q);
+
+              // add result to global gradient
+              for (unsigned int i = 0; i < dofs_per_cell; ++i)
+                grad[local_dof_indices[i]][k] += grad_component_cell[i];
+            }
+        }
+    }
+
+  // average contributions from neighbouring cells
+  for (auto &it : gradients)
+    {
+      for (unsigned int i = 0; i < n_dofs; ++i)
+        {
+          AssertThrow(count[i] > 0,
+                      ExcMessage("count[" + std::to_string(i) +
+                                 "]=" + std::to_string(count[i]) +
+                                 ", positive value expected"));
+
+          it.second[i] /= count[i];
+        }
+    }
+}
+
+template <int dim>
+const std::vector<Tensor<1, dim>> &
+DoFGradientEvaluation<dim>::get_gradient(const std::string &name) const
+{
+  return gradients.at(name);
 }
 
 #endif
