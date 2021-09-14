@@ -1446,12 +1446,6 @@ TemperatureSolver<dim>::prepare_for_solve()
   temperature_update.reinit(n_dofs);
   system_rhs.reinit(n_dofs);
 
-  DynamicSparsityPattern dsp(n_dofs);
-  DoFTools::make_sparsity_pattern(dh, dsp);
-
-  sparsity_pattern.copy_from(dsp);
-  system_matrix.reinit(sparsity_pattern);
-
   // Apply Dirichlet boundary conditions
   std::map<types::global_dof_index, double> boundary_values;
   for (const auto &bc : bc1_data)
@@ -1465,6 +1459,15 @@ TemperatureSolver<dim>::prepare_for_solve()
     {
       temperature[bv.first] = bv.second;
     }
+
+  if (!sparsity_pattern.empty() && !system_matrix.empty())
+    return;
+
+  DynamicSparsityPattern dsp(n_dofs);
+  DoFTools::make_sparsity_pattern(dh, dsp);
+
+  sparsity_pattern.copy_from(dsp);
+  system_matrix.reinit(sparsity_pattern);
 }
 
 template <int dim>
