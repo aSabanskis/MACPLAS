@@ -429,6 +429,11 @@ template <int dim>
 class DoFGradientEvaluation
 {
 public:
+  /** Delete all data
+   */
+  void
+  clear();
+
   /** Add a FE field
    */
   void
@@ -1753,6 +1758,15 @@ SurfaceInterpolator2D::info() const
 }
 
 // DoFGradientEvaluation
+
+template <int dim>
+void
+DoFGradientEvaluation<dim>::clear()
+{
+  dh = nullptr;
+  fields.clear();
+  gradients.clear();
+}
 
 template <int dim>
 void

@@ -29,12 +29,30 @@ private:
   deform_grid();
 
   void
+  calculate_field_gradients();
+
+  void
+  update_fields();
+
+  void
   initialize_temperature();
+
+  void
+  set_temperature_BC();
+
+  void
+  solve_steady_temperature();
 
   TemperatureSolver<dim> temperature_solver;
 
+  std::vector<Point<dim>> support_points, support_points_prev;
+
+  std::vector<Tensor<1, dim>> dr;
+
+#ifdef DEBUG
   // for testing
   Vector<double> f_test;
+#endif
 
   // crystallization interface
   constexpr static unsigned int boundary_id_interface = 0;
@@ -53,6 +71,8 @@ private:
 
   FunctionParser<2> interface_shape;
 
+  DoFGradientEvaluation<dim> grad_eval;
+
   ParameterHandler prm;
 };
 
@@ -60,10 +80,25 @@ template <int dim>
 Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
   : temperature_solver(order, use_default_prm)
 {
-  prm.declare_entry("Initial temperature",
-                    "1000",
+  prm.declare_entry("Melting point",
+                    "1210",
                     Patterns::Double(0),
-                    "Initial temperature T_0 in K");
+                    "Melting point T_0 in K");
+
+  prm.declare_entry("Max temperature change",
+                    "0.1",
+                    Patterns::Double(0),
+                    "Maximum temperature change in K");
+
+  prm.declare_entry("Heat transfer coefficient",
+                    "10",
+                    Patterns::Double(0),
+                    "Heat transfer coefficient h in W/m^2/K");
+
+  prm.declare_entry("Reference temperature",
+                    "300",
+                    Patterns::Double(0),
+                    "Reference temperature T_ref in K");
 
   prm.declare_entry(
     "Pull rate",
@@ -125,10 +160,13 @@ Problem<dim>::run()
   make_grid();
   initialize_temperature();
 
-  // proof of concept
+  solve_steady_temperature();
+
   while (true)
     {
       deform_grid();
+
+      set_temperature_BC();
 
       bool keep_going_temp = temperature_solver.solve();
 
@@ -227,6 +265,9 @@ Problem<dim>::deform_grid()
   Triangulation<dim> triangulation;
   triangulation.copy_triangulation(temperature_solver.get_mesh());
 
+  temperature_solver.get_support_points(support_points_prev);
+  calculate_field_gradients();
+
   const auto &points = triangulation.get_vertices();
 
   const auto points_axis = get_boundary_points(triangulation, boundary_id_axis),
@@ -294,34 +335,19 @@ Problem<dim>::deform_grid()
       points_new[it.first] = it.second + dp;
     }
 
-  // evaluate gradients at the previous mesh
-  std::vector<Point<dim>> support_points_prev;
-  temperature_solver.get_support_points(support_points_prev);
-
-  DoFGradientEvaluation<dim> grad_eval;
-
-  grad_eval.add_field("f", f_test);
-  grad_eval.attach_dof_handler(temperature_solver.get_dof_handler());
-  grad_eval.calculate();
-  const auto &grad = grad_eval.get_gradient("f");
-
   // update the mesh and obtain displacements for all DoFs
   GridTools::laplace_transform(points_new, triangulation);
 
   temperature_solver.get_mesh().clear();
   temperature_solver.get_mesh().copy_triangulation(triangulation);
 
-  std::vector<Point<dim>> support_points;
   temperature_solver.get_support_points(support_points);
 
-  std::vector<Tensor<1, dim>> dr(f_test.size());
-  for (unsigned int i = 0; i < f_test.size(); ++i)
-    {
-      dr[i] = support_points[i] - support_points_prev[i];
-      f_test[i] += dr[i] * grad[i];
-    }
+  dr.resize(support_points.size());
+  for (unsigned int i = 0; i < dr.size(); ++i)
+    dr[i] = support_points[i] - support_points_prev[i];
 
-  temperature_solver.add_field("f", f_test);
+  update_fields();
 
   // shift the whole mesh according to the pull rate
   Point<dim> dz;
@@ -357,24 +383,102 @@ Problem<dim>::deform_grid()
 
 template <int dim>
 void
+Problem<dim>::calculate_field_gradients()
+{
+  // evaluate gradients at the previous mesh
+  grad_eval.clear();
+
+  grad_eval.attach_dof_handler(temperature_solver.get_dof_handler());
+  grad_eval.add_field("T", temperature_solver.get_temperature());
+
+#ifdef DEBUG
+  grad_eval.add_field("f", f_test);
+#endif
+
+  grad_eval.calculate();
+}
+
+template <int dim>
+void
+Problem<dim>::update_fields()
+{
+  Vector<double> &T = temperature_solver.get_temperature();
+
+  const auto &grad_T = grad_eval.get_gradient("T");
+
+  for (unsigned int i = 0; i < T.size(); ++i)
+    T[i] += dr[i] * grad_T[i];
+
+#ifdef DEBUG
+  const auto &grad_f = grad_eval.get_gradient("f");
+
+  for (unsigned int i = 0; i < T.size(); ++i)
+    f_test[i] += dr[i] * grad_f[i];
+
+  temperature_solver.add_field("f", f_test);
+#endif
+}
+
+template <int dim>
+void
 Problem<dim>::initialize_temperature()
 {
   temperature_solver.initialize(); // sets T=0
 
   Vector<double> &temperature = temperature_solver.get_temperature();
-  temperature.add(prm.get_double("Initial temperature"));
-
-  // manually construct a field for testing
-  std::vector<Point<dim>> points;
-  temperature_solver.get_support_points(points);
-
-  f_test.reinit(temperature.size());
-  for (unsigned int i = 0; i < f_test.size(); ++i)
-    f_test[i] = 2 * sqr(points[i][0] - 0.005) + sqr(points[i][dim - 1] - 0.005);
-  temperature_solver.add_field("f", f_test);
+  temperature.add(prm.get_double("Melting point"));
 
   temperature_solver.output_mesh();
   temperature_solver.output_parameter_table();
+
+#ifdef DEBUG
+  // manually construct a field for testing
+  temperature_solver.get_support_points(support_points);
+  f_test.reinit(temperature.size());
+  for (unsigned int i = 0; i < f_test.size(); ++i)
+    f_test[i] = 2 * sqr(support_points[i][0] - 0.005) +
+                sqr(support_points[i][dim - 1] - 0.005);
+  temperature_solver.add_field("f", f_test);
+#endif
+}
+
+template <int dim>
+void
+Problem<dim>::set_temperature_BC()
+{
+  const double T_0   = 1210;
+  const double T_ref = prm.get_double("Reference temperature");
+  const double h     = prm.get_double("Heat transfer coefficient");
+
+  temperature_solver.set_bc1(boundary_id_interface, T_0);
+  temperature_solver.set_bc_convective(boundary_id_surface, h, T_ref);
+}
+
+template <int dim>
+void
+Problem<dim>::solve_steady_temperature()
+{
+  std::cout << "Calculating steady-state temperature field\n";
+
+  const double dt0 = temperature_solver.get_time_step();
+
+  temperature_solver.get_time_step() = 0;
+
+  double max_dT;
+  do
+    {
+      Vector<double> temperature = temperature_solver.get_temperature();
+
+      set_temperature_BC();
+      temperature_solver.solve();
+
+      temperature -= temperature_solver.get_temperature();
+      max_dT = temperature.linfty_norm();
+
+      std::cout << "max_dT=" << max_dT << " K\n";
+  } while (max_dT > prm.get_double("Max temperature change"));
+
+  temperature_solver.get_time_step() = dt0;
 
   temperature_solver.output_vtk();
 }
