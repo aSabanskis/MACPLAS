@@ -436,6 +436,8 @@ Problem<dim>::update_fields()
   for (unsigned int i = 0; i < T.size(); ++i)
     T[i] += dr[i] * grad_T[i];
 
+  temperature_solver.apply_bc1();
+
 #ifdef DEBUG
   const auto &grad_f = grad_eval.get_gradient("f");
 

@@ -242,6 +242,14 @@ public:
   double
   calc_rho_c_p(const double T) const;
 
+  /** Apply first-type boundary condition previously set by
+   * TemperatureSolver::set_bc1.
+   * Needs to be called by the user only in special cases, such as simulations
+   * on a moving mesh.
+   */
+  void
+  apply_bc1();
+
   /** Set first-type boundary condition \f$T = \mathrm{val}\f$
    */
   void
@@ -975,6 +983,22 @@ TemperatureSolver<dim>::get_dof_handler() const
 
 template <int dim>
 void
+TemperatureSolver<dim>::apply_bc1()
+{
+  std::map<types::global_dof_index, double> boundary_values;
+
+  for (const auto &bc : bc1_data)
+    VectorTools::interpolate_boundary_values(dh,
+                                             bc.first,
+                                             ConstantFunction<dim>(bc.second),
+                                             boundary_values);
+
+  for (const auto &bv : boundary_values)
+    temperature[bv.first] = bv.second;
+}
+
+template <int dim>
+void
 TemperatureSolver<dim>::set_bc1(const unsigned int id, const double val)
 {
   bc1_data[id] = val;
@@ -1447,18 +1471,7 @@ TemperatureSolver<dim>::prepare_for_solve()
   system_rhs.reinit(n_dofs);
 
   // Apply Dirichlet boundary conditions
-  std::map<types::global_dof_index, double> boundary_values;
-  for (const auto &bc : bc1_data)
-    {
-      VectorTools::interpolate_boundary_values(dh,
-                                               bc.first,
-                                               ConstantFunction<dim>(bc.second),
-                                               boundary_values);
-    }
-  for (const auto &bv : boundary_values)
-    {
-      temperature[bv.first] = bv.second;
-    }
+  apply_bc1();
 
   if (!sparsity_pattern.empty() && !system_matrix.empty())
     return;
