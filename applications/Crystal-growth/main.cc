@@ -106,6 +106,16 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     Patterns::Double(0),
                     "Maximum temperature change in K");
 
+  prm.declare_entry("Emissivity",
+                    "0.55",
+                    Patterns::Double(0),
+                    "Emissivity epsilon (dimensionless)");
+
+  prm.declare_entry("Ambient temperature",
+                    "300",
+                    Patterns::Double(0),
+                    "Ambient temperature T_amb in K");
+
   prm.declare_entry("Heat transfer coefficient",
                     "10",
                     Patterns::Double(0),
@@ -510,12 +520,26 @@ template <int dim>
 void
 Problem<dim>::set_temperature_BC()
 {
-  const double T_0   = 1210;
+  const double T_0   = prm.get_double("Melting point");
   const double T_ref = prm.get_double("Reference temperature");
   const double h     = prm.get_double("Heat transfer coefficient");
+  const double e     = prm.get_double("Emissivity");
+  const double T_a   = prm.get_double("Ambient temperature");
 
   temperature_solver.set_bc1(boundary_id_interface, T_0);
   temperature_solver.set_bc_convective(boundary_id_surface, h, T_ref);
+
+  std::function<double(const double)> emissivity_const = [=](const double) {
+    return e;
+  };
+
+  std::function<double(const double)> emissivity_deriv_const =
+    [](const double) { return 0.0; };
+
+  Vector<double> q(temperature_solver.get_temperature().size());
+
+  temperature_solver.set_bc_rad_mixed(
+    boundary_id_surface, q, emissivity_const, emissivity_deriv_const, T_a);
 }
 
 template <int dim>
