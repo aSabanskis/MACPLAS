@@ -431,17 +431,17 @@ class DoFGradientEvaluation
 public:
   /** Delete all data
    */
-  void
+  inline void
   clear();
 
   /** Add a FE field
    */
-  void
+  inline void
   add_field(const std::string &name, const Vector<double> &field);
 
   /** Attach a DoF handler corresponding to the added FE fields
    */
-  void
+  inline void
   attach_dof_handler(const DoFHandler<dim> &dof_handler);
 
   /** Calculate gradients of all fields.
@@ -450,12 +450,12 @@ public:
    * @param n_quadrature_points number of QGauss quadrature points. The default
    * value of 0 corresponds to order+1.
    */
-  void
+  inline void
   calculate(const unsigned int n_quadrature_points = 0);
 
   /** Get calculated gradients by field name
    */
-  const std::vector<Tensor<1, dim>> &
+  inline const std::vector<Tensor<1, dim>> &
   get_gradient(const std::string &name) const;
 
 private:
