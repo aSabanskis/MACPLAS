@@ -399,6 +399,30 @@ Problem<dim>::calculate_field_gradients()
 #endif
 
   grad_eval.calculate();
+
+  // output gradients
+  const auto         dims = coordinate_names(dim);
+  const unsigned int n    = temperature_solver.get_temperature().size();
+  Vector<double>     grad_component(n);
+
+  std::vector<std::string> field_names{"T"};
+#ifdef DEBUG
+  field_names.push_back("f");
+#endif
+
+  for (const auto &name : field_names)
+    {
+      const auto &grad = grad_eval.get_gradient(name);
+
+      for (unsigned int k = 0; k < dim; ++k)
+        {
+          for (unsigned int i = 0; i < n; ++i)
+            grad_component[i] = grad[i][k];
+
+          temperature_solver.add_field("d" + name + "_d" + dims[k],
+                                       grad_component);
+        }
+    }
 }
 
 template <int dim>
@@ -480,6 +504,8 @@ Problem<dim>::solve_steady_temperature()
 
       std::cout << "max_dT=" << max_dT << " K\n";
   } while (max_dT > prm.get_double("Max temperature change"));
+
+  calculate_field_gradients();
 
   temperature_solver.get_time_step() = dt0;
 
