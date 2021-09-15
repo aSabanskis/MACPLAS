@@ -40,8 +40,21 @@ private:
   void
   set_temperature_BC();
 
+  /** Checks whether the results need to be outputted at the end of the current
+   * time step, and adjusts it if necessary */
+  bool
+  update_output_time_step();
+
+  void
+  set_time_step(const double dt);
+
   void
   solve_steady_temperature();
+
+  void
+  output_results(const bool data     = false,
+                 const bool vtk      = true,
+                 const bool boundary = dim == 2) const;
 
   TemperatureSolver<dim> temperature_solver;
 
@@ -72,6 +85,9 @@ private:
   FunctionParser<2> interface_shape;
 
   DoFGradientEvaluation<dim> grad_eval;
+
+  double previous_time_step;
+  double next_output_time;
 
   ParameterHandler prm;
 };
@@ -116,6 +132,12 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     Patterns::Anything(),
                     "Crystallization interface shape z(r, t)");
 
+  prm.declare_entry("Output time step",
+                    "0",
+                    Patterns::Double(0),
+                    "Time interval in s between result output (0 - disabled). "
+                    "The time step is adjusted to match the required time.");
+
   if (use_default_prm)
     {
       std::ofstream of("problem.prm");
@@ -151,6 +173,8 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
   interface_shape.initialize("r,t",
                              prm.get("Interface shape"),
                              typename FunctionParser<2>::ConstMap());
+
+  next_output_time = prm.get_double("Output time step");
 }
 
 template <int dim>
@@ -161,20 +185,31 @@ Problem<dim>::run()
   initialize_temperature();
 
   solve_steady_temperature();
+  output_results();
 
   while (true)
     {
+      const bool output_enabled = update_output_time_step();
+
       deform_grid();
 
       set_temperature_BC();
 
       bool keep_going_temp = temperature_solver.solve();
 
-      temperature_solver.output_vtk();
-
       if (!keep_going_temp)
         break;
+
+      if (output_enabled)
+        {
+          output_results();
+
+          std::cout << "Restoring previous dt=" << previous_time_step << "s\n";
+          set_time_step(previous_time_step);
+        }
     };
+
+  output_results();
 }
 
 template <int dim>
@@ -484,6 +519,44 @@ Problem<dim>::set_temperature_BC()
 }
 
 template <int dim>
+bool
+Problem<dim>::update_output_time_step()
+{
+  const double t  = temperature_solver.get_time();
+  const double dt = temperature_solver.get_time_step();
+
+  const double dt_output = prm.get_double("Output time step");
+
+  previous_time_step = dt;
+
+  // output time step is not specified
+  if (dt_output <= 0)
+    return false;
+
+  // output time too far away, nothing to do
+  if (dt_output > 0 && t + (1 + 1e-4) * dt < next_output_time)
+    return false;
+
+  // output time is specified and the time step has to be adjusted
+  set_time_step(next_output_time - t);
+
+  std::cout << "dt changed from " << dt << " to "
+            << temperature_solver.get_time_step()
+            << " s for result output at t=" << next_output_time << " s\n";
+
+  next_output_time += dt_output;
+
+  return true;
+}
+
+template <int dim>
+void
+Problem<dim>::set_time_step(const double dt)
+{
+  temperature_solver.get_time_step() = dt;
+}
+
+template <int dim>
 void
 Problem<dim>::solve_steady_temperature()
 {
@@ -510,8 +583,32 @@ Problem<dim>::solve_steady_temperature()
   calculate_field_gradients();
 
   temperature_solver.get_time_step() = dt0;
+}
 
-  temperature_solver.output_vtk();
+template <int dim>
+void
+Problem<dim>::output_results(const bool data,
+                             const bool vtk,
+                             const bool boundary) const
+{
+  if (data)
+    {
+      temperature_solver.output_data();
+    }
+
+  if (vtk)
+    {
+      temperature_solver.output_vtk();
+    }
+
+  // Exports values at all the boundaries in 2D.
+  // Export is disabled by default in 3D.
+  if (boundary)
+    {
+      temperature_solver.output_boundary_values(boundary_id_interface);
+      temperature_solver.output_boundary_values(boundary_id_surface);
+      temperature_solver.output_boundary_values(boundary_id_axis);
+    }
 }
 
 int
