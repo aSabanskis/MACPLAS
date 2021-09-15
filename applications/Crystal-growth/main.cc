@@ -148,6 +148,16 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     "Time interval in s between result output (0 - disabled). "
                     "The time step is adjusted to match the required time.");
 
+  prm.declare_entry("Probe coordinates x",
+                    "0, 0.01",
+                    Patterns::List(Patterns::Double(), 1),
+                    "Comma-separated radial coordinates");
+
+  prm.declare_entry("Probe coordinates z",
+                    "0.002, 0.002",
+                    Patterns::List(Patterns::Double(), 1),
+                    "Comma-separated vertical coordinates");
+
   if (use_default_prm)
     {
       std::ofstream of("problem.prm");
@@ -504,6 +514,22 @@ Problem<dim>::initialize_temperature()
 
   temperature_solver.output_mesh();
   temperature_solver.output_parameter_table();
+
+  const std::vector<double> X = split_string(prm.get("Probe coordinates x"));
+  const std::vector<double> Z = split_string(prm.get("Probe coordinates z"));
+  AssertDimension(X.size(), Z.size());
+
+  for (unsigned int i = 0; i < X.size(); ++i)
+    {
+      Point<dim> p;
+      p[0]       = X[i];
+      p[dim - 1] = Z[i];
+      temperature_solver.add_probe(p);
+    }
+
+  // initialize the columns for probe output
+  temperature_solver.add_output("R[m]", crystal_radius->value(Point<1>()));
+  temperature_solver.add_output("V[m/s]", pull_rate->value(Point<1>()));
 
 #ifdef DEBUG
   // manually construct a field for testing
