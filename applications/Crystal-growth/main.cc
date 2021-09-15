@@ -309,6 +309,10 @@ Problem<dim>::deform_grid()
             << '\n';
 #endif
 
+  std::vector<Point<dim>> projector_points = surface_projector.get_points();
+  const Point<dim>        p_triple_old     = projector_points.back();
+  const Point<dim>        p_triple_new     = p_triple + dp_triple;
+
   auto points_new = points_axis;
   for (auto &it : points_new)
     {
@@ -318,6 +322,10 @@ Problem<dim>::deform_grid()
       it.second += dp;
     }
 
+  // Special treatment for the crystal side surface: project to the precise
+  // surface shape, which needs to be updated with the new triple point position
+  projector_points.push_back(p_triple_new);
+  surface_projector.set_points(projector_points);
   for (const auto &it : points_surface)
     {
       const auto dp = dp_triple * (p_axis_2 - it.second)[dim - 1] /
@@ -354,14 +362,9 @@ Problem<dim>::deform_grid()
   dz[dim - 1] = V * dt;
   GridTools::shift(dz, triangulation);
 
-  // update the precise crystal surface shape
-  const auto p_triple_new     = p_triple + dp_triple;
-  const auto p_triple_old     = surface_projector.get_points().back();
-  auto       projector_points = surface_projector.get_points();
-
-  // extend the surface by adding a new point
-  if ((p_triple_new - p_triple_old).norm() > 0.1e-3)
-    projector_points.push_back(p_triple_new);
+  // The new triple point is already added, check if the distance is too small
+  if ((p_triple_new - p_triple_old).norm() < 0.1e-3)
+    projector_points.pop_back();
 
   // shift all points
   for (auto &p : projector_points)
