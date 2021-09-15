@@ -504,6 +504,11 @@ private:
    */
   std::map<std::string, double> additional_output;
 
+  /** Flag for writing header of the probes file
+   */
+  bool probes_header_written;
+
+
   /** Parameter handler
    */
   ParameterHandler prm;
@@ -583,6 +588,7 @@ template <int dim>
 DislocationSolver<dim>::DislocationSolver(const unsigned int order,
                                           const bool         use_default_prm)
   : stress_solver(order, use_default_prm)
+  , probes_header_written(false)
   , current_time(0)
   , current_time_step(0)
   , previous_time_step(0)
@@ -789,7 +795,11 @@ DislocationSolver<dim>::solve(const bool stress_only)
       // calculate stresses and nothing more
       stress_solver.solve();
       update_time_step();
+
       output_probes();
+      // set here to keep const-ness of output_probes
+      probes_header_written = true;
+
       return has_converged();
     }
 
@@ -827,6 +837,7 @@ DislocationSolver<dim>::solve(const bool stress_only)
     AssertThrow(false, ExcNotImplemented());
 
   output_probes();
+  probes_header_written = true;
 
   if (!has_converged())
     {
@@ -1106,7 +1117,8 @@ template <int dim>
 void
 DislocationSolver<dim>::add_output(const std::string &name, const double value)
 {
-  if (get_time() > 0 && additional_output.find(name) == additional_output.end())
+  if (probes_header_written &&
+      additional_output.find(name) == additional_output.end())
     throw std::runtime_error(solver_name() + "  add_output: cannot add '" +
                              name + "' which was not present at t=0");
 
@@ -1737,7 +1749,7 @@ DislocationSolver<dim>::output_probes() const
   const BlockVector<double> &S   = get_stress_deviator();
   const BlockVector<double> &e_c = get_strain_c();
 
-  if (t == 0)
+  if (!probes_header_written)
     {
       // write header at the first time step
       std::ofstream output(file_name);

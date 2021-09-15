@@ -448,10 +448,6 @@ private:
    */
   Vector<double> vol_heat_source;
 
-  /** User-defined fields
-   */
-  std::map<std::string, Vector<double>> additional_fields;
-
   /** Density (temperature function) \f$\rho\f$, kg m<sup>-3</sup>
    */
   FunctionParser<1> m_rho;
@@ -484,6 +480,10 @@ private:
    */
   std::map<unsigned int, convective_cooling_data> bc_convective_data;
 
+
+  /** User-defined fields
+   */
+  std::map<std::string, Vector<double>> additional_fields;
 
   /** Locations of probe points
    */
@@ -1040,7 +1040,8 @@ template <int dim>
 void
 TemperatureSolver<dim>::add_output(const std::string &name, const double value)
 {
-  if (get_time() > 0 && additional_output.find(name) == additional_output.end())
+  if (probes_header_written &&
+      additional_output.find(name) == additional_output.end())
     throw std::runtime_error(solver_name() + "  add_output: cannot add '" +
                              name + "' which was not present at t=0");
 
