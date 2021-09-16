@@ -337,9 +337,13 @@ Problem<dim>::deform_grid()
 
   const double t  = temperature_solver.get_time();
   const double dt = temperature_solver.get_time_step();
-  const double R0 = crystal_radius->value(Point<1>(t));
+  const double R0 = crystal_radius->value(Point<1>(t + dt)); // at the end
   const double R  = p_triple[0];
   const double V  = pull_rate->value(Point<1>(t));
+
+  // Vertical shift of the crystal due to the pull rate
+  Point<dim> dz;
+  dz[dim - 1] = V * dt;
 
   temperature_solver.add_output("R[m]", R0);
   temperature_solver.add_output("V[m/s]", V);
@@ -347,10 +351,13 @@ Problem<dim>::deform_grid()
   auto calc_interface_displacement = [&](const Point<dim> &p) {
     Point<dim> dp;
 
-    // scale radially
+    // Scale radially
     dp[0] = (R0 - R) * (p[0] / R);
-    // shift vertically
-    dp[dim - 1] = interface_shape.value(Point<2>(p[0], t)) - p[dim - 1];
+
+    // Shift vertically. The crystal pulling has to taken into account to keep
+    // the correct interface position at the end of the time step.
+    dp[dim - 1] =
+      interface_shape.value(Point<2>(p[0], t)) - dz[dim - 1] - p[dim - 1];
 
     return dp;
   };
@@ -413,8 +420,6 @@ Problem<dim>::deform_grid()
   update_fields();
 
   // shift the whole mesh according to the pull rate
-  Point<dim> dz;
-  dz[dim - 1] = V * dt;
   GridTools::shift(dz, triangulation);
 
   // The new triple point is already added, check if the distance is too small
