@@ -52,6 +52,9 @@ private:
   solve_steady_temperature();
 
   void
+  solve_temperature();
+
+  void
   output_results(const bool data     = false,
                  const bool vtk      = true,
                  const bool boundary = dim == 2) const;
@@ -213,31 +216,8 @@ Problem<dim>::run()
   initialize_temperature();
 
   solve_steady_temperature();
-  output_results();
 
-  while (true)
-    {
-      const bool output_enabled = update_output_time_step();
-
-      deform_grid();
-
-      set_temperature_BC();
-
-      bool keep_going_temp = temperature_solver.solve();
-
-      if (!keep_going_temp)
-        break;
-
-      if (output_enabled)
-        {
-          output_results();
-
-          std::cout << "Restoring previous dt=" << previous_time_step << "s\n";
-          set_time_step(previous_time_step);
-        }
-    };
-
-  output_results();
+  solve_temperature();
 
   std::cout << "Finished in " << timer.wall_time() << " s\n";
 }
@@ -677,7 +657,40 @@ Problem<dim>::solve_steady_temperature()
 
   calculate_field_gradients();
 
+  output_results();
+
   temperature_solver.get_time_step() = dt0;
+}
+
+template <int dim>
+void
+Problem<dim>::solve_temperature()
+{
+  std::cout << "Calculating transient temperature field\n";
+
+  while (true)
+    {
+      const bool output_enabled = update_output_time_step();
+
+      deform_grid();
+
+      set_temperature_BC();
+
+      bool keep_going_temp = temperature_solver.solve();
+
+      if (!keep_going_temp)
+        break;
+
+      if (output_enabled)
+        {
+          output_results();
+
+          std::cout << "Restoring previous dt=" << previous_time_step << "s\n";
+          set_time_step(previous_time_step);
+        }
+    };
+
+  output_results();
 }
 
 template <int dim>
