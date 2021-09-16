@@ -142,6 +142,12 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     Patterns::Anything(),
                     "Crystallization interface shape z(r, t)");
 
+  prm.declare_entry(
+    "Surface update tolerance",
+    "0.1e-3",
+    Patterns::Double(0),
+    "Distance in m for update of precise crystal shape (0 - always)");
+
   prm.declare_entry("Output time step",
                     "0",
                     Patterns::Double(0),
@@ -388,6 +394,23 @@ Problem<dim>::deform_grid()
   // surface shape, which needs to be updated with the new triple point position
   projector_points.push_back(p_triple_new);
   surface_projector.set_points(projector_points);
+
+#ifdef DEBUG
+  std::stringstream tmp;
+  tmp << std::setprecision(8) << "crystal-surface-t" << t << ".dat";
+  std::ofstream out(tmp.str());
+  // output the precise crystal shape
+  for (const auto &p : projector_points)
+    out << p << '\n';
+
+  // output the original, shifted and projected points (see the 'for' loop)
+  out.close();
+  tmp.str("");
+  tmp << std::setprecision(8) << "crystal-points-t" << t << ".dat";
+  out.open(tmp.str());
+  out << "# original shifted projected\n";
+#endif
+
   for (const auto &it : points_surface)
     {
       const auto dp = dp_triple * (p_axis_2 - it.second)[dim - 1] /
@@ -396,6 +419,10 @@ Problem<dim>::deform_grid()
       const auto p = it.second + dp;
 
       points_new[it.first] = surface_projector.project(p);
+
+#ifdef DEBUG
+      out << it.second << ' ' << p << ' ' << points_new[it.first] << '\n';
+#endif
     }
 
   for (const auto &it : points_interface)
@@ -423,7 +450,8 @@ Problem<dim>::deform_grid()
   GridTools::shift(dz, triangulation);
 
   // The new triple point is already added, check if the distance is too small
-  if ((p_triple_new - p_triple_old).norm() < 0.1e-3)
+  if ((p_triple_new - p_triple_old).norm() <
+      prm.get_double("Surface update tolerance"))
     projector_points.pop_back();
 
   // shift all points
@@ -431,14 +459,6 @@ Problem<dim>::deform_grid()
     p += dz;
 
   surface_projector.set_points(projector_points);
-
-#ifdef DEBUG
-  std::stringstream ss;
-  ss << std::setprecision(8) << "crystal-surface-t" << t << ".dat";
-  std::ofstream out(ss.str());
-  for (const auto &p : projector_points)
-    out << p << '\n';
-#endif
 
   temperature_solver.get_mesh().clear();
   temperature_solver.get_mesh().copy_triangulation(triangulation);
