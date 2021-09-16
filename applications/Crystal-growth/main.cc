@@ -56,6 +56,8 @@ private:
                  const bool vtk      = true,
                  const bool boundary = dim == 2) const;
 
+  Timer timer;
+
   TemperatureSolver<dim> temperature_solver;
 
   std::vector<Point<dim>> support_points, support_points_prev;
@@ -236,6 +238,8 @@ Problem<dim>::run()
     };
 
   output_results();
+
+  std::cout << "Finished in " << timer.wall_time() << " s\n";
 }
 
 template <int dim>
