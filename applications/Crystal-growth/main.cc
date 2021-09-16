@@ -494,6 +494,10 @@ Problem<dim>::calculate_field_gradients()
   field_names.push_back("f");
 #endif
 
+  // initialize displacement with zeros at t=0
+  for (unsigned int k = 0; k < dim; ++k)
+    temperature_solver.add_field("d" + dims[k], grad_component);
+
   for (const auto &name : field_names)
     {
       const auto &grad = grad_eval.get_gradient(name);
@@ -513,19 +517,31 @@ template <int dim>
 void
 Problem<dim>::update_fields()
 {
-  Vector<double> &T = temperature_solver.get_temperature();
+  Vector<double> &   T = temperature_solver.get_temperature();
+  const unsigned int n = T.size();
 
   const auto &grad_T = grad_eval.get_gradient("T");
 
-  for (unsigned int i = 0; i < T.size(); ++i)
+  for (unsigned int i = 0; i < n; ++i)
     T[i] += dr[i] * grad_T[i];
 
   temperature_solver.apply_bc1();
 
+  // output the displacement at DoFs as well
+  const auto     dims = coordinate_names(dim);
+  Vector<double> dr_component(n);
+  for (unsigned int k = 0; k < dim; ++k)
+    {
+      for (unsigned int i = 0; i < n; ++i)
+        dr_component[i] = dr[i][k];
+
+      temperature_solver.add_field("d" + dims[k], dr_component);
+    }
+
 #ifdef DEBUG
   const auto &grad_f = grad_eval.get_gradient("f");
 
-  for (unsigned int i = 0; i < T.size(); ++i)
+  for (unsigned int i = 0; i < n; ++i)
     f_test[i] += dr[i] * grad_f[i];
 
   temperature_solver.add_field("f", f_test);
