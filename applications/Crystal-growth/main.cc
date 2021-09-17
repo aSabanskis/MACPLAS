@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <fstream>
 
+#include "../../include/dislocation_solver.h"
 #include "../../include/temperature_solver.h"
 #include "../../include/utilities.h"
 
@@ -38,6 +39,9 @@ private:
   initialize_temperature();
 
   void
+  initialize_dislocation();
+
+  void
   set_temperature_BC();
 
   /** Checks whether the results need to be outputted at the end of the current
@@ -55,13 +59,22 @@ private:
   solve_temperature();
 
   void
+  solve_temperature_dislocation();
+
+  void
   output_results(const bool data     = false,
                  const bool vtk      = true,
                  const bool boundary = dim == 2) const;
 
+  // false if only the temperature field is calculated
+  bool
+  with_dislocation() const;
+
   Timer timer;
 
   TemperatureSolver<dim> temperature_solver;
+
+  DislocationSolver<dim> dislocation_solver;
 
   std::vector<Point<dim>> support_points, support_points_prev;
 
@@ -100,6 +113,7 @@ private:
 template <int dim>
 Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
   : temperature_solver(order, use_default_prm)
+  , dislocation_solver(order, use_default_prm)
 {
   prm.declare_entry("Melting point",
                     "1210",
@@ -130,6 +144,11 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     "300",
                     Patterns::Double(0),
                     "Reference temperature T_ref in K");
+
+  prm.declare_entry("Temperature only",
+                    "false",
+                    Patterns::Bool(),
+                    "Calculate just the temperature field");
 
   prm.declare_entry(
     "Pull rate",
@@ -197,6 +216,20 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
   temperature_solver.get_parameters().print_parameters(std::cout,
                                                        ParameterHandler::Text);
 
+  if (with_dislocation())
+    {
+      std::cout << "# ---------------------\n"
+                << "# " << dislocation_solver.solver_name() << '\n';
+      dislocation_solver.get_parameters().print_parameters(
+        std::cout, ParameterHandler::Text);
+
+      std::cout << "# ---------------------\n"
+                << "# " << dislocation_solver.get_stress_solver().solver_name()
+                << '\n';
+      dislocation_solver.get_stress_solver().get_parameters().print_parameters(
+        std::cout, ParameterHandler::Text);
+    }
+
   initialize_function(pull_rate, prm.get("Pull rate"));
 
   initialize_function(crystal_radius, prm.get("Crystal radius"));
@@ -212,12 +245,34 @@ template <int dim>
 void
 Problem<dim>::run()
 {
+  // initialize the mesh, all fields (steady T) and output the results at t=0
+
   make_grid();
+
   initialize_temperature();
 
   solve_steady_temperature();
 
-  solve_temperature();
+  if (with_dislocation())
+    initialize_dislocation();
+
+  calculate_field_gradients();
+
+  output_results();
+
+  // now run transient simulations unless the time step is zero
+  if (temperature_solver.get_time_step() == 0)
+    {
+      std::cout << "dt=0, stopping simulation\n";
+    }
+  else if (!with_dislocation())
+    {
+      solve_temperature();
+    }
+  else
+    {
+      solve_temperature_dislocation();
+    }
 
   std::cout << "Finished in " << timer.wall_time() << " s\n";
 }
@@ -232,6 +287,9 @@ Problem<dim>::make_grid()
   gi.attach_triangulation(triangulation);
   std::ifstream f("mesh-" + std::to_string(dim) + "d.msh");
   gi.read_msh(f);
+
+  if (with_dislocation())
+    dislocation_solver.get_mesh().copy_triangulation(triangulation);
 
   // print info
   std::cout << "Number of cells: " << triangulation.n_cells() << "\n"
@@ -337,6 +395,11 @@ Problem<dim>::deform_grid()
 
   temperature_solver.add_output("R[m]", R0);
   temperature_solver.add_output("V[m/s]", V);
+  if (with_dislocation())
+    {
+      dislocation_solver.add_output("R[m]", R0);
+      dislocation_solver.add_output("V[m/s]", V);
+    }
 
   auto calc_interface_displacement = [&](const Point<dim> &p) {
     Point<dim> dp;
@@ -446,6 +509,12 @@ Problem<dim>::deform_grid()
 
   temperature_solver.get_mesh().clear();
   temperature_solver.get_mesh().copy_triangulation(triangulation);
+
+  if (with_dislocation())
+    {
+      dislocation_solver.get_mesh().clear();
+      dislocation_solver.get_mesh().copy_triangulation(triangulation);
+    }
 }
 
 template <int dim>
@@ -457,6 +526,16 @@ Problem<dim>::calculate_field_gradients()
 
   grad_eval.attach_dof_handler(temperature_solver.get_dof_handler());
   grad_eval.add_field("T", temperature_solver.get_temperature());
+
+  if (with_dislocation())
+    {
+      grad_eval.add_field("N_m", dislocation_solver.get_dislocation_density());
+
+      const BlockVector<double> &e_c = dislocation_solver.get_strain_c();
+
+      for (unsigned int j = 0; j < e_c.n_blocks(); ++j)
+        grad_eval.add_field("e_c_" + std::to_string(j), e_c.block(j));
+    }
 
 #ifdef DEBUG
   grad_eval.add_field("f", f_test);
@@ -473,6 +552,7 @@ Problem<dim>::calculate_field_gradients()
 #ifdef DEBUG
   field_names.push_back("f");
 #endif
+  // skip gradients of dislocation density solver fields for now
 
   // initialize displacement with zeros at t=0
   for (unsigned int k = 0; k < dim; ++k)
@@ -526,6 +606,30 @@ Problem<dim>::update_fields()
 
   temperature_solver.add_field("f", f_test);
 #endif
+
+  if (with_dislocation())
+    {
+      Vector<double> &N_m = dislocation_solver.get_dislocation_density();
+
+      const auto &grad_N_m = grad_eval.get_gradient("N_m");
+
+      for (unsigned int i = 0; i < n; ++i)
+        N_m[i] += dr[i] * grad_N_m[i];
+
+
+      BlockVector<double> &e_c = dislocation_solver.get_strain_c();
+
+      for (unsigned int j = 0; j < e_c.n_blocks(); ++j)
+        {
+          Vector<double> &e = e_c.block(j);
+
+          const auto &grad_e =
+            grad_eval.get_gradient("e_c_" + std::to_string(j));
+
+          for (unsigned int i = 0; i < n; ++i)
+            e[i] += dr[i] * grad_e[i];
+        }
+    }
 }
 
 template <int dim>
@@ -533,6 +637,8 @@ void
 Problem<dim>::initialize_temperature()
 {
   temperature_solver.initialize(); // sets T=0
+
+  previous_time_step = temperature_solver.get_time_step();
 
   Vector<double> &temperature = temperature_solver.get_temperature();
   temperature.add(prm.get_double("Melting point"));
@@ -550,6 +656,7 @@ Problem<dim>::initialize_temperature()
       p[0]       = X[i];
       p[dim - 1] = Z[i];
       temperature_solver.add_probe(p);
+      dislocation_solver.add_probe(p);
     }
 
   // initialize the columns for probe output
@@ -565,6 +672,27 @@ Problem<dim>::initialize_temperature()
                 sqr(support_points[i][dim - 1] - 0.005);
   temperature_solver.add_field("f", f_test);
 #endif
+}
+
+template <int dim>
+void
+Problem<dim>::initialize_dislocation()
+{
+  // initialize dislocations and stresses
+  dislocation_solver.initialize();
+  dislocation_solver.get_temperature() = temperature_solver.get_temperature();
+
+  dislocation_solver.add_output("R[m]", crystal_radius->value(Point<1>()));
+  dislocation_solver.add_output("V[m/s]", pull_rate->value(Point<1>()));
+
+  dislocation_solver.output_parameter_table();
+
+  if (dim == 2)
+    dislocation_solver.get_stress_solver().set_bc1(boundary_id_axis, 0, 0);
+
+  dislocation_solver.solve(true);
+
+  previous_time_step = temperature_solver.get_time_step();
 }
 
 template <int dim>
@@ -629,6 +757,7 @@ void
 Problem<dim>::set_time_step(const double dt)
 {
   temperature_solver.get_time_step() = dt;
+  dislocation_solver.get_time_step() = dt;
 }
 
 template <int dim>
@@ -655,10 +784,6 @@ Problem<dim>::solve_steady_temperature()
       std::cout << "max_dT=" << max_dT << " K\n";
   } while (max_dT > prm.get_double("Max temperature change"));
 
-  calculate_field_gradients();
-
-  output_results();
-
   temperature_solver.get_time_step() = dt0;
 }
 
@@ -676,9 +801,47 @@ Problem<dim>::solve_temperature()
 
       set_temperature_BC();
 
-      bool keep_going_temp = temperature_solver.solve();
+      const bool keep_going_temp = temperature_solver.solve();
 
       if (!keep_going_temp)
+        break;
+
+      if (output_enabled)
+        {
+          output_results();
+
+          std::cout << "Restoring previous dt=" << previous_time_step << "s\n";
+          set_time_step(previous_time_step);
+        }
+    };
+
+  output_results();
+}
+
+template <int dim>
+void
+Problem<dim>::solve_temperature_dislocation()
+{
+  std::cout << "Calculating temperature and dislocation density\n";
+
+  while (true)
+    {
+      const bool output_enabled = update_output_time_step();
+
+      set_time_step(dislocation_solver.get_time_step());
+
+      deform_grid();
+
+      set_temperature_BC();
+
+      const bool keep_going_temp = temperature_solver.solve();
+
+      dislocation_solver.get_temperature() =
+        temperature_solver.get_temperature();
+
+      const bool keep_going_disl = dislocation_solver.solve();
+
+      if (!keep_going_temp || !keep_going_disl)
         break;
 
       if (output_enabled)
@@ -699,14 +862,22 @@ Problem<dim>::output_results(const bool data,
                              const bool vtk,
                              const bool boundary) const
 {
+  const bool has_dislocation =
+    with_dislocation() &&
+    dislocation_solver.get_dof_handler().has_active_dofs();
+
   if (data)
     {
       temperature_solver.output_data();
+      if (has_dislocation)
+        dislocation_solver.output_data();
     }
 
   if (vtk)
     {
       temperature_solver.output_vtk();
+      if (has_dislocation)
+        dislocation_solver.output_vtk();
     }
 
   // Exports values at all the boundaries in 2D.
@@ -716,7 +887,20 @@ Problem<dim>::output_results(const bool data,
       temperature_solver.output_boundary_values(boundary_id_interface);
       temperature_solver.output_boundary_values(boundary_id_surface);
       temperature_solver.output_boundary_values(boundary_id_axis);
+      if (has_dislocation)
+        {
+          dislocation_solver.output_boundary_values(boundary_id_interface);
+          dislocation_solver.output_boundary_values(boundary_id_surface);
+          dislocation_solver.output_boundary_values(boundary_id_axis);
+        }
     }
+}
+
+template <int dim>
+bool
+Problem<dim>::with_dislocation() const
+{
+  return !prm.get_bool("Temperature only");
 }
 
 int
