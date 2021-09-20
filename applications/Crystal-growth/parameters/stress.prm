@@ -1,0 +1,25 @@
+set Linear solver iterations         = 1000
+set Linear solver tolerance          = 1e-8
+set Linear solver type               = UMFPACK # minres
+set Number of cell quadrature points = 0
+set Number of threads                = 0
+set Output precision                 = 8
+set Output subdivisions              = 0
+set Poisson's ratio                  = 0.26
+set Preconditioner relaxation        = 1.0
+set Preconditioner type              = jacobi
+set Reference temperature            = 280
+set Thermal expansion coefficient    = 7.5e-6
+set Young's modulus                  = 1.03e11
+set Log convergence full             = false
+set Log convergence final            = false
+subsection Stress recovery
+  set Method                    = extrapolation # global
+  set Linear solver iterations  = 1000
+  set Linear solver tolerance   = 1e-12
+  set Linear solver type        = minres
+  set Log convergence final     = true
+  set Log convergence full      = false
+  set Preconditioner relaxation = 1.0
+  set Preconditioner type       = jacobi
+end

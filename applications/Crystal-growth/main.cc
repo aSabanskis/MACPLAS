@@ -136,7 +136,7 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     "Ambient temperature T_amb in K");
 
   prm.declare_entry("Heat transfer coefficient",
-                    "10",
+                    "0",
                     Patterns::Double(0),
                     "Heat transfer coefficient h in W/m^2/K");
 
@@ -157,14 +157,15 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
     "Crystal pull rate V in m/s (time function or data file name)");
 
   prm.declare_entry("Crystal radius",
-                    "0.01 + 0.5e-3 * sin(t * 0.5)",
+                    "0.01",
                     Patterns::Anything(),
                     "Crystal radius R in m (time function or data file name)");
 
-  prm.declare_entry("Interface shape",
-                    "-5e-4 * cos(r * 500) * sin(t * 0.1)",
-                    Patterns::Anything(),
-                    "Crystallization interface shape z(r, t)");
+  prm.declare_entry(
+    "Interface shape",
+    "0",
+    Patterns::Anything(),
+    "Crystallization interface shape z(r, t) in laboratory reference frame");
 
   prm.declare_entry(
     "Surface update tolerance",
