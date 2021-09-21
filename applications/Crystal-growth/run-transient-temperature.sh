@@ -22,7 +22,7 @@ cp parameters/*.prm .
 setup_parameters
 
 sed -Ei "s|(set Temperature only *= *).*|\1 true|" problem.prm
-sed -Ei "s|(set Time step *= *).*|\1 2|" temperature.prm
+sed -Ei "s|(set Time step *= *).*|\1 1|" temperature.prm
 
 cp -- *.prm "$r"
 
