@@ -64,7 +64,8 @@ private:
   void
   output_results(const bool data     = false,
                  const bool vtk      = true,
-                 const bool boundary = dim == 2) const;
+                 const bool boundary = dim == 2,
+                 const bool mesh     = true) const;
 
   // false if only the temperature field is calculated
   bool
@@ -644,7 +645,6 @@ Problem<dim>::initialize_temperature()
   Vector<double> &temperature = temperature_solver.get_temperature();
   temperature.add(prm.get_double("Melting point"));
 
-  temperature_solver.output_mesh();
   temperature_solver.output_parameter_table();
 
   const std::vector<double> X = split_string(prm.get("Probe coordinates x"));
@@ -861,7 +861,8 @@ template <int dim>
 void
 Problem<dim>::output_results(const bool data,
                              const bool vtk,
-                             const bool boundary) const
+                             const bool boundary,
+                             const bool mesh) const
 {
   const bool has_dislocation =
     with_dislocation() &&
@@ -894,6 +895,11 @@ Problem<dim>::output_results(const bool data,
           dislocation_solver.output_boundary_values(boundary_id_surface);
           dislocation_solver.output_boundary_values(boundary_id_axis);
         }
+    }
+
+  if (mesh)
+    {
+      temperature_solver.output_mesh();
     }
 }
 
