@@ -713,6 +713,7 @@ TemperatureSolver<dim>::initialize_parameters()
   get_time_step() = prm.get_double("Time step");
 
   add_output("nNewton");
+  add_output("Velocity[m/s]");
 
   const long int n_q_default = get_degree() + 1;
 
@@ -733,7 +734,7 @@ TemperatureSolver<dim>::initialize_parameters()
             << "c_p=" << m_c_p_expression << "\n"
             << "lambda=" << m_lambda_expression << "\n"
             << "derivative_lambda=" << m_derivative_lambda_expression << "\n"
-            << "V_z=" << prm.get("Velocity") << "\n";
+            << "V_z=" << calc_V_z() << "\n";
 
   std::cout << "n_q_cell=" << prm.get("Number of cell quadrature points")
             << "\n"
@@ -770,8 +771,9 @@ TemperatureSolver<dim>::solve(const bool skip_time_advance)
   const double dt    = get_time_step();
   const double t_max = get_max_time();
 
-#ifdef DEBUG
   const double V_z = calc_V_z();
+  add_output("Velocity[m/s]", V_z);
+#ifdef DEBUG
   if (dt > 0 && V_z != 0)
     {
       std::cout << solver_name() << "  Warning: non-zero velocity V_z=" << V_z
