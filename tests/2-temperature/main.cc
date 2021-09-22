@@ -25,7 +25,7 @@ private:
 
   TemperatureSolver<dim> solver;
 
-  int BC;
+  std::string BC;
 
   bool steady;
 };
@@ -33,21 +33,20 @@ private:
 template <int dim>
 Problem<dim>::Problem(const std::vector<std::string> &arguments)
   : solver(get_degree(arguments))
-  , BC(1)
   , steady(false)
 {
   for (unsigned int i = 1; i < arguments.size(); ++i)
     {
-      if (arguments[i] == "bc1" || arguments[i] == "BC1")
-        BC = 1;
-      if (arguments[i] == "bc2" || arguments[i] == "BC2")
-        BC = 2;
-      if (arguments[i] == "bc3" || arguments[i] == "BC3")
-        BC = 3;
+      if (Utilities::match_at_string_start(arguments[i], "bc") ||
+          Utilities::match_at_string_start(arguments[i], "BC"))
+        BC = arguments[i].substr(2);
 
       if (arguments[i] == "steady")
         steady = true;
     }
+
+  AssertThrow(!BC.empty(), ExcMessage("No boundary conditions provided"));
+  std::cout << "BC = " << BC << '\n';
 }
 
 template <int dim>
@@ -136,7 +135,7 @@ Problem<dim>::initialize()
 
   unsigned int boundary_id = 0;
 
-  if (dim == 1 && BC == 1)
+  if (BC == "1")
     {
       const double T0 = 1000;
       std::cout << "Setting T=" << T0 << " at boundary " << boundary_id << '\n';
@@ -144,7 +143,7 @@ Problem<dim>::initialize()
       return;
     }
 
-  if (dim == 1 && BC == 2)
+  if (BC == "2")
     {
       std::vector<Point<dim>> points;
       std::vector<bool>       boundary_dofs;
@@ -168,7 +167,7 @@ Problem<dim>::initialize()
       return;
     }
 
-  if (dim == 1 && BC == 3)
+  if (BC == "3")
     {
       const double h = 2000;
       const double T = 1000;
@@ -178,51 +177,53 @@ Problem<dim>::initialize()
       return;
     }
 
-  if (dim == 2)
+  if (BC == "1b")
     {
       const double T1 = 500;
       const double T2 = 1000;
-      std::cout << "Setting T=" << T1 << " at boundary " << 0 << ", T=" << T2
-                << " at boundary " << 1 << '\n';
+      std::cout << "Setting T=" << T1 << " at boundary 0\n";
       solver.set_bc1(0, T1);
+      std::cout << "Setting T=" << T2 << " at boundary 1\n";
       solver.set_bc1(1, T2);
       return;
     }
 
-  // BC == 3
-
-  // Physical parameters from https://doi.org/10.1016/S0022-0248(03)01253-3
-  const double T0 = 1687;
-
-  Vector<double> &temperature = solver.get_temperature();
-  temperature.add(T0);
-
-  std::cout << "Setting T=" << T0 << " at boundary " << boundary_id << '\n';
-  solver.set_bc1(boundary_id, T0);
-
-  std::vector<Point<dim>> points;
-  std::vector<bool>       boundary_dofs;
-  boundary_id = 1;
-  solver.get_boundary_points(boundary_id, points, boundary_dofs);
-  const double   q0 = 1e4;
-  Vector<double> q(points.size());
-  for (unsigned int i = 0; i < q.size(); ++i)
+  if (BC == "3b")
     {
-      if (boundary_dofs[i])
-        q[i] = q0;
+      // Physical parameters from https://doi.org/10.1016/S0022-0248(03)01253-3
+      const double T0 = 1687;
+
+      Vector<double> &temperature = solver.get_temperature();
+      temperature.add(T0);
+
+      std::cout << "Setting T=" << T0 << " at boundary " << boundary_id << '\n';
+      solver.set_bc1(boundary_id, T0);
+
+      std::vector<Point<dim>> points;
+      std::vector<bool>       boundary_dofs;
+      boundary_id = 1;
+      solver.get_boundary_points(boundary_id, points, boundary_dofs);
+      const double   q0 = 1e4;
+      Vector<double> q(points.size());
+      for (unsigned int i = 0; i < q.size(); ++i)
+        {
+          if (boundary_dofs[i])
+            q[i] = q0;
+        }
+      const double                        emissivity0 = 0.46;
+      std::function<double(const double)> emissivity  = [=](const double T) {
+        const double t = T / T0;
+        return emissivity0 * (t < 0.593 ? 1.39 : 1.96 - 0.96 * t);
+      };
+      std::function<double(const double)> emissivity_deriv =
+        [=](const double T) {
+          const double t = T / T0;
+          return emissivity0 * (t < 0.593 ? 0 : -0.96 / T0);
+        };
+      std::cout << "Setting e(T) at boundary " << boundary_id << '\n';
+      std::cout << "Setting q=" << q0 << " at boundary " << boundary_id << '\n';
+      solver.set_bc_rad_mixed(boundary_id, q, emissivity, emissivity_deriv);
     }
-  const double                        emissivity0 = 0.46;
-  std::function<double(const double)> emissivity  = [=](const double T) {
-    const double t = T / T0;
-    return emissivity0 * (t < 0.593 ? 1.39 : 1.96 - 0.96 * t);
-  };
-  std::function<double(const double)> emissivity_deriv = [=](const double T) {
-    const double t = T / T0;
-    return emissivity0 * (t < 0.593 ? 0 : -0.96 / T0);
-  };
-  std::cout << "Setting e(T) at boundary " << boundary_id << '\n';
-  std::cout << "Setting q=" << q0 << " at boundary " << boundary_id << '\n';
-  solver.set_bc_rad_mixed(boundary_id, q, emissivity, emissivity_deriv);
 }
 
 template <int dim>
