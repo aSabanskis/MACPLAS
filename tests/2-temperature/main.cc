@@ -8,7 +8,7 @@ template <int dim>
 class Problem
 {
 public:
-  Problem(const unsigned int order = 2, const int bc = 0);
+  Problem(const std::vector<std::string> &arguments);
 
   void
   run();
@@ -20,16 +20,35 @@ private:
   void
   initialize();
 
+  unsigned int
+  get_degree(const std::vector<std::string> &arguments) const;
+
   TemperatureSolver<dim> solver;
 
   int BC;
+
+  bool steady;
 };
 
 template <int dim>
-Problem<dim>::Problem(const unsigned int order, const int bc)
-  : solver(order)
-  , BC(bc)
-{}
+Problem<dim>::Problem(const std::vector<std::string> &arguments)
+  : solver(get_degree(arguments))
+  , BC(1)
+  , steady(false)
+{
+  for (unsigned int i = 1; i < arguments.size(); ++i)
+    {
+      if (arguments[i] == "bc1" || arguments[i] == "BC1")
+        BC = 1;
+      if (arguments[i] == "bc2" || arguments[i] == "BC2")
+        BC = 2;
+      if (arguments[i] == "bc3" || arguments[i] == "BC3")
+        BC = 3;
+
+      if (arguments[i] == "steady")
+        steady = true;
+    }
+}
 
 template <int dim>
 void
@@ -53,8 +72,7 @@ Problem<dim>::run()
 
   // write results on x axis
   std::stringstream ss;
-  ss << "result-" << dim << "d-order"
-     << solver.get_dof_handler().get_fe().degree << "-x.dat";
+  ss << "result-" << dim << "d-order" << solver.get_degree() << "-x.dat";
   const std::string file_name = ss.str();
   std::cout << "Saving postprocessed results to '" << file_name << "'";
 
@@ -73,10 +91,8 @@ Problem<dim>::run()
       // select points with y=z=0
       Point<dim> p = support_points[i];
       p[0]         = 0;
-      if (p.norm_square() > 1e-8)
-        continue;
-
-      f << support_points[i] << " " << temperature[i] << '\n';
+      if (p.norm_square() < 1e-8)
+        f << support_points[i] << " " << temperature[i] << '\n';
     }
 }
 
@@ -114,12 +130,17 @@ Problem<dim>::initialize()
 {
   solver.initialize(); // sets T=0
 
+  // steady-state: set time step to zero
+  if (steady)
+    solver.get_time_step() = 0;
+
   unsigned int boundary_id = 0;
 
-  // essential boundary conditions
   if (dim == 1 && BC == 1)
     {
-      solver.set_bc1(boundary_id, 1000);
+      const double T0 = 1000;
+      std::cout << "Setting T=" << T0 << " at boundary " << boundary_id << '\n';
+      solver.set_bc1(boundary_id, T0);
       return;
     }
 
@@ -128,36 +149,43 @@ Problem<dim>::initialize()
       std::vector<Point<dim>> points;
       std::vector<bool>       boundary_dofs;
 
+      const double q0 = 3e5;
+
       solver.get_boundary_points(boundary_id, points, boundary_dofs);
       Vector<double> q(points.size());
       for (unsigned int i = 0; i < q.size(); ++i)
         {
           if (boundary_dofs[i])
-            q[i] = 3e5;
+            q[i] = q0;
         }
 
       std::function<double(const double)> zero = [=](const double) {
         return 0.0;
       };
 
+      std::cout << "Setting q=" << q0 << " at boundary " << boundary_id << '\n';
       solver.set_bc_rad_mixed(boundary_id, q, zero, zero);
       return;
     }
 
   if (dim == 1 && BC == 3)
     {
-      solver.set_bc_convective(boundary_id, 2000, 1000);
+      const double h = 2000;
+      const double T = 1000;
+      std::cout << "Setting h=" << h << ", T=" << T << " at boundary "
+                << boundary_id << '\n';
+      solver.set_bc_convective(boundary_id, h, T);
       return;
     }
 
-  // steady-state
-  solver.get_time_step() = 0;
-
-  // natural boundary conditions
   if (dim == 2)
     {
-      solver.set_bc1(0, 500);
-      solver.set_bc1(1, 1000);
+      const double T1 = 500;
+      const double T2 = 1000;
+      std::cout << "Setting T=" << T1 << " at boundary " << 0 << ", T=" << T2
+                << " at boundary " << 1 << '\n';
+      solver.set_bc1(0, T1);
+      solver.set_bc1(1, T2);
       return;
     }
 
@@ -169,17 +197,19 @@ Problem<dim>::initialize()
   Vector<double> &temperature = solver.get_temperature();
   temperature.add(T0);
 
+  std::cout << "Setting T=" << T0 << " at boundary " << boundary_id << '\n';
   solver.set_bc1(boundary_id, T0);
 
   std::vector<Point<dim>> points;
   std::vector<bool>       boundary_dofs;
   boundary_id = 1;
   solver.get_boundary_points(boundary_id, points, boundary_dofs);
+  const double   q0 = 1e4;
   Vector<double> q(points.size());
   for (unsigned int i = 0; i < q.size(); ++i)
     {
       if (boundary_dofs[i])
-        q[i] = 1e4;
+        q[i] = q0;
     }
   const double                        emissivity0 = 0.46;
   std::function<double(const double)> emissivity  = [=](const double T) {
@@ -190,7 +220,22 @@ Problem<dim>::initialize()
     const double t = T / T0;
     return emissivity0 * (t < 0.593 ? 0 : -0.96 / T0);
   };
+  std::cout << "Setting e(T) at boundary " << boundary_id << '\n';
+  std::cout << "Setting q=" << q0 << " at boundary " << boundary_id << '\n';
   solver.set_bc_rad_mixed(boundary_id, q, emissivity, emissivity_deriv);
+}
+
+template <int dim>
+unsigned int
+Problem<dim>::get_degree(const std::vector<std::string> &arguments) const
+{
+  unsigned int order = 2;
+
+  for (unsigned int i = 1; i < arguments.size(); ++i)
+    if (arguments[i] == "order" && i + 1 < arguments.size())
+      order = std::stoi(arguments[i + 1]);
+
+  return order;
 }
 
 int
@@ -198,9 +243,7 @@ main(int argc, char *argv[])
 {
   const std::vector<std::string> arguments(argv, argv + argc);
 
-  int order     = 2;
   int dimension = 1;
-  int bc        = 0;
 
   for (unsigned int i = 1; i < arguments.size(); ++i)
     {
@@ -210,33 +253,24 @@ main(int argc, char *argv[])
         dimension = 2;
       if (arguments[i] == "3d" || arguments[i] == "3D")
         dimension = 3;
-
-      if (arguments[i] == "bc1" || arguments[i] == "BC1")
-        bc = 1;
-      if (arguments[i] == "bc2" || arguments[i] == "BC2")
-        bc = 2;
-      if (arguments[i] == "bc3" || arguments[i] == "BC3")
-        bc = 3;
     }
 
   deallog.attach(std::cout);
   deallog.depth_console(2);
 
-  std::cout << "Problem dimension=" << dimension << ", bc=" << bc << "\n";
-
   if (dimension == 1)
     {
-      Problem<1> p(order, bc);
-      p.run();
+      Problem<1> p1(arguments);
+      p1.run();
     }
   else if (dimension == 2)
     {
-      Problem<2> p2(order);
+      Problem<2> p2(arguments);
       p2.run();
     }
   else if (dimension == 3)
     {
-      Problem<3> p3(order);
+      Problem<3> p3(arguments);
       p3.run();
     }
 

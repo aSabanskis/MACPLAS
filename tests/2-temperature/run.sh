@@ -9,6 +9,6 @@ mv probes-temperature-1d.txt probes-temperature-1d-BC2.txt
 ./macplas-test-2 1D BC3
 mv probes-temperature-1d.txt probes-temperature-1d-BC3.txt
 
-./macplas-test-2 2D
+./macplas-test-2 2D steady
 
 ./plot-probes.plt
