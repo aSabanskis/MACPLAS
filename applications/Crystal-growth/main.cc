@@ -769,7 +769,14 @@ Problem<dim>::solve_steady_temperature()
 
   const double dt0 = temperature_solver.get_time_step();
 
+  ParameterHandler &prm_T = temperature_solver.get_parameters();
+  // saving as string to avoid ambiguous overloads
+  const std::string V0 = prm_T.get("Velocity");
+
   temperature_solver.get_time_step() = 0;
+
+  // set the pull rate
+  prm_T.set("Velocity", pull_rate->value(Point<1>()));
 
   double max_dT;
   do
@@ -786,6 +793,7 @@ Problem<dim>::solve_steady_temperature()
   } while (max_dT > prm.get_double("Max temperature change"));
 
   temperature_solver.get_time_step() = dt0;
+  prm_T.set("Velocity", V0);
 }
 
 template <int dim>
