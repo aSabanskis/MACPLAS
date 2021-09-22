@@ -242,6 +242,13 @@ public:
   double
   calc_rho_c_p(const double T) const;
 
+  /** Calculate the vertical velocity \f$V_z\f$, m s<sup>-1</sup>.
+   * The reason for a separate function is that the value can be changed through
+   * parameters during the simulation.
+   */
+  double
+  calc_V_z() const;
+
   /** Apply first-type boundary condition previously set by
    * TemperatureSolver::set_bc1.
    * Needs to be called by the user only in special cases, such as simulations
@@ -645,6 +652,11 @@ TemperatureSolver<dim>::TemperatureSolver(const unsigned int order,
                     Patterns::Anything(),
                     "Derivative of thermal conductivity in W/m/K^2" + info_T);
 
+  prm.declare_entry("Velocity",
+                    "0",
+                    Patterns::Double(),
+                    "Vertical velocity in m/s");
+
   if (use_default_prm)
     {
       std::ofstream of("temperature.prm");
@@ -720,7 +732,8 @@ TemperatureSolver<dim>::initialize_parameters()
   std::cout << "rho=" << m_rho_expression << "\n"
             << "c_p=" << m_c_p_expression << "\n"
             << "lambda=" << m_lambda_expression << "\n"
-            << "derivative_lambda=" << m_derivative_lambda_expression << "\n";
+            << "derivative_lambda=" << m_derivative_lambda_expression << "\n"
+            << "V_z=" << prm.get("Velocity") << "\n";
 
   std::cout << "n_q_cell=" << prm.get("Number of cell quadrature points")
             << "\n"
@@ -756,6 +769,15 @@ TemperatureSolver<dim>::solve(const bool skip_time_advance)
   const double t     = get_time();
   const double dt    = get_time_step();
   const double t_max = get_max_time();
+
+#ifdef DEBUG
+  const double V_z = calc_V_z();
+  if (dt > 0 && V_z != 0)
+    {
+      std::cout << solver_name() << "  Warning: non-zero velocity V_z=" << V_z
+                << " m/s specified in transient simulations\n";
+    }
+#endif
 
   for (int i = 1;; ++i)
     {
@@ -1367,6 +1389,13 @@ TemperatureSolver<dim>::calc_rho_c_p(const double T) const
 }
 
 template <int dim>
+double
+TemperatureSolver<dim>::calc_V_z() const
+{
+  return prm.get_double("Velocity");
+}
+
+template <int dim>
 std::string
 TemperatureSolver<dim>::output_name_suffix() const
 {
@@ -1573,6 +1602,7 @@ TemperatureSolver<dim>::local_assemble_system(
   // precalculate constant parameters
   const double dt     = get_time_step();
   const double inv_dt = dt == 0 ? 0 : 1 / dt;
+  const double V_z    = calc_V_z();
 
   FEValues<dim> &            fe_values       = scratch_data.fe_values;
   FEFaceValues<dim> &        fe_face_values  = scratch_data.fe_face_values;
@@ -1611,7 +1641,9 @@ TemperatureSolver<dim>::local_assemble_system(
 
   for (unsigned int q = 0; q < n_q_points; ++q)
     {
-      const double tmp = inv_dt * calc_rho_c_p(T_q[q]);
+      const double rho_c_p = calc_rho_c_p(T_q[q]);
+      const double tmp     = inv_dt * rho_c_p;
+      const double conv_q  = rho_c_p * V_z * grad_T_q[q][dim - 1];
 
       const double lambda_q       = calc_lambda(T_q[q]);
       const double lambda_deriv_q = calc_derivative_lambda(T_q[q]);
@@ -1629,6 +1661,7 @@ TemperatureSolver<dim>::local_assemble_system(
           const double tmp_i      = tmp * phi_i;
           const double tmp_grad_i = grad_T_q[q] * grad_phi_i;
           const double tmp2_i     = lambda_deriv_q * tmp_grad_i + tmp_i;
+          const double tmp_V_i    = rho_c_p * V_z * phi_i;
 
           for (unsigned int j = 0; j < dofs_per_cell; ++j)
             {
@@ -1637,13 +1670,15 @@ TemperatureSolver<dim>::local_assemble_system(
 
               // Newthon's method
               cell_matrix(i, j) +=
-                (lambda_q * (grad_phi_j * grad_phi_i) + tmp2_i * phi_j) *
+                (lambda_q * (grad_phi_j * grad_phi_i) + tmp2_i * phi_j +
+                 tmp_V_i * grad_phi_j[dim - 1]) *
                 weight;
             }
 
-          cell_rhs(i) -= (lambda_q * tmp_grad_i +
-                          tmp_i * (T_q[q] - T_prev_q[q]) - dot_q_q[q] * phi_i) *
-                         weight;
+          cell_rhs(i) -=
+            (lambda_q * tmp_grad_i + tmp_i * (T_q[q] - T_prev_q[q]) +
+             (conv_q - dot_q_q[q]) * phi_i) *
+            weight;
         }
     }
 

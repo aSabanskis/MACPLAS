@@ -43,13 +43,22 @@ for [i=0:5] f3 u 1:'T_'.i.'[K]' w l lw 2 ti 'T_'.i,\
 for [i=0:5] T_1d_3(0.1*i, x) w l lt -1 dt 2 noti
 
 
-set output 'result-probes-1d-BC1b.pdf'
+set output 'result-probes-1d-BC1b-q.pdf'
 T_1d_b(x, dot_q) = T1 + (T2-T1)*x/L + dot_q/(2*lambda)*x*(L-x)
 p \
 'result-1d-q4e5-x.dat' u 1:2 smooth unique w l lw 2 ti 'T',\
 'result-1d-q-4e5-x.dat' u 1:2 smooth unique w l lw 2 ti 'T',\
 T_1d_b(x, 4e5) w l lt -1 dt 2 noti,\
 T_1d_b(x, -4e5) w l lt -1 dt 2 noti
+
+
+set output 'result-probes-1d-BC1b-V.pdf'
+T_1d_b(x, V) = T1 + (T2-T1)/(exp(L*rho*c_p*V/lambda)-1)*(exp(x*rho*c_p*V/lambda)-1)
+p \
+'result-1d-V1e-3-x.dat' u 1:2 smooth unique w l lw 2 ti 'T',\
+'result-1d-V-1e-3-x.dat' u 1:2 smooth unique w l lw 2 ti 'T',\
+T_1d_b(x, 1e-3) w l lt -1 dt 2 noti,\
+T_1d_b(x, -1e-3) w l lt -1 dt 2 noti
 
 
 set output 'result-probes-2d.pdf'

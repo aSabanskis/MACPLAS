@@ -30,6 +30,8 @@ private:
   bool steady;
 
   double vol_heat_source;
+
+  double velocity;
 };
 
 template <int dim>
@@ -37,6 +39,7 @@ Problem<dim>::Problem(const std::vector<std::string> &arguments)
   : solver(get_degree(arguments))
   , steady(false)
   , vol_heat_source(0)
+  , velocity(0)
 {
   for (unsigned int i = 1; i < arguments.size(); ++i)
     {
@@ -49,12 +52,16 @@ Problem<dim>::Problem(const std::vector<std::string> &arguments)
 
       if (arguments[i] == "vol_heat_source" && i + 1 < arguments.size())
         vol_heat_source = std::stod(arguments[i + 1]);
+
+      if (arguments[i] == "velocity" && i + 1 < arguments.size())
+        velocity = std::stod(arguments[i + 1]);
     }
 
   AssertThrow(!BC.empty(), ExcMessage("No boundary conditions provided"));
 
   std::cout << "BC = " << BC << '\n';
   std::cout << "vol_heat_source = " << vol_heat_source << '\n';
+  std::cout << "velocity = " << velocity << '\n';
 }
 
 template <int dim>
@@ -143,6 +150,9 @@ Problem<dim>::initialize()
 
   solver.get_heat_source() = 0;
   solver.get_heat_source().add(vol_heat_source);
+
+  solver.get_parameters().set("Velocity", velocity);
+
 
   unsigned int boundary_id = 0;
 
