@@ -28,12 +28,15 @@ private:
   std::string BC;
 
   bool steady;
+
+  double vol_heat_source;
 };
 
 template <int dim>
 Problem<dim>::Problem(const std::vector<std::string> &arguments)
   : solver(get_degree(arguments))
   , steady(false)
+  , vol_heat_source(0)
 {
   for (unsigned int i = 1; i < arguments.size(); ++i)
     {
@@ -43,10 +46,15 @@ Problem<dim>::Problem(const std::vector<std::string> &arguments)
 
       if (arguments[i] == "steady")
         steady = true;
+
+      if (arguments[i] == "vol_heat_source" && i + 1 < arguments.size())
+        vol_heat_source = std::stod(arguments[i + 1]);
     }
 
   AssertThrow(!BC.empty(), ExcMessage("No boundary conditions provided"));
+
   std::cout << "BC = " << BC << '\n';
+  std::cout << "vol_heat_source = " << vol_heat_source << '\n';
 }
 
 template <int dim>
@@ -66,19 +74,19 @@ Problem<dim>::run()
 
   solver.output_vtk();
 
-  if (dim == 1)
+  if (!steady)
     return;
 
   // write results on x axis
   std::stringstream ss;
   ss << "result-" << dim << "d-order" << solver.get_degree() << "-x.dat";
   const std::string file_name = ss.str();
-  std::cout << "Saving postprocessed results to '" << file_name << "'";
+  std::cout << "Saving postprocessed results to '" << file_name << "'\n";
 
   const Vector<double> &temperature = solver.get_temperature();
 
   std::ofstream f(file_name);
-  f << (dim == 2 ? "x y" : "x y z");
+  f << (dim == 1 ? "x" : dim == 2 ? "x y" : "x y z");
   f << " T[K]\n";
   f << std::setprecision(8);
 
@@ -132,6 +140,9 @@ Problem<dim>::initialize()
   // steady-state: set time step to zero
   if (steady)
     solver.get_time_step() = 0;
+
+  solver.get_heat_source() = 0;
+  solver.get_heat_source().add(vol_heat_source);
 
   unsigned int boundary_id = 0;
 
@@ -274,6 +285,8 @@ main(int argc, char *argv[])
       Problem<3> p3(arguments);
       p3.run();
     }
+
+  std::cout << "Finished\n";
 
   return 0;
 }
