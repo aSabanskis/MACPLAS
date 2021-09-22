@@ -721,7 +721,7 @@ StressSolver<dim>::solve(const bool postprocess_only)
     {
       std::cout << '\n'
                 << solver_name()
-                << "  Error occured, outputting all data for diagnosis."
+                << "  Error occurred, outputting all data for diagnosis."
                 << e.what();
       converged = false;
       output_mesh();
@@ -1184,7 +1184,7 @@ StressSolver<dim>::assemble_system()
 #ifdef DEBUG
           std::cout << '\n'
                     << solver_name()
-                    << "  dislplacement=0 applied for dimension " << i;
+                    << "  displacement=0 applied for dimension " << i;
 #endif
         }
     }
