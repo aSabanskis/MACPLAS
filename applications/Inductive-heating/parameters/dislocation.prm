@@ -20,6 +20,7 @@ set Min time step                   = 0
 set Output precision                = 8
 set Output subdivisions             = 0
 set Peierls potential               = 2.17
+set Peierls potential correction    = 0
 set Strain hardening factor         = 4.3
 set Time scheme                     = Linearized N_m
 set Time step                       = 10
