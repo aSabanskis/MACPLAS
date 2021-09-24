@@ -1858,11 +1858,11 @@ StressSolver<dim>::output_name_suffix() const
 
 // Specialization for dim=2 and 3 (not needed for dim=1)
 template <>
-const std::array<std::string, StressSolver<2>::n_components>
+inline const std::array<std::string, StressSolver<2>::n_components>
   StressSolver<2>::stress_component_names{"rr", "zz", "ff", "rz"};
 
 template <>
-const std::array<std::string, StressSolver<3>::n_components>
+inline const std::array<std::string, StressSolver<3>::n_components>
   StressSolver<3>::stress_component_names{"xx", "yy", "zz", "yz", "xz", "xy"};
 
 #endif
