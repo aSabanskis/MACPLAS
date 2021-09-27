@@ -218,7 +218,8 @@ public:
 
   /** Names of stress components in Voigt notation
    */
-  static const std::array<std::string, n_components> stress_component_names;
+  const std::vector<std::string>
+  stress_component_names() const;
 
 private:
   /** Initialize parameters. Called by the constructor
@@ -496,8 +497,9 @@ StressSolver<dim>::StressSolver(const unsigned int order,
   AssertThrow(dim == 2 || dim == 3, ExcNotImplemented());
 
   std::cout << "Stress components in Voigt notation:\n";
-  for (unsigned int i = 0; i < stress_component_names.size(); ++i)
-    std::cout << i << " " << stress_component_names[i] << "\n";
+  const auto names = stress_component_names();
+  for (unsigned int i = 0; i < names.size(); ++i)
+    std::cout << i << " " << names[i] << "\n";
 
   const std::string info_T = " (temperature function)";
 
@@ -1856,13 +1858,17 @@ StressSolver<dim>::output_name_suffix() const
   return ss.str();
 }
 
-// Specialization for dim=2 and 3 (not needed for dim=1)
-template <>
-inline const std::array<std::string, StressSolver<2>::n_components>
-  StressSolver<2>::stress_component_names{"rr", "zz", "ff", "rz"};
+template <int dim>
+const std::vector<std::string>
+StressSolver<dim>::stress_component_names() const
+{
+  if (dim == 2)
+    return {"rr", "zz", "ff", "rz"};
+  if (dim == 3)
+    return {"xx", "yy", "zz", "yz", "xz", "xy"};
 
-template <>
-inline const std::array<std::string, StressSolver<3>::n_components>
-  StressSolver<3>::stress_component_names{"xx", "yy", "zz", "yz", "xz", "xy"};
+  AssertThrow(false, ExcNotImplemented());
+  return {};
+}
 
 #endif
