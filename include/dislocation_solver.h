@@ -547,7 +547,7 @@ private:
    */
   FunctionParser<1> m_tau_crit;
 
-  /** Swith that enables \f$\tau_\mathrm{crit}\f$ in \f$\tau_\mathrm{eff}^l\f$
+  /** Switch that enables \f$\tau_\mathrm{crit}\f$ in \f$\tau_\mathrm{eff}^l\f$
    * term of the time derivative of dislocation density \f$\dot{N_m}\f$
    */
   bool dot_N_m_with_tau_crit_l;
