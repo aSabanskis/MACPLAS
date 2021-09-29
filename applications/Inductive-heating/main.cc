@@ -64,10 +64,13 @@ private:
                  const bool boundary = dim == 2) const;
 
   void
-  postprocess_T();
+  postprocess();
 
   void
   update_T_max();
+
+  void
+  update_tau_eff_max();
 
   void
   measure_T();
@@ -93,6 +96,9 @@ private:
 
   // max temperature during the whole simulation
   Vector<double> T_max;
+
+  // max effective stress during the whole simulation
+  Vector<double> tau_eff_max;
 
   std::vector<Point<dim>> inductor_probes;
 
@@ -457,7 +463,7 @@ Problem<dim>::solve_steady_temperature()
   if (prm.get_bool("Load saved results"))
     {
       temperature_solver.load_data();
-      postprocess_T();
+      postprocess();
       output_results();
       return;
     }
@@ -501,7 +507,7 @@ Problem<dim>::solve_steady_temperature()
       prm.set("Approximate skin effect", false);
     }
 
-  postprocess_T();
+  postprocess();
   output_results();
 }
 
@@ -513,7 +519,7 @@ Problem<dim>::solve_dislocation()
 
   initialize_dislocation();
 
-  postprocess_T();
+  postprocess();
   output_results();
 
   while (true)
@@ -524,6 +530,7 @@ Problem<dim>::solve_dislocation()
         break;
     };
 
+  postprocess();
   output_results();
 }
 
@@ -535,7 +542,7 @@ Problem<dim>::solve_temperature_dislocation()
 
   initialize_dislocation();
 
-  postprocess_T();
+  postprocess();
   output_results();
 
   for (unsigned int i = 1;; ++i)
@@ -559,9 +566,9 @@ Problem<dim>::solve_temperature_dislocation()
       dislocation_solver.get_temperature() =
         temperature_solver.get_temperature();
 
-      postprocess_T();
-
       const bool keep_going_disl = dislocation_solver.solve();
+
+      postprocess();
 
       if (!keep_going_temp || !keep_going_disl)
         break;
@@ -584,7 +591,7 @@ Problem<dim>::solve_temperature()
 {
   std::cout << "Calculating transient temperature field\n";
 
-  postprocess_T();
+  postprocess();
 
   for (unsigned int i = 1;; ++i)
     {
@@ -600,7 +607,7 @@ Problem<dim>::solve_temperature()
           keep_going_temp = temperature_solver.solve(n > 0);
         }
 
-      postprocess_T();
+      postprocess();
 
       if (!keep_going_temp)
         break;
@@ -870,9 +877,10 @@ Problem<dim>::interpolate_q_em(const double z)
 
 template <int dim>
 void
-Problem<dim>::postprocess_T()
+Problem<dim>::postprocess()
 {
   update_T_max();
+  update_tau_eff_max();
   measure_T();
 }
 
@@ -897,6 +905,34 @@ Problem<dim>::update_T_max()
 
   if (with_dislocation())
     dislocation_solver.add_field("T_max", T_max);
+}
+
+template <int dim>
+void
+Problem<dim>::update_tau_eff_max()
+{
+  const bool has_dislocation =
+    with_dislocation() &&
+    dislocation_solver.get_dof_handler().has_active_dofs();
+
+  if (!has_dislocation)
+    return;
+
+  Vector<double> tau;
+  dislocation_solver.get_tau_eff(tau);
+
+  if (tau_eff_max.size() == 0)
+    {
+      std::cout << "Initializing tau_eff_max\n";
+      tau_eff_max = tau;
+    }
+
+  AssertDimension(tau_eff_max.size(), tau.size());
+
+  for (unsigned int k = 0; k < tau_eff_max.size(); ++k)
+    tau_eff_max[k] = std::max(tau_eff_max[k], tau[k]);
+
+  dislocation_solver.add_field("tau_eff_max", tau_eff_max);
 }
 
 template <int dim>

@@ -140,6 +140,11 @@ public:
   BlockVector<double> &
   get_strain_c();
 
+  /** Get effective stress \f$\tau_\mathrm{eff}\f$, Pa
+   */
+  void
+  get_tau_eff(Vector<double> &tau) const;
+
   /** Get coordinates of boundary DOFs for temperature
    */
   void
@@ -971,6 +976,17 @@ BlockVector<double> &
 DislocationSolver<dim>::get_strain_c()
 {
   return stress_solver.get_strain_c();
+}
+
+template <int dim>
+void
+DislocationSolver<dim>::get_tau_eff(Vector<double> &tau) const
+{
+  const Vector<double> &N_m = get_dislocation_density();
+  const Vector<double> &J_2 = get_stress_J_2();
+  const Vector<double> &T   = get_temperature();
+
+  tau = tau_eff(N_m, J_2, T);
 }
 
 template <int dim>
