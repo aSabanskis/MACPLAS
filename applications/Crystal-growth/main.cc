@@ -33,6 +33,9 @@ private:
   calculate_field_gradients();
 
   void
+  calculate_dof_distance();
+
+  void
   update_fields();
 
   void
@@ -80,6 +83,9 @@ private:
   std::vector<Point<dim>> support_points, support_points_prev;
 
   std::vector<Tensor<1, dim>> dr;
+
+  // distance between closest DOFs (for time step control)
+  Vector<double> dof_distance;
 
 #ifdef DEBUG
   // for testing
@@ -260,6 +266,8 @@ Problem<dim>::run()
 
   calculate_field_gradients();
 
+  calculate_dof_distance();
+
   output_results();
 
   // now run transient simulations unless the time step is zero
@@ -372,6 +380,8 @@ Problem<dim>::deform_grid()
 
   temperature_solver.get_support_points(support_points_prev);
   calculate_field_gradients();
+
+  calculate_dof_distance();
 
   const auto &points = triangulation.get_vertices();
 
@@ -573,6 +583,49 @@ Problem<dim>::calculate_field_gradients()
                                        grad_component);
         }
     }
+}
+
+template <int dim>
+void
+Problem<dim>::calculate_dof_distance()
+{
+  const DoFHandler<dim> &dh = temperature_solver.get_dof_handler();
+
+  dof_distance.reinit(dh.n_dofs());
+  dof_distance.add(std::numeric_limits<double>::max());
+
+  temperature_solver.get_support_points(support_points);
+
+  const unsigned int dofs_per_cell = dh.get_fe().dofs_per_cell;
+
+  std::vector<types::global_dof_index> local_dof_indices(dofs_per_cell);
+
+  typename DoFHandler<dim>::active_cell_iterator cell = dh.begin_active(),
+                                                 endc = dh.end();
+  for (; cell != endc; ++cell)
+    {
+      cell->get_dof_indices(local_dof_indices);
+
+      for (unsigned int i = 0; i < dofs_per_cell; ++i)
+        {
+          for (unsigned int j = 0; j < dofs_per_cell; ++j)
+            {
+              if (i != j)
+                {
+                  const double d = (support_points[local_dof_indices[i]] -
+                                    support_points[local_dof_indices[j]])
+                                     .norm();
+
+                  dof_distance[local_dof_indices[i]] =
+                    std::min(dof_distance[local_dof_indices[i]], d);
+                  dof_distance[local_dof_indices[j]] =
+                    std::min(dof_distance[local_dof_indices[j]], d);
+                }
+            }
+        }
+    }
+
+  temperature_solver.add_field("dof_distance", dof_distance);
 }
 
 template <int dim>
