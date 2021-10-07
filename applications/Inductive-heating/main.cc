@@ -33,10 +33,11 @@ private:
   void
   interpolate_q_em(const double z);
 
-  /** Reduces the current time step when the inductor position starts to change
+  /** Reduces the current time step to minimum value at user-defined instants
+   * (e.g., when the inductor position starts to change)
    */
   void
-  update_dz_ind_time_step();
+  update_min_time_step();
 
   /** Checks whether the results need to be outputted at the end of the current
    * time step, and adjusts it if necessary */
@@ -114,6 +115,8 @@ private:
 
   double previous_time_step;
   double next_output_time;
+
+  std::vector<double> dt_min_times;
 
   ParameterHandler prm;
 
@@ -238,6 +241,12 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     "The time step is adjusted to match the required time. "
                     "Overrides 'Output frequency'.");
 
+  prm.declare_entry(
+    "Time step reduction instants",
+    "",
+    Patterns::List(Patterns::Double()),
+    "Comma-separated times in s at which minimum time step should be applied");
+
   prm.declare_entry("Probe coordinates x",
                     "0, 0, 0",
                     Patterns::List(Patterns::Double(), 1),
@@ -359,7 +368,7 @@ Problem<dim>::run()
 
 template <int dim>
 void
-Problem<dim>::update_dz_ind_time_step()
+Problem<dim>::update_min_time_step()
 {
   const double dt_min = dislocation_solver.get_time_step_min();
 
@@ -369,45 +378,36 @@ Problem<dim>::update_dz_ind_time_step()
   const double t  = dislocation_solver.get_time();
   const double dt = dislocation_solver.get_time_step();
 
-  const double z0 = inductor_position->value(Point<1>(t - dt));
-  const double z1 = inductor_position->value(Point<1>(t));
-  const double z2 = inductor_position->value(Point<1>(t + dt));
+  bool found_time = false;
 
-  const bool was_const   = std::abs(z1 - z0) < 1e-12;
-  const bool is_changing = std::abs(z2 - z1) > 1e-12;
+  double dt_new;
 
-  if (was_const && is_changing)
+  for (const auto &t_new : dt_min_times)
     {
-      // bisection method to find the time when z actually starts to change
-      double dt_a = dt_min;
-      double dt_b = dt;
+      if (t_new < t)
+        continue;
 
-      double z_a = inductor_position->value(Point<1>(t + dt_a));
-
-      unsigned int i = 0;
-
-      while (dt_b - dt_a > dt_min / 2)
+      if (!found_time)
         {
-          ++i;
-          const double dt_c = (dt_a + dt_b) / 2;
-          const double z_c  = inductor_position->value(Point<1>(t + dt_c));
-          if (std::abs(z_c - z_a) < 1e-12)
-            {
-              dt_a = dt_c;
-              z_a  = z_c;
-            }
-          else
-            {
-              dt_b = dt_c;
-            }
+          dt_new     = t_new - t;
+          found_time = true;
         }
+      else
+        {
+          dt_new = std::min(dt_new, t_new - t);
+        }
+    }
 
-      set_time_step(dt_a);
+  if (found_time && dt_new < dt)
+    {
+      const double t_new = t + dt_new;
 
-      std::cout << "dt changed from " << dt << " to "
-                << temperature_solver.get_time_step()
-                << " s due to inductor position change"
-                << " (" << i << " iterations)\n";
+      dt_new = std::max(dt_new, dt_min);
+
+      set_time_step(dt_new);
+
+      std::cout << "dt changed from " << dt << " to " << dt_new
+                << " s at user-specified time instant" << t_new << " s\n";
     }
 }
 
@@ -547,7 +547,7 @@ Problem<dim>::solve_temperature_dislocation()
 
   for (unsigned int i = 1;; ++i)
     {
-      update_dz_ind_time_step();
+      update_min_time_step();
 
       const bool output_enabled = update_output_time_step(i);
 
@@ -682,6 +682,8 @@ Problem<dim>::initialize_temperature()
   previous_time_step = temperature_solver.get_time_step();
 
   temperature_solver.output_mesh();
+
+  dt_min_times = split_string(prm.get("Time step reduction instants"));
 
   const std::vector<double> X = split_string(prm.get("Probe coordinates x"));
   const std::vector<double> Z = split_string(prm.get("Probe coordinates z"));

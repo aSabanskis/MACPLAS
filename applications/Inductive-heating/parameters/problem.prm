@@ -11,6 +11,7 @@ set Max temperature change            = 1e-1
 set Outer temperature iterations      = 1
 set Output frequency                  = 0
 set Output time step                  = 300
+set Time step reduction instants      =
 set Probe coordinates x               = 0.01, 0.01, 0.01, 0.01
 set Probe coordinates z               = 0.37043, 0.39038, 0.41053, 0.43045
 set Custom probes x relative to inductor = 0.01, 0.01, 0.01, 0.01, 0.01, 0.01
