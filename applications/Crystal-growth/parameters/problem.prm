@@ -7,6 +7,7 @@ set Pull rate                 = 1e-3/60
 set Crystal radius            = 0.01
 set Interface shape           = 0
 set Max temperature change    = 0.1
+set Max time                  = 0
 set Output time step          = 60
 set Probe coordinates x       = 0, 0.002
 set Probe coordinates z       = 0.002, 0.002
