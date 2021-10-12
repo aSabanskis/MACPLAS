@@ -163,10 +163,11 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
     Patterns::Anything(),
     "Crystal pull rate V in m/s (time function or data file name)");
 
-  prm.declare_entry("Crystal radius",
-                    "0.01",
-                    Patterns::Anything(),
-                    "Crystal radius R in m (time function or data file name)");
+  prm.declare_entry(
+    "Crystal radius",
+    "0.01",
+    Patterns::Anything(),
+    "Crystal radius R in m (length function or data file name)");
 
   prm.declare_entry(
     "Interface shape",
@@ -252,7 +253,7 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
 
   initialize_function(pull_rate, prm.get("Pull rate"));
 
-  initialize_function(crystal_radius, prm.get("Crystal radius"));
+  initialize_function(crystal_radius, prm.get("Crystal radius"), "L");
 
   interface_shape.initialize("r,t",
                              prm.get("Interface shape"),
@@ -371,7 +372,9 @@ Problem<dim>::make_grid()
 #endif
   surface_projector.set_points(points_sorted);
 
-  const double R0 = crystal_radius->value(Point<1>());
+  const double L  = (points_surface.at(point_id_axis_z_max) -
+                    points_surface.at(point_id_triple))[dim - 1];
+  const double R0 = crystal_radius->value(Point<1>(L));
   const double R  = points_surface.at(point_id_triple)[0];
 
   AssertThrow(std::fabs(R - R0) < 1e-4,
@@ -379,7 +382,13 @@ Problem<dim>::make_grid()
                          " m differs from the expected R0 = " +
                          std::to_string(R0) + " m"));
 
+  temperature_solver.add_output("L[m]", L);
   temperature_solver.add_output("R[m]", R);
+  if (with_dislocation())
+    {
+      dislocation_solver.add_output("L[m]", L);
+      dislocation_solver.add_output("R[m]", R);
+    }
 }
 
 template <int dim>
@@ -409,18 +418,24 @@ Problem<dim>::deform_grid()
 
   const double t  = temperature_solver.get_time();
   const double dt = temperature_solver.get_time_step();
-  const double R0 = crystal_radius->value(Point<1>(t + dt)); // at the end
-  const double R  = p_triple[0];
   const double V  = pull_rate->value(Point<1>(t));
 
   // Vertical shift of the crystal due to the pull rate
   Point<dim> dz;
   dz[dim - 1] = V * dt;
 
+  const double L  = (p_axis_2 - p_triple)[dim - 1];
+  const double dL = V * dt + p_triple[dim - 1] -
+                    interface_shape.value(Point<2>(p_triple[0], t));
+  const double R  = p_triple[0];
+  const double R0 = crystal_radius->value(Point<1>(L + dL)); // at the end
+
+  temperature_solver.add_output("L[m]", L);
   temperature_solver.add_output("R[m]", R0);
   temperature_solver.add_output("V[m/s]", V);
   if (with_dislocation())
     {
+      dislocation_solver.add_output("L[m]", L);
       dislocation_solver.add_output("R[m]", R0);
       dislocation_solver.add_output("V[m/s]", V);
     }
@@ -725,8 +740,6 @@ Problem<dim>::initialize_temperature()
       dislocation_solver.add_probe(p);
     }
 
-  // initialize the columns for probe output
-  temperature_solver.add_output("R[m]", crystal_radius->value(Point<1>()));
   temperature_solver.add_output("V[m/s]", pull_rate->value(Point<1>()));
 
 #ifdef DEBUG
@@ -748,7 +761,6 @@ Problem<dim>::initialize_dislocation()
   dislocation_solver.initialize();
   dislocation_solver.get_temperature() = temperature_solver.get_temperature();
 
-  dislocation_solver.add_output("R[m]", crystal_radius->value(Point<1>()));
   dislocation_solver.add_output("V[m/s]", pull_rate->value(Point<1>()));
 
   dislocation_solver.output_parameter_table();
