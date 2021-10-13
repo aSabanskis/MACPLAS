@@ -12,4 +12,5 @@ set Output time step          = 60
 set Probe coordinates x       = 0, 0.002
 set Probe coordinates z       = 0.002, 0.002
 set Surface update tolerance  = 0.1e-3
+set Max relative shift        = 0
 set Temperature only          = false

@@ -47,6 +47,11 @@ private:
   void
   set_temperature_BC();
 
+  /** Reduces the current time step when the DOF movement is too large
+   */
+  void
+  update_grid_time_step();
+
   /** Checks whether the results need to be outputted at the end of the current
    * time step, and adjusts it if necessary */
   bool
@@ -181,6 +186,12 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
     Patterns::Double(0),
     "Distance in m for update of precise crystal shape (0 - always)");
 
+  prm.declare_entry(
+    "Max relative shift",
+    "0",
+    Patterns::Double(0),
+    "Maximum relative (to neighbour) mesh movement (0 - unlimited)");
+
   prm.declare_entry("Max time",
                     "0",
                     Patterns::Double(0),
@@ -272,14 +283,14 @@ Problem<dim>::run()
 
   initialize_temperature();
 
+  calculate_dof_distance();
+
   solve_steady_temperature();
 
   if (with_dislocation())
     initialize_dislocation();
 
   calculate_field_gradients();
-
-  calculate_dof_distance();
 
   output_results();
 
@@ -740,6 +751,8 @@ Problem<dim>::initialize_temperature()
       dislocation_solver.add_probe(p);
     }
 
+  dr.resize(temperature.size());
+
   temperature_solver.add_output("V[m/s]", pull_rate->value(Point<1>()));
 
 #ifdef DEBUG
@@ -767,6 +780,8 @@ Problem<dim>::initialize_dislocation()
 
   if (dim == 2)
     dislocation_solver.get_stress_solver().set_bc1(boundary_id_axis, 0, 0);
+
+  update_grid_time_step();
 
   dislocation_solver.solve(true);
 
@@ -797,6 +812,49 @@ Problem<dim>::set_temperature_BC()
 
   temperature_solver.set_bc_rad_mixed(
     boundary_id_surface, q, emissivity_const, emissivity_deriv_const, T_a);
+}
+
+template <int dim>
+void
+Problem<dim>::update_grid_time_step()
+{
+  const double dt_min = dislocation_solver.get_time_step_min();
+
+  if (!with_dislocation() || dt_min == 0)
+    return;
+
+  const double t  = dislocation_solver.get_time();
+  const double dt = dislocation_solver.get_time_step();
+  const double V  = pull_rate->value(Point<1>(t));
+
+  // simple approach based on previous shift and the current pull rate
+  const double dL_V = V * dt;
+
+  AssertDimension(dr.size(), dof_distance.size());
+  AssertDimension(dr.size(), temperature_solver.get_temperature().size());
+
+  double relative_shift = 0;
+  for (unsigned int i = 0; i < dof_distance.size(); ++i)
+    {
+      const double dL = dr[i].norm() + dL_V;
+
+      relative_shift = std::max(relative_shift, dL / dof_distance[i]);
+    }
+
+  const double max_relative_shift = prm.get_double("Max relative shift");
+
+  const double dt_new =
+    relative_shift > 0 && max_relative_shift > 0 ?
+      std::max(dt_min,
+               dt * std::min(1.0, max_relative_shift / relative_shift)) :
+      dt;
+
+  set_time_step(dt_new);
+
+#ifdef DEBUG
+  std::cout << "t=" << t << " s relative_shift=" << relative_shift
+            << " dt=" << dt << " s dt_new=" << dt_new << " s\n";
+#endif
 }
 
 template <int dim>
@@ -912,6 +970,8 @@ Problem<dim>::solve_temperature_dislocation()
 
   while (true)
     {
+      update_grid_time_step();
+
       const bool output_enabled = update_output_time_step();
 
       set_time_step(dislocation_solver.get_time_step());
