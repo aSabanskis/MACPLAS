@@ -192,6 +192,11 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
     Patterns::Double(0),
     "Maximum relative (to neighbour) mesh movement (0 - unlimited)");
 
+  prm.declare_entry("Laplace tolerance",
+                    "1e-10",
+                    Patterns::Double(0),
+                    "Tolerance of linear solver for Laplace transform");
+
   prm.declare_entry("Max time",
                     "0",
                     Patterns::Double(0),
@@ -529,8 +534,14 @@ Problem<dim>::deform_grid()
       points_new[it.first] = it.second + dp;
     }
 
-  // update the mesh and obtain displacements for all DoFs
-  GridTools::laplace_transform(points_new, triangulation);
+  // Update the mesh and obtain displacements for all DoFs.
+  // Use improved implementation of function which allows to specify tolerance
+  // instead of built-in (from \c GridTools).
+  laplace_transform<dim>(points_new,
+                         triangulation,
+                         nullptr,
+                         false,
+                         prm.get_double("Laplace tolerance"));
 
   temperature_solver.get_mesh().clear();
   temperature_solver.get_mesh().copy_triangulation(triangulation);

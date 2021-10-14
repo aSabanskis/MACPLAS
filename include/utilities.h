@@ -9,6 +9,7 @@
 
 #include <deal.II/fe/fe_tools.h>
 
+#include <deal.II/lac/filtered_matrix.h>
 #include <deal.II/lac/vector.h>
 
 #include <array>
@@ -471,6 +472,70 @@ private:
    */
   SmartPointer<const DoFHandler<dim>> dh;
 };
+
+/**
+ * Transform the given triangulation smoothly to a different domain where,
+ * typically, each of the vertices at the boundary of the triangulation is
+ * mapped to the corresponding points in the @p new_points map.
+ *
+ * The unknown displacement field $u_d(\mathbf x)$ in direction $d$ is obtained
+ * from the minimization problem \f[ \min\, \int \frac{1}{2} c(\mathbf x)
+ *   \mathbf \nabla u_d(\mathbf x) \cdot
+ *   \mathbf \nabla u_d(\mathbf x)
+ *   \,\rm d x
+ * \f]
+ * subject to prescribed constraints. The minimizer is obtained by solving the
+ * Laplace equation of the dim components of a displacement field that maps the
+ * current
+ * domain into one described by @p new_points . Linear finite elements with
+ * four Gaussian quadrature points in each direction are used. The difference
+ * between the vertex positions specified in @p new_points and their current
+ * value in @p tria therefore represents the prescribed values of this
+ * displacement field at the boundary of the domain, or more precisely at all
+ * of those locations for which @p new_points provides values (which may be
+ * at part of the boundary, or even in the interior of the domain). The
+ * function then evaluates this displacement field at each unconstrained
+ * vertex and uses it to place the mapped vertex where the displacement
+ * field locates it. Because the solution of the Laplace equation is smooth,
+ * this guarantees a smooth mapping from the old domain to the new one.
+ *
+ * @param[in] new_points The locations where a subset of the existing
+ * vertices are to be placed. Typically, this would be a map from the vertex
+ * indices of all nodes on the boundary to their new locations, thus
+ * completely specifying the geometry of the mapped domain. However, it may
+ * also include interior points if necessary and it does not need to include
+ * all boundary vertices (although you then lose control over the exact
+ * shape of the mapped domain).
+ *
+ * @param[in,out] tria The Triangulation object. This object is changed in-
+ * place, i.e., the previous locations of vertices are overwritten.
+ *
+ * @param[in] coefficient An optional coefficient for the Laplace problem.
+ * Larger values make cells less prone to deformation (effectively
+ * increasing their stiffness). The coefficient is evaluated in the
+ * coordinate system of the old, undeformed configuration of the
+ * triangulation as input, i.e., before the transformation is applied.
+ * Should this function be provided, sensible results can only be expected
+ * if all coefficients are positive.
+ *
+ * @param[in] solve_for_absolute_positions If set to <code>true</code>, the
+ * minimization problem is formulated with respect to the final vertex positions
+ * as opposed to their displacement. The two formulations are equivalent for
+ * the homogeneous problem (default value of @p coefficient), but they
+ * result in very different mesh motion otherwise. Since in most cases one will
+ * be using a non-constant coefficient in displacement formulation, the default
+ * value of this parameter is <code>false</code>.
+ *
+ * @note This function is not currently implemented for the 1d case.
+ * @note The code is taken from deal.II sources and user-specified solver tolerance added.
+ */
+template <int dim>
+inline void
+laplace_transform(const std::map<unsigned int, Point<dim>> &new_points,
+                  Triangulation<dim> &                      tria,
+                  const Function<dim, double> *             coefficient = 0,
+                  const bool   solve_for_absolute_positions             = false,
+                  const double tol = 1.e-10);
 
 
 // IMPLEMENTATION
@@ -1884,6 +1949,149 @@ const std::vector<Tensor<1, dim>> &
 DoFGradientEvaluation<dim>::get_gradient(const std::string &name) const
 {
   return gradients.at(name);
+}
+
+namespace
+{
+  /**
+   * Solve the Laplace equation for the @p laplace_transform function for one
+   * of the @p dim space dimensions. Factorized into a function of its own
+   * in order to allow parallel execution.
+   */
+  void
+  laplace_solve(const SparseMatrix<double> &                     S,
+                const std::map<types::global_dof_index, double> &fixed_dofs,
+                Vector<double> &                                 u,
+                const double                                     tol)
+  {
+    const unsigned int                       n_dofs = S.n();
+    FilteredMatrix<Vector<double>>           SF(S);
+    PreconditionJacobi<SparseMatrix<double>> prec;
+    prec.initialize(S, 1.2);
+    FilteredMatrix<Vector<double>> PF(prec);
+
+    SolverControl                       control(n_dofs, tol, false, false);
+    GrowingVectorMemory<Vector<double>> mem;
+    SolverCG<Vector<double>>            solver(control, mem);
+
+    Vector<double> f(n_dofs);
+
+    SF.add_constraints(fixed_dofs);
+    SF.apply_constraints(f, true);
+    solver.solve(SF, u, f, PF);
+  }
+} // namespace
+
+
+
+// Implementation for 1D only
+template <>
+void
+laplace_transform(const std::map<unsigned int, Point<1>> &,
+                  Triangulation<1> &,
+                  const Function<1> *,
+                  const bool,
+                  const double)
+{
+  Assert(false, ExcNotImplemented());
+}
+
+
+// Implementation for dimensions except 1
+template <int dim>
+void
+laplace_transform(const std::map<unsigned int, Point<dim>> &new_points,
+                  Triangulation<dim> &                      triangulation,
+                  const Function<dim> *                     coefficient,
+                  const bool   solve_for_absolute_positions,
+                  const double tol)
+{
+  // first provide everything that is needed for solving a Laplace
+  // equation.
+  FE_Q<dim> q1(1);
+
+  DoFHandler<dim> dof_handler(triangulation);
+  dof_handler.distribute_dofs(q1);
+
+  DynamicSparsityPattern dsp(dof_handler.n_dofs(), dof_handler.n_dofs());
+  DoFTools::make_sparsity_pattern(dof_handler, dsp);
+  dsp.compress();
+
+  SparsityPattern sparsity_pattern;
+  sparsity_pattern.copy_from(dsp);
+  sparsity_pattern.compress();
+
+  SparseMatrix<double> S(sparsity_pattern);
+
+  QGauss<dim> quadrature(4);
+
+  MatrixCreator::create_laplace_matrix(
+    StaticMappingQ1<dim>::mapping, dof_handler, quadrature, S, coefficient);
+
+  // set up the boundary values for the laplace problem
+  std::map<types::global_dof_index, double>                   fixed_dofs[dim];
+  typename std::map<unsigned int, Point<dim>>::const_iterator map_end =
+    new_points.end();
+
+  // fill these maps using the data given by new_points
+  typename DoFHandler<dim>::cell_iterator cell = dof_handler.begin_active(),
+                                          endc = dof_handler.end();
+  for (; cell != endc; ++cell)
+    {
+      // loop over all vertices of the cell and see if it is listed in the map
+      // given as first argument of the function
+      for (unsigned int vertex_no = 0;
+           vertex_no < GeometryInfo<dim>::vertices_per_cell;
+           ++vertex_no)
+        {
+          const unsigned int vertex_index = cell->vertex_index(vertex_no);
+          const Point<dim> & vertex_point = cell->vertex(vertex_no);
+
+          const typename std::map<unsigned int, Point<dim>>::const_iterator
+            map_iter = new_points.find(vertex_index);
+
+          if (map_iter != map_end)
+            for (unsigned int i = 0; i < dim; ++i)
+              fixed_dofs[i].insert(std::pair<types::global_dof_index, double>(
+                cell->vertex_dof_index(vertex_no, 0),
+                (solve_for_absolute_positions ?
+                   map_iter->second(i) :
+                   map_iter->second(i) - vertex_point[i])));
+        }
+    }
+
+  // solve the dim problems with different right hand sides.
+  Vector<double> us[dim];
+  for (unsigned int i = 0; i < dim; ++i)
+    us[i].reinit(dof_handler.n_dofs());
+
+  // solve linear systems in parallel
+  Threads::TaskGroup<> tasks;
+  for (unsigned int i = 0; i < dim; ++i)
+    tasks += Threads::new_task(&laplace_solve, S, fixed_dofs[i], us[i], tol);
+  tasks.join_all();
+
+  // change the coordinates of the points of the triangulation
+  // according to the computed values
+  std::vector<bool> vertex_touched(triangulation.n_vertices(), false);
+  for (cell = dof_handler.begin_active(); cell != endc; ++cell)
+    for (unsigned int vertex_no = 0;
+         vertex_no < GeometryInfo<dim>::vertices_per_cell;
+         ++vertex_no)
+      if (vertex_touched[cell->vertex_index(vertex_no)] == false)
+        {
+          Point<dim> &v = cell->vertex(vertex_no);
+
+          const types::global_dof_index dof_index =
+            cell->vertex_dof_index(vertex_no, 0);
+          for (unsigned int i = 0; i < dim; ++i)
+            if (solve_for_absolute_positions)
+              v(i) = us[i](dof_index);
+            else
+              v(i) += us[i](dof_index);
+
+          vertex_touched[cell->vertex_index(vertex_no)] = true;
+        }
 }
 
 #endif
