@@ -438,7 +438,7 @@ Problem<dim>::deform_grid()
 
   const double t  = temperature_solver.get_time();
   const double dt = temperature_solver.get_time_step();
-  const double V  = pull_rate->value(Point<1>(t));
+  const double V  = pull_rate->value(Point<1>(t + dt));
 
   // Vertical shift of the crystal due to the pull rate
   Point<dim> dz;
@@ -446,16 +446,16 @@ Problem<dim>::deform_grid()
 
   const double L  = (p_axis_2 - p_triple)[dim - 1];
   const double dL = V * dt + p_triple[dim - 1] -
-                    interface_shape.value(Point<2>(p_triple[0], t));
+                    interface_shape.value(Point<2>(p_triple[0], t + dt));
   const double R  = p_triple[0];
   const double R0 = crystal_radius->value(Point<1>(L + dL)); // at the end
 
-  temperature_solver.add_output("L[m]", L);
+  temperature_solver.add_output("L[m]", L + dL);
   temperature_solver.add_output("R[m]", R0);
   temperature_solver.add_output("V[m/s]", V);
   if (with_dislocation())
     {
-      dislocation_solver.add_output("L[m]", L);
+      dislocation_solver.add_output("L[m]", L + dL);
       dislocation_solver.add_output("R[m]", R0);
       dislocation_solver.add_output("V[m/s]", V);
     }
@@ -469,7 +469,7 @@ Problem<dim>::deform_grid()
     // Shift vertically. The crystal pulling has to taken into account to keep
     // the correct interface position at the end of the time step.
     dp[dim - 1] =
-      interface_shape.value(Point<2>(p[0], t)) - dz[dim - 1] - p[dim - 1];
+      interface_shape.value(Point<2>(p[0], t + dt)) - dz[dim - 1] - p[dim - 1];
 
     return dp;
   };
