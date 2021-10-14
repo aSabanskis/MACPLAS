@@ -27,7 +27,11 @@ params = {
     "Ta1": 300,
     "Ta2": 940,
     "mr": 85,
-    "rho": 5370,
+    "R_crucible": 43,
+    "H0_crucible": 13,
+    "H1_crucible": 58,
+    "rho_c": 5370,
+    "rho_m": 5534,
 }
 
 
@@ -80,10 +84,10 @@ V = interpolate.interp1d(x, y)
 
 # MASS
 m_total = 0
-rho = params.get("rho")
+rho_c = params.get("rho_c")
 L_arr, dL = np.linspace(0, L_total, int(L_total / 1e-4), retstep=True)
 for L in L_arr:
-    m_total += rho * dL * np.pi * R(L) ** 2
+    m_total += rho_c * dL * np.pi * R(L) ** 2
 print(f"m_total={m_total*1e3:g} g")
 
 # MAX TIME
@@ -96,7 +100,7 @@ while True:
     t += dt
     dL = V(t) * dt
     L += dL
-    dm = rho * dL * np.pi * R(L) ** 2
+    dm = rho_c * dL * np.pi * R(L) ** 2
     m_melt -= dm
     if L >= L_total or m_melt <= m_residual:
         break
@@ -106,3 +110,41 @@ m_crystal = m_total - m_melt
 print(f"t_max={t_max:g} s")
 print(f"L_max={L_max*1e3:g} mm")
 print(f"m_crystal={m_crystal*1e3:g} g")
+
+# CRUCIBLE SHAPE
+H0 = params.get("H0_crucible")
+H1 = params.get("H1_crucible")
+x = [0, H0, H0 + H1]
+Rc = params.get("R_crucible")
+y = [0, Rc, Rc]
+
+fig = plt.figure(figsize=(6, 4))
+plt.plot(x, y, "o-")
+plt.grid(True)
+plt.gca().set_aspect("equal")
+plt.xlabel("Height, mm")
+plt.ylabel("Radius, mm")
+plt.savefig("crucible-shape.png", dpi=150, bbox_inches="tight")
+
+# convert to SI
+x = np.asarray(x) * 1e-3
+y = np.asarray(y) * 1e-3
+np.savetxt("crucible-shape.dat", np.c_[x, y], fmt="%g")
+R_crucible = interpolate.interp1d(x, y)
+
+# MELT LEVEL
+rho_m = params.get("rho_m")
+h_melt = 0
+m = 0
+dh = 1e-4
+while m < m_total:
+    h_melt += dh
+    dm = rho_m * dh * np.pi * R_crucible(h_melt) ** 2
+    m += dm
+print(f"h_melt={h_melt*1e3:g} mm")
+
+with open("problem-generated.prm", "w") as f:
+    f.write("# Auto-generated file, please do not edit\n")
+    f.write("set Crystal radius = crystal-shape.dat\n")
+    f.write("set Pull rate = pull-rate.dat\n")
+    f.write(f"set Max time = {t_max:g}\n")
