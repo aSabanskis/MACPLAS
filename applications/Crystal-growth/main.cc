@@ -411,6 +411,10 @@ template <int dim>
 void
 Problem<dim>::deform_grid()
 {
+  Timer timer;
+
+  std::cout << "Deforming grid";
+
   // the mesh will be modified, make a copy
   Triangulation<dim> triangulation;
   triangulation.copy_triangulation(temperature_solver.get_mesh());
@@ -576,6 +580,8 @@ Problem<dim>::deform_grid()
       dislocation_solver.get_mesh().clear();
       dislocation_solver.get_mesh().copy_triangulation(triangulation);
     }
+
+  std::cout << " " << format_time(timer) << "\n";
 }
 
 template <int dim>
