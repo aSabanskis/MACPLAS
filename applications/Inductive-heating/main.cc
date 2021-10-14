@@ -228,6 +228,11 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     Patterns::Bool(),
                     "Approximate LF EM field from HF EM data");
 
+  prm.declare_entry("Max time",
+                    "0",
+                    Patterns::Double(0),
+                    "Maximum time in seconds (0 - use solver parameters)");
+
   prm.declare_entry(
     "Output frequency",
     "0",
@@ -284,6 +289,13 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
         std::ofstream of("problem-default.prm");
         prm.print_parameters(of, ParameterHandler::Text);
       }
+
+  const double t_max = prm.get_double("Max time");
+  if (t_max > 0)
+    {
+      temperature_solver.get_parameters().set("Max time", t_max);
+      dislocation_solver.get_parameters().set("Max time", t_max);
+    }
 
   // print all problem-specific and solver parameters
   std::cout << "# ---------------------\n"

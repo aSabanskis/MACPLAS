@@ -8,6 +8,7 @@ set Inductor current                  = t<=12900 ? 34.2 + 68*t/12900 : 0
 set Inductor frequency                = 2.715e6
 set Initial temperature               = 1000
 set Max temperature change            = 1e-1
+set Max time                          = 0
 set Outer temperature iterations      = 1
 set Output frequency                  = 0
 set Output time step                  = 300
