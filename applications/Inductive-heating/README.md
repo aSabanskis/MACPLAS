@@ -12,7 +12,8 @@ Command-line arguments:
 | ```init``` or  ```use_default_prm``` | Write ```.prm``` files with default parameters and exit |
 | ```order <p>``` | Set finite element order ```p``` |
 | ```2d``` or ```2D``` | 2D simulation mode |
+| ```3d``` or ```3D``` | 3D simulation mode |
 
-The default mode is 3D simulation using second-order finite elements.
+The default mode is 2D simulation using second-order finite elements.
 
 ![Calculated temperature, effective stress and dislocation density distributions](results-T-tau-Nm.png)

@@ -1078,7 +1078,7 @@ main(int argc, char *argv[])
 
   bool init      = false;
   int  order     = 2;
-  int  dimension = 3;
+  int  dimension = 2;
 
   for (unsigned int i = 1; i < arguments.size(); ++i)
     {
@@ -1088,6 +1088,8 @@ main(int argc, char *argv[])
         order = std::stoi(arguments[i + 1]);
       if (arguments[i] == "2d" || arguments[i] == "2D")
         dimension = 2;
+      if (arguments[i] == "3d" || arguments[i] == "3D")
+        dimension = 3;
     }
 
   deallog.attach(std::cout);
