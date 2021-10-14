@@ -1626,7 +1626,10 @@ SurfaceInterpolator2D::set_points(const std::vector<Point<dim>> &new_points)
 {
   clear();
   points = new_points;
+
+#ifdef DEBUG
   info();
+#endif
 }
 
 const std::vector<Point<SurfaceInterpolator2D::dim>> &
