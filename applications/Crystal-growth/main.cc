@@ -486,7 +486,8 @@ Problem<dim>::deform_grid()
   const auto dp_triple = calc_interface_displacement(p_triple);
 
 #ifdef DEBUG
-  std::cout << "p_axis = " << p_axis_1 << " dp_axis = " << dp_axis << '\n'
+  std::cout << '\n'
+            << "p_axis = " << p_axis_1 << " dp_axis = " << dp_axis << '\n'
             << "p_triple = " << p_triple << " dp_triple = " << dp_triple
             << '\n';
 #endif
@@ -853,14 +854,11 @@ template <int dim>
 void
 Problem<dim>::update_grid_time_step()
 {
-  const double dt_min = dislocation_solver.get_time_step_min();
-
-  if (!with_dislocation() || dt_min == 0)
-    return;
-
-  const double t  = dislocation_solver.get_time();
-  const double dt = dislocation_solver.get_time_step();
-  const double V  = pull_rate->value(Point<1>(t));
+  const double t  = temperature_solver.get_time();
+  const double dt = temperature_solver.get_time_step();
+  const double dt_min =
+    with_dislocation() ? dislocation_solver.get_time_step_min() : dt;
+  const double V = pull_rate->value(Point<1>(t));
 
   // simple approach based on previous shift and the current pull rate
   const double dL_V = V * dt;
@@ -888,7 +886,7 @@ Problem<dim>::update_grid_time_step()
   dislocation_solver.add_output("shift_relative", relative_shift);
 
   const double dt_new =
-    relative_shift > 0 && max_relative_shift > 0 ?
+    dt_min > 0 && relative_shift > 0 && max_relative_shift > 0 ?
       std::max(dt_min,
                dt * std::min(1.0, max_relative_shift / relative_shift)) :
       dt;
@@ -983,6 +981,8 @@ Problem<dim>::solve_temperature()
 
   while (true)
     {
+      update_grid_time_step();
+
       const bool output_enabled = update_output_time_step();
 
       deform_grid();
