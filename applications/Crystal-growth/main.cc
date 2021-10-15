@@ -351,7 +351,8 @@ Problem<dim>::make_grid()
     }
 
   // preprocess some point indices
-  auto cmp_z = [](const auto &it1, const auto &it2) {
+  auto cmp_z = [](const std::pair<unsigned int, Point<dim>> &it1,
+                  const std::pair<unsigned int, Point<dim>> &it2) {
     return it1.second[dim - 1] < it2.second[dim - 1];
   };
 
@@ -386,7 +387,7 @@ Problem<dim>::make_grid()
     }
   std::sort(points_sorted.begin(),
             points_sorted.end(),
-            [](const auto &p1, const auto &p2) {
+            [](const Point<dim> &p1, const Point<dim> &p2) {
               // from highest to lowest, so that additional points can be added
               return p1[dim - 1] > p2[dim - 1];
             });
