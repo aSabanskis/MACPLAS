@@ -1,8 +1,5 @@
 #!/bin/bash
 
-set -e # exit script on error
-
-
 clean_prm(){
     for f in *.prm
     do
