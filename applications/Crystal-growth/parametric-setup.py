@@ -143,6 +143,27 @@ while m < m_total:
     m += dm
 print(f"h_melt={h_melt*1e3:g} mm")
 
+m = m_total
+h = h_melt
+h_arr = []
+L_arr, dL = np.linspace(0, L_max, int(L_max / 1e-4), retstep=True)
+for L in L_arr:
+    dm = rho_c * dL * np.pi * R(L) ** 2
+    dh = dm / (rho_m * np.pi * R_crucible(h) ** 2)
+    m -= dm
+    h -= dh
+    h_arr = np.append(h_arr, [h])
+
+np.savetxt("melt-height.dat", np.c_[L_arr, h_arr], fmt="%g")
+
+fig = plt.figure(figsize=(6, 4))
+plt.plot(L_arr * 1e3, h_arr * 1e3, "-")
+plt.grid(True)
+plt.xlabel("Length, mm")
+plt.ylabel("Melt height, mm")
+plt.savefig("melt-height.png", dpi=150, bbox_inches="tight")
+
+# PARAMETER FILE
 with open("problem-generated.prm", "w") as f:
     f.write("# Auto-generated file, please do not edit\n")
     f.write("set Crystal radius = crystal-shape.dat\n")
