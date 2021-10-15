@@ -796,7 +796,7 @@ Problem<dim>::initialize_temperature()
       for (unsigned int i = 0; i < f_test.size(); ++i)
         f_test[i] = calc_f.value(support_points[i]);
 
-      temperature_solver.add_field("f", f_test);
+      temperature_solver.add_field("f_test", f_test);
     }
 }
 
