@@ -21,7 +21,7 @@ params = {
     "v0": 0,
     "v1": 1,
     "v2": 1,
-    "t0": 5,
+    "t0": 0,
     "t1": 30,
     "t2": 120,
     "Ta1": 300,
@@ -36,8 +36,8 @@ params = {
 
 
 # RADIUS
-x = [params.get(f"L{x}") for x in range(4)]
-y = [params.get(f"r{x}") for x in range(4)]
+x = np.array([params.get(f"L{x}") for x in range(4)])
+y = np.array([params.get(f"r{x}") for x in range(4)])
 if x[0] > 0:
     x = np.append([0], x)
     y = np.append([y[0]], y)
@@ -61,8 +61,8 @@ R = interpolate.interp1d(x, y)
 
 
 # PULL RATE
-x = [params.get(f"t{x}") for x in range(3)]
-y = [params.get(f"v{x}") for x in range(3)]
+x = np.array([params.get(f"t{x}") for x in range(3)])
+y = np.array([params.get(f"v{x}") for x in range(3)])
 if x[0] > 0:
     x = np.append([0], x)
     y = np.append([0], y)
@@ -114,9 +114,9 @@ print(f"m_crystal={m_crystal*1e3:g} g")
 # CRUCIBLE SHAPE
 H0 = params.get("H0_crucible")
 H1 = params.get("H1_crucible")
-x = [0, H0, H0 + H1]
+x = np.array([0, H0, H0 + H1])
 Rc = params.get("R_crucible")
-y = [0, Rc, Rc]
+y = np.array([0, Rc, Rc])
 
 fig = plt.figure(figsize=(6, 4))
 plt.plot(x, y, "o-")
@@ -127,8 +127,8 @@ plt.ylabel("Radius, mm")
 plt.savefig("crucible-shape.png", dpi=150, bbox_inches="tight")
 
 # convert to SI
-x = np.asarray(x) * 1e-3
-y = np.asarray(y) * 1e-3
+x = x * 1e-3
+y = y * 1e-3
 np.savetxt("crucible-shape.dat", np.c_[x, y], fmt="%g")
 R_crucible = interpolate.interp1d(x, y)
 
@@ -148,3 +148,13 @@ with open("problem-generated.prm", "w") as f:
     f.write("set Crystal radius = crystal-shape.dat\n")
     f.write("set Pull rate = pull-rate.dat\n")
     f.write(f"set Max time = {t_max:g}\n")
+
+lines = open("problem.prm").readlines()
+include_found = False
+with open("problem.prm", "w") as f:
+    for line in lines:
+        f.write(line)
+        if line.startswith("include "):
+            include_found = True
+    if not include_found:
+        f.write("include problem-generated.prm")
