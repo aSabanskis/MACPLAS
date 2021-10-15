@@ -96,10 +96,8 @@ private:
   // distance between closest DOFs (for time step control)
   Vector<double> dof_distance;
 
-#ifdef DEBUG
-  // for testing
+  // for testing of interpolation
   Vector<double> f_test;
-#endif
 
   // crystallization interface
   constexpr static unsigned int boundary_id_interface = 0;
@@ -189,6 +187,12 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
     "0.1e-3",
     Patterns::Double(0),
     "Distance in m for update of precise crystal shape (0 - always)");
+
+  prm.declare_entry(
+    "Interpolation test function",
+    "",
+    Patterns::Anything(),
+    "Function f(r, z) for interpolation test on a moving mesh (empty - disabled)");
 
   prm.declare_entry(
     "Max relative shift",
@@ -608,9 +612,8 @@ Problem<dim>::calculate_field_gradients()
         grad_eval.add_field("e_c_" + std::to_string(j), e_c.block(j));
     }
 
-#ifdef DEBUG
-  grad_eval.add_field("f", f_test);
-#endif
+  if (f_test.size() > 0)
+    grad_eval.add_field("f_test", f_test);
 
   grad_eval.calculate();
 
@@ -620,9 +623,10 @@ Problem<dim>::calculate_field_gradients()
   Vector<double>     grad_component(n);
 
   std::vector<std::string> field_names{"T"};
-#ifdef DEBUG
-  field_names.push_back("f");
-#endif
+
+  if (f_test.size() > 0)
+    field_names.push_back("f_test");
+
   // skip gradients of dislocation density solver fields for now
 
   // initialize displacement with zeros at t=0
@@ -712,14 +716,15 @@ Problem<dim>::update_fields()
       temperature_solver.add_field("d" + dims[k], shift_component);
     }
 
-#ifdef DEBUG
-  const auto &grad_f = grad_eval.get_gradient("f");
+  if (f_test.size() > 0)
+    {
+      const auto &grad_f = grad_eval.get_gradient("f_test");
 
-  for (unsigned int i = 0; i < n; ++i)
-    f_test[i] += shift[i] * grad_f[i];
+      for (unsigned int i = 0; i < n; ++i)
+        f_test[i] += shift[i] * grad_f[i];
 
-  temperature_solver.add_field("f", f_test);
-#endif
+      temperature_solver.add_field("f_test", f_test);
+    }
 
   if (with_dislocation())
     {
@@ -778,15 +783,21 @@ Problem<dim>::initialize_temperature()
   temperature_solver.add_output("V[m/s]", pull_rate->value(Point<1>()));
   temperature_solver.add_output("shift_relative");
 
-#ifdef DEBUG
-  // manually construct a field for testing
-  temperature_solver.get_support_points(support_points);
-  f_test.reinit(temperature.size());
-  for (unsigned int i = 0; i < f_test.size(); ++i)
-    f_test[i] = 2 * sqr(support_points[i][0] - 0.005) +
-                sqr(support_points[i][dim - 1] - 0.005);
-  temperature_solver.add_field("f", f_test);
-#endif
+  // construct a field for testing
+  const std::string expr = prm.get("Interpolation test function");
+  if (!expr.empty())
+    {
+      FunctionParser<2> calc_f;
+      calc_f.initialize("r,z", expr, typename FunctionParser<2>::ConstMap());
+
+      temperature_solver.get_support_points(support_points);
+      f_test.reinit(temperature.size());
+
+      for (unsigned int i = 0; i < f_test.size(); ++i)
+        f_test[i] = calc_f.value(support_points[i]);
+
+      temperature_solver.add_field("f", f_test);
+    }
 }
 
 template <int dim>
