@@ -87,7 +87,11 @@ private:
 
   std::vector<Point<dim>> support_points, support_points_prev;
 
-  std::vector<Tensor<1, dim>> dr;
+  // DOF shift
+  std::vector<Tensor<1, dim>> shift;
+
+  // DOF shift relative to the distance to neighbour
+  Vector<double> shift_relative;
 
   // distance between closest DOFs (for time step control)
   Vector<double> dof_distance;
@@ -552,9 +556,9 @@ Problem<dim>::deform_grid()
 
   temperature_solver.get_support_points(support_points);
 
-  dr.resize(support_points.size());
-  for (unsigned int i = 0; i < dr.size(); ++i)
-    dr[i] = support_points[i] - support_points_prev[i];
+  shift.resize(support_points.size());
+  for (unsigned int i = 0; i < shift.size(); ++i)
+    shift[i] = support_points[i] - support_points_prev[i];
 
   update_fields();
 
@@ -693,26 +697,26 @@ Problem<dim>::update_fields()
   const auto &grad_T = grad_eval.get_gradient("T");
 
   for (unsigned int i = 0; i < n; ++i)
-    T[i] += dr[i] * grad_T[i];
+    T[i] += shift[i] * grad_T[i];
 
   temperature_solver.apply_bc1();
 
   // output the displacement at DoFs as well
   const auto     dims = coordinate_names(dim);
-  Vector<double> dr_component(n);
+  Vector<double> shift_component(n);
   for (unsigned int k = 0; k < dim; ++k)
     {
       for (unsigned int i = 0; i < n; ++i)
-        dr_component[i] = dr[i][k];
+        shift_component[i] = shift[i][k];
 
-      temperature_solver.add_field("d" + dims[k], dr_component);
+      temperature_solver.add_field("d" + dims[k], shift_component);
     }
 
 #ifdef DEBUG
   const auto &grad_f = grad_eval.get_gradient("f");
 
   for (unsigned int i = 0; i < n; ++i)
-    f_test[i] += dr[i] * grad_f[i];
+    f_test[i] += shift[i] * grad_f[i];
 
   temperature_solver.add_field("f", f_test);
 #endif
@@ -724,7 +728,7 @@ Problem<dim>::update_fields()
       const auto &grad_N_m = grad_eval.get_gradient("N_m");
 
       for (unsigned int i = 0; i < n; ++i)
-        N_m[i] += dr[i] * grad_N_m[i];
+        N_m[i] += shift[i] * grad_N_m[i];
 
 
       BlockVector<double> &e_c = dislocation_solver.get_strain_c();
@@ -737,7 +741,7 @@ Problem<dim>::update_fields()
             grad_eval.get_gradient("e_c_" + std::to_string(j));
 
           for (unsigned int i = 0; i < n; ++i)
-            e[i] += dr[i] * grad_e[i];
+            e[i] += shift[i] * grad_e[i];
         }
     }
 }
@@ -768,9 +772,11 @@ Problem<dim>::initialize_temperature()
       dislocation_solver.add_probe(p);
     }
 
-  dr.resize(temperature.size());
+  shift.resize(temperature.size());
+  shift_relative.reinit(temperature.size());
 
   temperature_solver.add_output("V[m/s]", pull_rate->value(Point<1>()));
+  temperature_solver.add_output("shift_relative");
 
 #ifdef DEBUG
   // manually construct a field for testing
@@ -792,6 +798,7 @@ Problem<dim>::initialize_dislocation()
   dislocation_solver.get_temperature() = temperature_solver.get_temperature();
 
   dislocation_solver.add_output("V[m/s]", pull_rate->value(Point<1>()));
+  dislocation_solver.add_output("shift_relative");
 
   dislocation_solver.output_parameter_table();
 
@@ -847,18 +854,27 @@ Problem<dim>::update_grid_time_step()
   // simple approach based on previous shift and the current pull rate
   const double dL_V = V * dt;
 
-  AssertDimension(dr.size(), dof_distance.size());
-  AssertDimension(dr.size(), temperature_solver.get_temperature().size());
+  const unsigned int n = temperature_solver.get_temperature().size();
 
-  double relative_shift = 0;
-  for (unsigned int i = 0; i < dof_distance.size(); ++i)
+  AssertDimension(shift.size(), dof_distance.size());
+  AssertDimension(shift.size(), n);
+
+  shift_relative.reinit(n);
+
+  for (unsigned int i = 0; i < n; ++i)
     {
-      const double dL = dr[i].norm() + dL_V;
+      const double dL = shift[i].norm() + dL_V;
 
-      relative_shift = std::max(relative_shift, dL / dof_distance[i]);
+      shift_relative[i] = std::max(shift_relative[i], dL / dof_distance[i]);
     }
 
+  temperature_solver.add_field("shift_relative", shift_relative);
+
+  const double relative_shift     = shift_relative.linfty_norm();
   const double max_relative_shift = prm.get_double("Max relative shift");
+
+  temperature_solver.add_output("shift_relative", relative_shift);
+  dislocation_solver.add_output("shift_relative", relative_shift);
 
   const double dt_new =
     relative_shift > 0 && max_relative_shift > 0 ?
