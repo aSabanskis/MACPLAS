@@ -149,16 +149,6 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     Patterns::Double(0),
                     "Ambient temperature T_amb in K");
 
-  prm.declare_entry("Heat transfer coefficient",
-                    "0",
-                    Patterns::Double(0),
-                    "Heat transfer coefficient h in W/m^2/K");
-
-  prm.declare_entry("Reference temperature",
-                    "300",
-                    Patterns::Double(0),
-                    "Reference temperature T_ref in K");
-
   prm.declare_entry("Temperature only",
                     "false",
                     Patterns::Bool(),
@@ -829,14 +819,11 @@ template <int dim>
 void
 Problem<dim>::set_temperature_BC()
 {
-  const double T_0   = prm.get_double("Melting point");
-  const double T_ref = prm.get_double("Reference temperature");
-  const double h     = prm.get_double("Heat transfer coefficient");
-  const double e     = prm.get_double("Emissivity");
-  const double T_a   = prm.get_double("Ambient temperature");
+  const double T_0 = prm.get_double("Melting point");
+  const double e   = prm.get_double("Emissivity");
+  const double T_a = prm.get_double("Ambient temperature");
 
   temperature_solver.set_bc1(boundary_id_interface, T_0);
-  temperature_solver.set_bc_convective(boundary_id_surface, h, T_ref);
 
   std::function<double(const double)> emissivity_const = [=](const double) {
     return e;
