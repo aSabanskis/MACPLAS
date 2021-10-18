@@ -39,7 +39,9 @@ private:
   update_fields();
 
   void
-  apply_field_gradient(Vector<double> &field, const std::string &name);
+  apply_field_gradient(Vector<double> &         field,
+                       const std::string &      name,
+                       const std::vector<bool> &do_not_change);
 
   void
   initialize_temperature();
@@ -696,17 +698,15 @@ void
 Problem<dim>::update_fields()
 {
   std::vector<Point<dim>> points;
-  std::vector<bool>       boundary_dofs;
+  std::vector<bool>       interface_dofs;
   temperature_solver.get_boundary_points(boundary_id_interface,
                                          points,
-                                         boundary_dofs);
+                                         interface_dofs);
 
   Vector<double> &   T = temperature_solver.get_temperature();
   const unsigned int n = T.size();
 
-  apply_field_gradient(T, "T");
-
-  temperature_solver.apply_bc1();
+  apply_field_gradient(T, "T", interface_dofs);
 
   // output the displacement at DoFs as well
   const auto     dims = coordinate_names(dim);
@@ -721,7 +721,7 @@ Problem<dim>::update_fields()
 
   if (f_test.size() > 0)
     {
-      apply_field_gradient(f_test, "f_test");
+      apply_field_gradient(f_test, "f_test", interface_dofs);
 
       temperature_solver.add_field("f_test", f_test);
     }
@@ -730,7 +730,7 @@ Problem<dim>::update_fields()
     {
       Vector<double> &N_m = dislocation_solver.get_dislocation_density();
 
-      apply_field_gradient(N_m, "N_m");
+      apply_field_gradient(N_m, "N_m", interface_dofs);
 
 
       BlockVector<double> &e_c = dislocation_solver.get_strain_c();
@@ -739,20 +739,27 @@ Problem<dim>::update_fields()
         {
           Vector<double> &e = e_c.block(j);
 
-          apply_field_gradient(e, "e_c_" + std::to_string(j));
+          apply_field_gradient(e, "e_c_" + std::to_string(j), interface_dofs);
         }
     }
 }
 
 template <int dim>
 void
-Problem<dim>::apply_field_gradient(Vector<double> &   field,
-                                   const std::string &name)
+Problem<dim>::apply_field_gradient(Vector<double> &         field,
+                                   const std::string &      name,
+                                   const std::vector<bool> &do_not_change)
 {
+  const Vector<double> field0 = field;
+
   const auto &grad = grad_eval.get_gradient(name);
 
   for (unsigned int i = 0; i < field.size(); ++i)
     field[i] += shift[i] * grad[i];
+
+  for (unsigned int i = 0; i < do_not_change.size(); ++i)
+    if (do_not_change[i])
+      field[i] = field0[i];
 }
 
 template <int dim>
