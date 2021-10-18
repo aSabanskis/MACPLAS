@@ -26,6 +26,7 @@ params = {
     "t2": 120,
     "Ta1": 300,
     "Ta2": 940,
+    "HTa": 30,
     "mr": 85,
     "R_crucible": 43,
     "H0_crucible": 13,
@@ -130,6 +131,8 @@ plt.savefig("crucible-shape.png", dpi=150, bbox_inches="tight")
 x = x * 1e-3
 y = y * 1e-3
 np.savetxt("crucible-shape.dat", np.c_[x, y], fmt="%g")
+H_crucible = y[-1]
+print(f"H_crucible={H_crucible*1e3:g} mm")
 R_crucible = interpolate.interp1d(x, y)
 
 # MELT LEVEL
@@ -163,11 +166,18 @@ plt.xlabel("Length, mm")
 plt.ylabel("Melt height, mm")
 plt.savefig("melt-height.png", dpi=150, bbox_inches="tight")
 
+zT = H_crucible + params.get("HTa") * 1e-3 - h_melt
+Ta1 = params.get("Ta1") + 273
+Ta2 = params.get("Ta2") + 273
+Tamb = f"z<{zT:g} ? {Ta1} : {Ta2}"
+print(f"Tamb={Tamb}")
+
 # PARAMETER FILE
 with open("problem-generated.prm", "w") as f:
     f.write("# Auto-generated file, please do not edit\n")
     f.write("set Crystal radius = crystal-shape.dat\n")
     f.write("set Pull rate = pull-rate.dat\n")
+    f.write(f"set Ambient temperature = {Tamb}\n")
     f.write(f"set Max time = {t_max:g}\n")
 
 lines = open("problem.prm").readlines()

@@ -110,6 +110,8 @@ private:
 
   SurfaceInterpolator2D surface_projector;
 
+  std::unique_ptr<Function<1>> ambient_temperature;
+
   std::unique_ptr<Function<1>> pull_rate;
 
   std::unique_ptr<Function<1>> crystal_radius;
@@ -144,10 +146,11 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     Patterns::Double(0),
                     "Emissivity epsilon (dimensionless)");
 
-  prm.declare_entry("Ambient temperature",
-                    "300",
-                    Patterns::Double(0),
-                    "Ambient temperature T_amb in K");
+  prm.declare_entry(
+    "Ambient temperature",
+    "300",
+    Patterns::Anything(),
+    "Ambient temperature T_amb in K (vertical coordinate z function or data file name)");
 
   prm.declare_entry("Temperature only",
                     "false",
@@ -264,6 +267,8 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
       dislocation_solver.get_stress_solver().get_parameters().print_parameters(
         std::cout, ParameterHandler::Text);
     }
+
+  initialize_function(ambient_temperature, prm.get("Ambient temperature"), "z");
 
   initialize_function(pull_rate, prm.get("Pull rate"));
 
@@ -821,7 +826,6 @@ Problem<dim>::set_temperature_BC()
 {
   const double T_0 = prm.get_double("Melting point");
   const double e   = prm.get_double("Emissivity");
-  const double T_a = prm.get_double("Ambient temperature");
 
   temperature_solver.set_bc1(boundary_id_interface, T_0);
 
@@ -832,10 +836,29 @@ Problem<dim>::set_temperature_BC()
   std::function<double(const double)> emissivity_deriv_const =
     [](const double) { return 0.0; };
 
-  Vector<double> q(temperature_solver.get_temperature().size());
+  const unsigned int n = temperature_solver.get_temperature().size();
+  Vector<double>     q_in(n);
 
-  temperature_solver.set_bc_rad_mixed(
-    boundary_id_surface, q, emissivity_const, emissivity_deriv_const, T_a);
+  std::vector<Point<dim>> points;
+  std::vector<bool>       boundary_dofs;
+  temperature_solver.get_boundary_points(boundary_id_surface,
+                                         points,
+                                         boundary_dofs);
+
+  for (unsigned int i = 0; i < n; ++i)
+    {
+      if (!boundary_dofs[i])
+        continue;
+
+      const double T = ambient_temperature->value(Point<1>(points[i][dim - 1]));
+
+      q_in[i] = sigma_SB * e * std::pow(T, 4);
+    }
+
+  temperature_solver.set_bc_rad_mixed(boundary_id_surface,
+                                      q_in,
+                                      emissivity_const,
+                                      emissivity_deriv_const);
 }
 
 template <int dim>
