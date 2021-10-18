@@ -28,7 +28,7 @@ set xrange [r_a:r_b]
 set yrange [-1e8:3e8]
 
 do for [dim=2:3] {
-    do for [order=1:2] {
+    do for [order=1:3] {
         n_components = 2 * dim
         f = 'result-'.dim.'d-order'.order.'-x.dat'
         set output 'result-'.dim.'d-order'.order.'-x.pdf'

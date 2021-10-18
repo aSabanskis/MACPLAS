@@ -149,7 +149,7 @@ main()
   deallog.attach(std::cout);
   deallog.depth_console(2);
 
-  for (unsigned int order = 1; order <= 2; ++order)
+  for (unsigned int order = 1; order <= 3; ++order)
     {
       Problem<2> p2d(order);
       p2d.run();
