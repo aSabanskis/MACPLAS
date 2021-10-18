@@ -39,6 +39,9 @@ private:
   update_fields();
 
   void
+  apply_field_gradient(Vector<double> &field, const std::string &name);
+
+  void
   initialize_temperature();
 
   void
@@ -692,13 +695,16 @@ template <int dim>
 void
 Problem<dim>::update_fields()
 {
+  std::vector<Point<dim>> points;
+  std::vector<bool>       boundary_dofs;
+  temperature_solver.get_boundary_points(boundary_id_interface,
+                                         points,
+                                         boundary_dofs);
+
   Vector<double> &   T = temperature_solver.get_temperature();
   const unsigned int n = T.size();
 
-  const auto &grad_T = grad_eval.get_gradient("T");
-
-  for (unsigned int i = 0; i < n; ++i)
-    T[i] += shift[i] * grad_T[i];
+  apply_field_gradient(T, "T");
 
   temperature_solver.apply_bc1();
 
@@ -715,10 +721,7 @@ Problem<dim>::update_fields()
 
   if (f_test.size() > 0)
     {
-      const auto &grad_f = grad_eval.get_gradient("f_test");
-
-      for (unsigned int i = 0; i < n; ++i)
-        f_test[i] += shift[i] * grad_f[i];
+      apply_field_gradient(f_test, "f_test");
 
       temperature_solver.add_field("f_test", f_test);
     }
@@ -727,10 +730,7 @@ Problem<dim>::update_fields()
     {
       Vector<double> &N_m = dislocation_solver.get_dislocation_density();
 
-      const auto &grad_N_m = grad_eval.get_gradient("N_m");
-
-      for (unsigned int i = 0; i < n; ++i)
-        N_m[i] += shift[i] * grad_N_m[i];
+      apply_field_gradient(N_m, "N_m");
 
 
       BlockVector<double> &e_c = dislocation_solver.get_strain_c();
@@ -739,13 +739,20 @@ Problem<dim>::update_fields()
         {
           Vector<double> &e = e_c.block(j);
 
-          const auto &grad_e =
-            grad_eval.get_gradient("e_c_" + std::to_string(j));
-
-          for (unsigned int i = 0; i < n; ++i)
-            e[i] += shift[i] * grad_e[i];
+          apply_field_gradient(e, "e_c_" + std::to_string(j));
         }
     }
+}
+
+template <int dim>
+void
+Problem<dim>::apply_field_gradient(Vector<double> &   field,
+                                   const std::string &name)
+{
+  const auto &grad = grad_eval.get_gradient(name);
+
+  for (unsigned int i = 0; i < field.size(); ++i)
+    field[i] += shift[i] * grad[i];
 }
 
 template <int dim>
