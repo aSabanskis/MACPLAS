@@ -297,7 +297,6 @@ void
 Problem<dim>::run()
 {
   // initialize the mesh, all fields (steady T) and output the results at t=0
-
   make_grid();
 
   initialize_temperature();
@@ -336,9 +335,13 @@ Problem<dim>::make_grid()
 {
   Triangulation<dim> &triangulation = temperature_solver.get_mesh();
 
+
+  const std::string msh = "mesh-" + std::to_string(dim) + "d.msh";
+  std::cout << "Reading " << msh << '\n';
+  std::ifstream f(msh);
+
   GridIn<dim> gi;
   gi.attach_triangulation(triangulation);
-  std::ifstream f("mesh-" + std::to_string(dim) + "d.msh");
   gi.read_msh(f);
 
   if (with_dislocation())
@@ -372,6 +375,8 @@ Problem<dim>::make_grid()
               ExcMessage("No points on boundary No. " +
                          std::to_string(boundary_id_surface) +
                          " (side surface) found"));
+
+  std::cout << "Preprocessing crystal points\n";
 
   point_id_axis_z_min =
     std::min_element(points_axis.begin(), points_axis.end(), cmp_z)->first;
@@ -635,7 +640,10 @@ Problem<dim>::calculate_field_gradients()
   if (f_test.size() > 0)
     field_names.push_back("f_test");
 
-  // skip gradients of dislocation density solver fields for now
+  if (with_dislocation())
+    field_names.push_back("N_m");
+
+  // skip gradients of creep strain for now
 
   // initialize displacement with zeros at t=0
   for (unsigned int k = 0; k < dim; ++k)
