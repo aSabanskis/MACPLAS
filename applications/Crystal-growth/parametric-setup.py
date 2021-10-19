@@ -25,7 +25,7 @@ params = {
     "t1": 30,
     "t2": 120,
     "Ta1": 300,
-    "Ta2": 940,
+    "Ta2": 937,
     "HTa": 30,
     "mr": 85,
     "R_crucible": 43,
@@ -169,7 +169,7 @@ plt.savefig("melt-height.png", dpi=150, bbox_inches="tight")
 zT = H_crucible + params.get("HTa") * 1e-3 - h_melt
 Ta1 = params.get("Ta1") + 273
 Ta2 = params.get("Ta2") + 273
-Tamb = f"z<{zT:g} ? {Ta1} : {Ta2}"
+Tamb = f"z>{zT:g} ? {Ta1} : {Ta2}"
 print(f"Tamb={Tamb}")
 
 # PARAMETER FILE

@@ -170,7 +170,7 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
 
   prm.declare_entry(
     "Crystal radius",
-    "0.01",
+    "0.002",
     Patterns::Anything(),
     "Crystal radius R in m (length function or data file name)");
 

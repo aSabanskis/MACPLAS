@@ -45,7 +45,7 @@ setup_parameters(){
     sed -Ei "s|(set Number of face quadrature points *= *).*|\1 0|" temperature.prm
 
     # custom code can be added
-    sed -Ei "s|(set Crystal radius *= *).*|\1 t<150 ? 2e-3 : t<2505 ? 2e-3+10e-3*(1+sin((t-150)/750-1.57)) : t<5000 ? 22e-3 : 2e-3+10e-3*(1+sin((t-5000)/1400+1.57))|" problem.prm
+    sed -Ei "s|(set Crystal radius *= *).*|\1 L<0.01 ? 2e-3 : L<0.0225632 ? 2e-3+10e-3*(1+sin((L-0.01)/0.004-1.57)) : 22e-3|" problem.prm
     # sed -Ei "s|(set Pull rate *= *).*|\1 V.txt|" problem.prm
     # sed -Ei "s|(set Interface shape *= *).*|\1 0|" problem.prm
 }
