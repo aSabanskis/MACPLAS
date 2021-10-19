@@ -198,6 +198,12 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
     Patterns::Double(0),
     "Maximum relative (to neighbour) mesh movement (0 - unlimited)");
 
+  prm.declare_entry(
+    "Number of gradient quadrature points",
+    "0",
+    Patterns::Integer(0),
+    "Number of QGauss<dim> quadrature points for gradient calculation (0: order+1)");
+
   prm.declare_entry("Laplace tolerance",
                     "1e-10",
                     Patterns::Double(0),
@@ -617,7 +623,7 @@ Problem<dim>::calculate_field_gradients()
   if (f_test.size() > 0)
     grad_eval.add_field("f_test", f_test);
 
-  grad_eval.calculate();
+  grad_eval.calculate(prm.get_integer("Number of gradient quadrature points"));
 
   // output gradients
   const auto         dims = coordinate_names(dim);
