@@ -2,15 +2,22 @@
 #define macplas_utilities_h
 
 #include <deal.II/base/function_lib.h>
+#include <deal.II/base/function_parser.h>
 #include <deal.II/base/point.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/base/timer.h>
 #include <deal.II/base/utilities.h>
 
-#include <deal.II/fe/fe_tools.h>
+#include <deal.II/dofs/dof_tools.h>
 
+#include <deal.II/fe/fe_tools.h>
+#include <deal.II/fe/fe_values.h>
+
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/filtered_matrix.h>
 #include <deal.II/lac/vector.h>
+
+#include <deal.II/numerics/matrix_tools.h>
 
 #include <array>
 #include <fstream>
