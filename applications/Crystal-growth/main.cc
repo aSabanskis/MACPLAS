@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <fstream>
 
+#include "../../include/advection_solver.h"
 #include "../../include/dislocation_solver.h"
 #include "../../include/temperature_solver.h"
 #include "../../include/utilities.h"
@@ -39,9 +40,9 @@ private:
   update_fields();
 
   void
-  apply_field_gradient(Vector<double> &         field,
-                       const std::string &      name,
-                       const std::vector<bool> &do_not_change);
+  update_one_field(Vector<double> &         field,
+                   const std::string &      name,
+                   const std::vector<bool> &do_not_change);
 
   void
   initialize_temperature();
@@ -84,11 +85,16 @@ private:
   bool
   with_dislocation() const;
 
+  bool
+  use_advection() const;
+
   Timer timer;
 
   TemperatureSolver<dim> temperature_solver;
 
   DislocationSolver<dim> dislocation_solver;
+
+  AdvectionSolver<dim> advection_solver;
 
   std::vector<Point<dim>> support_points, support_points_prev;
 
@@ -135,6 +141,7 @@ template <int dim>
 Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
   : temperature_solver(order, use_default_prm)
   , dislocation_solver(order, use_default_prm)
+  , advection_solver(order, use_default_prm)
 {
   prm.declare_entry("Melting point",
                     "1210",
@@ -185,6 +192,11 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
     "0.1e-3",
     Patterns::Double(0),
     "Distance in m for update of precise crystal shape (0 - always)");
+
+  prm.declare_entry("Interpolation method",
+                    "advection",
+                    Patterns::Selection("gradient|advection"),
+                    "Numerical method for interpolation on a moving mesh");
 
   prm.declare_entry(
     "Interpolation test function",
@@ -265,6 +277,11 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
   temperature_solver.get_parameters().print_parameters(std::cout,
                                                        ParameterHandler::Text);
 
+  std::cout << "# ---------------------\n"
+            << "# " << advection_solver.solver_name() << '\n';
+  advection_solver.get_parameters().print_parameters(std::cout,
+                                                     ParameterHandler::Text);
+
   if (with_dislocation())
     {
       std::cout << "# ---------------------\n"
@@ -343,6 +360,8 @@ Problem<dim>::make_grid()
   GridIn<dim> gi;
   gi.attach_triangulation(triangulation);
   gi.read_msh(f);
+
+  advection_solver.get_mesh().copy_triangulation(triangulation);
 
   if (with_dislocation())
     dislocation_solver.get_mesh().copy_triangulation(triangulation);
@@ -596,6 +615,9 @@ Problem<dim>::deform_grid()
   temperature_solver.get_mesh().clear();
   temperature_solver.get_mesh().copy_triangulation(triangulation);
 
+  advection_solver.get_mesh().clear();
+  advection_solver.get_mesh().copy_triangulation(triangulation);
+
   if (with_dislocation())
     {
       dislocation_solver.get_mesh().clear();
@@ -611,22 +633,34 @@ Problem<dim>::calculate_field_gradients()
 {
   // evaluate gradients at the previous mesh
   grad_eval.clear();
-
   grad_eval.attach_dof_handler(temperature_solver.get_dof_handler());
-  grad_eval.add_field("T", temperature_solver.get_temperature());
+
+  const Vector<double> &T = temperature_solver.get_temperature();
+
+  grad_eval.add_field("T", T);
+  advection_solver.add_field("T", T);
 
   if (with_dislocation())
     {
-      grad_eval.add_field("N_m", dislocation_solver.get_dislocation_density());
+      const Vector<double> &N_m = dislocation_solver.get_dislocation_density();
+
+      grad_eval.add_field("N_m", N_m);
+      advection_solver.add_field("N_m", N_m);
 
       const BlockVector<double> &e_c = dislocation_solver.get_strain_c();
 
       for (unsigned int j = 0; j < e_c.n_blocks(); ++j)
-        grad_eval.add_field("e_c_" + std::to_string(j), e_c.block(j));
+        {
+          grad_eval.add_field("e_c_" + std::to_string(j), e_c.block(j));
+          advection_solver.add_field("e_c_" + std::to_string(j), e_c.block(j));
+        }
     }
 
   if (f_test.size() > 0)
-    grad_eval.add_field("f_test", f_test);
+    {
+      grad_eval.add_field("f_test", f_test);
+      advection_solver.add_field("f_test", f_test);
+    }
 
   grad_eval.calculate(prm.get_integer("Number of gradient quadrature points"));
 
@@ -711,6 +745,14 @@ template <int dim>
 void
 Problem<dim>::update_fields()
 {
+  if (use_advection())
+    {
+      // reverse the velocity direction and specify velocity=shift
+      advection_solver.get_time_step() = -1;
+      advection_solver.set_velocity(shift);
+      advection_solver.solve();
+    }
+
   std::vector<Point<dim>> points;
   std::vector<bool>       interface_dofs;
   temperature_solver.get_boundary_points(boundary_id_interface,
@@ -720,7 +762,7 @@ Problem<dim>::update_fields()
   Vector<double> &   T = temperature_solver.get_temperature();
   const unsigned int n = T.size();
 
-  apply_field_gradient(T, "T", interface_dofs);
+  update_one_field(T, "T", interface_dofs);
 
   // output the displacement at DoFs as well
   const auto     dims = coordinate_names(dim);
@@ -735,7 +777,7 @@ Problem<dim>::update_fields()
 
   if (f_test.size() > 0)
     {
-      apply_field_gradient(f_test, "f_test", interface_dofs);
+      update_one_field(f_test, "f_test", interface_dofs);
 
       temperature_solver.add_field("f_test", f_test);
     }
@@ -744,7 +786,7 @@ Problem<dim>::update_fields()
     {
       Vector<double> &N_m = dislocation_solver.get_dislocation_density();
 
-      apply_field_gradient(N_m, "N_m", interface_dofs);
+      update_one_field(N_m, "N_m", interface_dofs);
 
 
       BlockVector<double> &e_c = dislocation_solver.get_strain_c();
@@ -753,18 +795,30 @@ Problem<dim>::update_fields()
         {
           Vector<double> &e = e_c.block(j);
 
-          apply_field_gradient(e, "e_c_" + std::to_string(j), interface_dofs);
+          update_one_field(e, "e_c_" + std::to_string(j), interface_dofs);
         }
     }
 }
 
 template <int dim>
 void
-Problem<dim>::apply_field_gradient(Vector<double> &         field,
-                                   const std::string &      name,
-                                   const std::vector<bool> &do_not_change)
+Problem<dim>::update_one_field(Vector<double> &         field,
+                               const std::string &      name,
+                               const std::vector<bool> &do_not_change)
 {
   const Vector<double> field0 = field;
+
+  if (use_advection())
+    {
+      field = advection_solver.get_field(name);
+
+#ifdef DEBUG
+      Vector<double> df = field;
+      df -= field0;
+      temperature_solver.add_field("d" + name + "_adv", df);
+#endif
+      return;
+    }
 
   const auto &grad = grad_eval.get_gradient(name);
 
@@ -774,6 +828,12 @@ Problem<dim>::apply_field_gradient(Vector<double> &         field,
   for (unsigned int i = 0; i < do_not_change.size(); ++i)
     if (do_not_change[i])
       field[i] = field0[i];
+
+#ifdef DEBUG
+  Vector<double> df = field;
+  df -= field0;
+  temperature_solver.add_field("d" + name + "_grad", df);
+#endif
 }
 
 template <int dim>
@@ -781,6 +841,8 @@ void
 Problem<dim>::initialize_temperature()
 {
   temperature_solver.initialize(); // sets T=0
+
+  advection_solver.initialize();
 
   previous_time_step = temperature_solver.get_time_step();
 
@@ -1136,6 +1198,13 @@ bool
 Problem<dim>::with_dislocation() const
 {
   return !prm.get_bool("Temperature only");
+}
+
+template <int dim>
+bool
+Problem<dim>::use_advection() const
+{
+  return prm.get("Interpolation method") == "advection";
 }
 
 int
