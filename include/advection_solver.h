@@ -102,6 +102,13 @@ public:
   void
   initialize();
 
+  /** Get coordinates of boundary DOFs
+   */
+  void
+  get_boundary_points(const unsigned int       id,
+                      std::vector<Point<dim>> &points,
+                      std::vector<bool> &      boundary_dofs) const;
+
   /** Get coordinates of DOFs
    */
   void
@@ -132,6 +139,11 @@ public:
    */
   void
   output_vtk() const;
+
+  /** Save results at DOFs of boundary \c id to disk
+   */
+  void
+  output_boundary_values(const unsigned int id) const;
 
 private:
   /** Initialize parameters. Called by the constructor
@@ -345,6 +357,11 @@ AdvectionSolver<dim>::initialize_parameters()
   if (prm.get_integer("Number of cell quadrature points") == 0)
     prm.set("Number of cell quadrature points", n_q_default);
 
+  const long int n_vtk_default = get_degree();
+
+  if (prm.get_integer("Output subdivisions") == 0)
+    prm.set("Output subdivisions", n_vtk_default);
+
   std::cout << "  done\n";
 
   std::cout << "n_q_cell=" << prm.get("Number of cell quadrature points")
@@ -442,6 +459,21 @@ AdvectionSolver<dim>::initialize()
             << "\n"
             << solver_name() << "  "
             << "Number of degrees of freedom: " << n_dofs << "\n";
+}
+
+template <int dim>
+void
+AdvectionSolver<dim>::get_boundary_points(
+  const unsigned int       id,
+  std::vector<Point<dim>> &points,
+  std::vector<bool> &      boundary_dofs) const
+{
+  get_support_points(points);
+  boundary_dofs.resize(dh.n_dofs());
+  DoFTools::extract_boundary_dofs(dh,
+                                  ComponentMask(),
+                                  boundary_dofs,
+                                  {static_cast<types::boundary_id>(id)});
 }
 
 template <int dim>
@@ -849,6 +881,71 @@ AdvectionSolver<dim>::output_vtk() const
   output << std::setprecision(precision);
 
   data_out.write_vtk(output);
+
+  std::cout << " " << format_time(timer) << "\n";
+}
+
+template <int dim>
+void
+AdvectionSolver<dim>::output_boundary_values(const unsigned int id) const
+{
+  Timer timer;
+
+  std::vector<Point<dim>> points;
+  std::vector<bool>       boundary_dofs;
+  get_boundary_points(id, points, boundary_dofs);
+
+  if (std::none_of(boundary_dofs.cbegin(),
+                   boundary_dofs.cend(),
+                   [](const bool b) { return b; }))
+    {
+      std::cout << solver_name()
+                << "  output_boundary_values: skipping empty boundary " << id
+                << "\n";
+      return;
+    }
+
+  const std::string file_name = "result-advection" + output_name_suffix() +
+                                "-boundary" + std::to_string(id) + ".dat";
+  std::cout << solver_name() << "  Saving to '" << file_name << "'";
+
+  std::ofstream output(file_name);
+
+  const int precision = prm.get_integer("Output precision");
+  output << std::setprecision(precision);
+
+  const auto dims = coordinate_names(dim);
+  for (const auto &d : dims)
+    output << d << "[m]\t";
+
+  for (const auto &it : fields)
+    output << it.first << '\t';
+
+  for (unsigned int k = 0; k < dim; ++k)
+    output << "u_" + std::to_string(k) << '\t';
+
+  output << "stabilization_factor";
+
+  output << '\n';
+
+
+  for (unsigned int i = 0; i < points.size(); ++i)
+    {
+      if (!boundary_dofs[i])
+        continue;
+
+      // a simple '<< points[i]' would put space between coordinates
+      for (unsigned int d = 0; d < dim; ++d)
+        output << points[i][d] << '\t';
+
+      for (const auto &it : fields)
+        output << it.second[i] << '\t';
+
+      for (unsigned int k = 0; k < dim; ++k)
+        output << velocity.block(k)[i] << '\t';
+
+      output << stabilization_factor[i] << '\n';
+    }
 
   std::cout << " " << format_time(timer) << "\n";
 }
