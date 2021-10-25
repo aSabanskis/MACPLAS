@@ -661,6 +661,8 @@ AdvectionSolver<dim>::assemble_system()
 
       fe_values.reinit(cell);
 
+      cell->get_dof_indices(local_dof_indices);
+
       for (unsigned int k = 0; k < n_fields; ++k)
         fe_values.get_function_values(fields_prev.block(k), f_prev_q[k]);
 
@@ -682,9 +684,9 @@ AdvectionSolver<dim>::assemble_system()
 
           for (unsigned int i = 0; i < dofs_per_cell; ++i)
             {
-              const double phi_i =
-                fe_values.shape_value(i, q) +
-                stabilization_factor[i] * (u_unit * fe_values.shape_grad(i, q));
+              const double tau   = stabilization_factor[local_dof_indices[i]];
+              const double phi_i = fe_values.shape_value(i, q) +
+                                   tau * (u_unit * fe_values.shape_grad(i, q));
 
               for (unsigned int j = 0; j < dofs_per_cell; ++j)
                 {
@@ -699,8 +701,6 @@ AdvectionSolver<dim>::assemble_system()
                 cell_rhs.block(k)(i) += f_prev_q[k][q] / dt * phi_i * weight;
             }
         }
-
-      cell->get_dof_indices(local_dof_indices);
 
       for (unsigned int i = 0; i < dofs_per_cell; ++i)
         {
