@@ -112,6 +112,12 @@ public:
   unsigned int
   get_degree() const;
 
+  /** Set first-type boundary condition \f$f = f_0\f$.
+   * The value does not need to be specified.
+   */
+  void
+  set_bc1(const unsigned int id);
+
   /** Add a FE field
    */
   void
@@ -199,6 +205,10 @@ private:
   /** Right-hand-side vector
    */
   BlockVector<double> system_rhs;
+
+  /** Boundary IDs for first-type BC
+   */
+  std::set<unsigned int> bc1;
 
   /**  Parameter handler
    */
@@ -451,6 +461,13 @@ AdvectionSolver<dim>::get_degree() const
 
 template <int dim>
 void
+AdvectionSolver<dim>::set_bc1(const unsigned int id)
+{
+  bc1.insert(id);
+}
+
+template <int dim>
+void
 AdvectionSolver<dim>::add_field(const std::string &   name,
                                 const Vector<double> &field)
 {
@@ -584,6 +601,7 @@ AdvectionSolver<dim>::assemble_system()
                           quadrature,
                           update_values | update_gradients | update_JxW_values);
 
+  const unsigned int n_dofs        = dh.n_dofs();
   const unsigned int dofs_per_cell = fe.dofs_per_cell;
   const unsigned int n_q_points    = quadrature.size();
   const unsigned int n_fields      = fields_prev.n_blocks();
@@ -661,6 +679,38 @@ AdvectionSolver<dim>::assemble_system()
 
           for (unsigned int k = 0; k < n_fields; ++k)
             system_rhs.block(k)(local_dof_indices[i]) += cell_rhs.block(k)(i);
+        }
+    }
+
+  // apply Dirichlet boundary conditions
+  for (const auto &b : bc1)
+    {
+      std::vector<bool> boundary_dofs(n_dofs, false);
+
+      DoFTools::extract_boundary_dofs(dh,
+                                      ComponentMask(),
+                                      boundary_dofs,
+                                      {static_cast<types::boundary_id>(b)});
+
+      for (unsigned int k = 0; k < n_fields; ++k)
+        {
+          std::map<types::global_dof_index, double> boundary_values;
+
+          const Vector<double> &f = fields_prev.block(k);
+
+          for (unsigned int i = 0; i < n_dofs; ++i)
+            {
+              if (boundary_dofs[i])
+                boundary_values[i] = f[i];
+            }
+
+          // The system matrix is reused for all fields, therefore the column
+          // elimination must be disabled.
+          MatrixTools::apply_boundary_values(boundary_values,
+                                             system_matrix,
+                                             fields_prev.block(k),
+                                             system_rhs.block(k),
+                                             false);
         }
     }
 

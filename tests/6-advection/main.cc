@@ -126,10 +126,19 @@ Problem<dim>::initialize()
 
   calculate_f();
   solver.add_field("f", f);
-  solver.output_vtk();
+
+  // add multiple functions to test implementation of BC1
+  Vector<double> tmp(f.size());
+  solver.add_field("another_function", tmp);
+  tmp.add(1);
+  solver.add_field("yet_another_function", tmp);
 
   const std::vector<Tensor<1, dim>> u(f.size(), velocity);
   solver.set_velocity(u);
+
+  solver.set_bc1(0);
+
+  solver.output_vtk();
 }
 
 template <int dim>
