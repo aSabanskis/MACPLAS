@@ -93,6 +93,7 @@ Problem<dim>::run()
   solver.add_field("f_exact", f);
 
   solver.output_vtk();
+  solver.output_boundary_values(0);
 }
 
 template <int dim>
@@ -106,7 +107,7 @@ Problem<dim>::make_grid()
     p2[i] = 1;
 
   Triangulation<dim> &triangulation = solver.get_mesh();
-  GridGenerator::hyper_rectangle(triangulation, p1, p2, true);
+  GridGenerator::hyper_rectangle(triangulation, p1, p2);
 
   triangulation.refine_global(5);
 }
@@ -139,6 +140,7 @@ Problem<dim>::initialize()
   solver.set_bc1(0);
 
   solver.output_vtk();
+  solver.output_boundary_values(0);
 }
 
 template <int dim>
