@@ -127,7 +127,7 @@ private:
 
   std::unique_ptr<Function<1>> crystal_radius;
 
-  FunctionParser<2> interface_shape;
+  std::unique_ptr<Function<2>> interface_shape;
 
   DoFGradientEvaluation<dim> grad_eval;
 
@@ -185,7 +185,8 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
     "Interface shape",
     "0",
     Patterns::Anything(),
-    "Crystallization interface shape z(r, t) in laboratory reference frame");
+    "Crystallization interface shape z(r, L) in laboratory reference frame "
+    "(function or data file name; r is normalized)");
 
   prm.declare_entry(
     "Surface update tolerance",
@@ -302,9 +303,7 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
 
   initialize_function(crystal_radius, prm.get("Crystal radius"), "L");
 
-  interface_shape.initialize("r,t",
-                             prm.get("Interface shape"),
-                             typename FunctionParser<2>::ConstMap());
+  initialize_function(interface_shape, prm.get("Interface shape"), "r,L");
 
   next_output_time = prm.get_double("Output time step");
 }
@@ -483,9 +482,9 @@ Problem<dim>::deform_grid()
   Point<dim> dz;
   dz[dim - 1] = V * dt;
 
-  const double L  = (p_axis_2 - p_triple)[dim - 1];
-  const double dL = V * dt + p_triple[dim - 1] -
-                    interface_shape.value(Point<2>(p_triple[0], t + dt));
+  const double L = (p_axis_2 - p_triple)[dim - 1];
+  const double dL =
+    V * dt + p_triple[dim - 1] - interface_shape->value(Point<2>(1, L + dL));
   const double R  = p_triple[0];
   const double R0 = crystal_radius->value(Point<1>(L + dL)); // at the end
 
@@ -507,8 +506,8 @@ Problem<dim>::deform_grid()
 
     // Shift vertically. The crystal pulling has to taken into account to keep
     // the correct interface position at the end of the time step.
-    dp[dim - 1] =
-      interface_shape.value(Point<2>(p[0], t + dt)) - dz[dim - 1] - p[dim - 1];
+    dp[dim - 1] = interface_shape->value(Point<2>(p[0] / R, L + dL)) -
+                  dz[dim - 1] - p[dim - 1];
 
     return dp;
   };
