@@ -18,6 +18,8 @@ params = {
     "r2": 21,
     "L3": 23,
     "r3": 12,
+    "d1": 0,
+    "d2": 0,
     "v0": 0,
     "v1": 1,
     "v2": 1,
@@ -56,9 +58,13 @@ plt.savefig("crystal-shape.png", dpi=150, bbox_inches="tight")
 x = x * 1e-3
 y = y * 1e-3
 L_total = x[-1]
+L_0 = x[1]
 print(f"L_total={L_total*1e3:g} mm")
+print(f"L_0={L_0*1e3:g} mm")
 np.savetxt("crystal-shape.dat", np.c_[x, y], fmt="%g")
 R = interpolate.interp1d(x, y)
+# save for later use
+Length = x
 
 
 # PULL RATE
@@ -158,6 +164,7 @@ for L in L_arr:
     h_arr = np.append(h_arr, [h])
 
 np.savetxt("melt-height.dat", np.c_[L_arr, h_arr], fmt="%g")
+H_melt = interpolate.interp1d(L_arr, h_arr)
 
 fig = plt.figure(figsize=(6, 4))
 plt.plot(L_arr * 1e3, h_arr * 1e3, "-")
@@ -172,11 +179,52 @@ Ta2 = params.get("Ta2") + 273
 Tamb = f"z>{zT:g} ? {Ta1} : {Ta2}"
 print(f"Tamb={Tamb}")
 
+
+# INTERFACE SHAPE
+x = Length * 1e3
+y = np.array([params.get("d1"), params.get("d2"), 0])
+while y.size < x.size:
+    y = np.append([0], y)
+
+fig = plt.figure(figsize=(6, 4))
+plt.plot(x, y, "o-")
+plt.grid(True)
+plt.xlabel("Length, mm")
+plt.ylabel("Deflection, mm")
+plt.savefig("deflection.png", dpi=150, bbox_inches="tight")
+
+# convert to SI
+x = x * 1e-3
+y = y * 1e-3
+deflection = interpolate.interp1d(x, y)
+
+L_arr = np.linspace(0, L_max, int(L_max / 1e-3))
+R_arr = np.linspace(0, 1, 11)
+with open("interface-shape.dat", "w") as f:
+    f.write(f"{R_arr.size} {L_arr.size}\n")
+    f.write(f"-1")  # dummy value
+    for r in R_arr:
+        f.write(f" {r:g}")
+    f.write("\n")
+
+    for L in L_arr:
+        f.write(f"{L:g}")
+
+        d = deflection(L)
+        z0 = H_melt(L) - H_melt(L_0)
+
+        for r in R_arr:
+            z = z0 + d * (r ** 2 - 1)
+            f.write(f" {z:g}")
+        f.write("\n")
+
+
 # PARAMETER FILE
 with open("problem-generated.prm", "w") as f:
     f.write("# Auto-generated file, please do not edit\n")
     f.write("set Crystal radius = crystal-shape.dat\n")
     f.write("set Pull rate = pull-rate.dat\n")
+    f.write("set Interface shape = interface-shape.dat\n")
     f.write(f"set Ambient temperature = {Tamb}\n")
     f.write(f"set Max time = {t_max:g}\n")
 
