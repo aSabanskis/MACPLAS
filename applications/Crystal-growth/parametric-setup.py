@@ -97,24 +97,19 @@ for L in L_arr:
     m_total += rho_c * dL * np.pi * R(L) ** 2
 print(f"m_total={m_total*1e3:g} g")
 
-# MAX TIME
+# MAX LENGTH
 m_melt = m_total
 m_residual = params.get("mr") * 1e-3
 L = 0
-t = 0
-dt = 2.0
+dL = 1e-4
 while True:
-    t += dt
-    dL = V(t) * dt
     L += dL
     dm = rho_c * dL * np.pi * R(L) ** 2
     m_melt -= dm
     if L >= L_total or m_melt <= m_residual:
         break
-t_max = t
 L_max = L
 m_crystal = m_total - m_melt
-print(f"t_max={t_max:g} s")
 print(f"L_max={L_max*1e3:g} mm")
 print(f"m_crystal={m_crystal*1e3:g} g")
 
@@ -179,6 +174,18 @@ Ta2 = params.get("Ta2") + 273
 Tamb = f"z>{zT:g} ? {Ta1} : {Ta2}"
 print(f"Tamb={Tamb}")
 
+# MAX TIME
+t = 0
+dt = 2.0
+L = 0
+z_top = L_0
+while L < L_max:
+    t += dt
+    dz = V(t) * dt
+    z_top += dz
+    L = z_top + (h_melt - H_melt(L))
+t_max = t
+print(f"t_max={t_max:g} s")
 
 # INTERFACE SHAPE
 x = Length * 1e3
