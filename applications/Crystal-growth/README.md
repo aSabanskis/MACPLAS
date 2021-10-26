@@ -1,6 +1,6 @@
 # Transient modelling of crystal growth
 
-*Currently in development.*
+Calculates transient temperature, stress and dislocation density distributions in a growing Ge crystal. The process parameters are specified by the user manually or generated using ```Python``` script ```parametric-setup.py```. The mesh is created from ```mesh-2d.geo``` using ```create-mesh.sh```.
 
 Command-line arguments:
 
@@ -10,3 +10,5 @@ Command-line arguments:
 | ```order <p>``` | Set finite element order ```p``` |
 
 The default mode is 2D simulation using second-order finite elements.
+
+![Crystal shape at different times](results-crystal-shape.png)
