@@ -49,6 +49,13 @@ initialize_function(std::unique_ptr<Function<1>> &f,
                     const std::string &           expression,
                     const std::string &           vars = "t");
 
+/** Same as above, for \c dim=2.
+ */
+inline void
+initialize_function(std::unique_ptr<Function<2>> &f,
+                    const std::string &           expression,
+                    const std::string &           vars = "r,z");
+
 /** Just like \c std::minmax, for \c Vector argument
  */
 template <class T>
@@ -604,6 +611,69 @@ initialize_function(std::unique_ptr<Function<1>> &f,
   else
     {
       using F = FunctionParser<1>;
+
+#ifdef DEAL_II_WITH_CXX14
+      f = std::make_unique<F>();
+#else
+      f = std::unique_ptr<F>(new F());
+#endif
+
+      auto *fp = dynamic_cast<F *>(f.get());
+      fp->initialize(vars, expression, F::ConstMap());
+    }
+}
+
+void
+initialize_function(std::unique_ptr<Function<2>> &f,
+                    const std::string &           expression,
+                    const std::string &           vars)
+{
+  const std::string ext =
+    expression.size() <= 4 ? "" : expression.substr(expression.size() - 4);
+
+  if (ext == ".txt" || ext == ".dat" || ext == ".tsv")
+    {
+      std::ifstream infile(expression);
+      AssertThrow(infile, ExcFileNotOpen(expression.c_str()));
+
+      std::array<std::vector<double>, 2> points;
+
+      for (unsigned int k = 0; k < 2; ++k)
+        {
+          int n;
+          infile >> n;
+          points[k].resize(n);
+        }
+
+      Table<2, double> data(points[0].size(), points[1].size());
+
+      double tmp;
+      infile >> tmp; // read dummy value
+
+      for (unsigned int i = 0; i < points[0].size(); ++i)
+        infile >> points[0][i];
+
+      for (unsigned int j = 0; j < points[1].size(); ++j)
+        {
+          infile >> points[1][j];
+
+          for (unsigned int i = 0; i < points[0].size(); ++i)
+            {
+              infile >> data[i][j];
+            }
+        }
+
+      using F = Functions::InterpolatedTensorProductGridData<2>;
+
+#ifdef DEAL_II_WITH_CXX14
+      f = std::make_unique<F>(points, data);
+#else
+      f = std::unique_ptr<F>(new F(points, data));
+#endif
+    }
+  else
+    {
+      using F = FunctionParser<2>;
 
 #ifdef DEAL_II_WITH_CXX14
       f = std::make_unique<F>();
