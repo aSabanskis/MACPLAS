@@ -206,6 +206,12 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
     "Function f(r, z) for interpolation test on a moving mesh (empty - disabled)");
 
   prm.declare_entry(
+    "Fix interface fields",
+    "true",
+    Patterns::Bool(),
+    "Do not interpolate fields on the crystallization interface");
+
+  prm.declare_entry(
     "Max relative shift",
     "0",
     Patterns::Double(0),
@@ -749,14 +755,19 @@ Problem<dim>::update_fields()
       // reverse the velocity direction and specify velocity=shift
       advection_solver.get_time_step() = -1;
       advection_solver.set_velocity(shift);
+
+      if (prm.get_bool("Fix interface fields"))
+        advection_solver.set_bc1(boundary_id_interface);
+
       advection_solver.solve();
     }
 
   std::vector<Point<dim>> points;
   std::vector<bool>       interface_dofs;
-  temperature_solver.get_boundary_points(boundary_id_interface,
-                                         points,
-                                         interface_dofs);
+  if (prm.get_bool("Fix interface fields"))
+    temperature_solver.get_boundary_points(boundary_id_interface,
+                                           points,
+                                           interface_dofs);
 
   Vector<double> &   T = temperature_solver.get_temperature();
   const unsigned int n = T.size();
