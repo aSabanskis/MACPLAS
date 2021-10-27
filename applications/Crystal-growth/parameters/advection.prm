@@ -1,6 +1,5 @@
 set Enable stabilization             = true
 set Linear solver iterations         = 1000
-set Linear solver relative tolerance = 1e-1
 set Linear solver tolerance          = 1e-12
 set Linear solver type               = fgmres
 set Log convergence final            = false

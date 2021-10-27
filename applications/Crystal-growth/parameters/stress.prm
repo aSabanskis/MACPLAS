@@ -18,7 +18,7 @@ subsection Stress recovery
   set Linear solver iterations  = 1000
   set Linear solver tolerance   = 1e-12
   set Linear solver type        = minres
-  set Log convergence final     = true
+  set Log convergence final     = false
   set Log convergence full      = false
   set Preconditioner relaxation = 1.0
   set Preconditioner type       = jacobi
