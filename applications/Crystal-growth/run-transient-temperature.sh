@@ -30,5 +30,6 @@ sed -Ei "s|(set Time step *= *).*|\1 1|" temperature.prm
 cp -- *.prm "$r"
 
 ./macplas-crystal-growth "$dim"d order "$order" > $r/log
+./plot-probes-minmax.gnu
 
-mv -- *-"$dim"d-order"$order"* probes*.txt "$r"
+mv -- *-"$dim"d-order"$order"* probes* "$r"
