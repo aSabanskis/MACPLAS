@@ -164,6 +164,12 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
     Patterns::Anything(),
     "Ambient temperature T_amb in K (vertical coordinate z function or data file name)");
 
+  prm.declare_entry(
+    "Ambient temperature top",
+    "-1",
+    Patterns::Double(),
+    "Ambient temperature for uppermost crystal points in K (negative - disabled)");
+
   prm.declare_entry("Temperature only",
                     "false",
                     Patterns::Bool(),
@@ -945,12 +951,18 @@ Problem<dim>::set_temperature_BC()
                                          points,
                                          boundary_dofs);
 
+  const double z_top = surface_projector.get_points()[0][dim - 1];
+  const double T_top = prm.get_double("Ambient temperature top");
+
   for (unsigned int i = 0; i < n; ++i)
     {
       if (!boundary_dofs[i])
         continue;
 
-      const double T = ambient_temperature->value(Point<1>(points[i][dim - 1]));
+      const double z      = points[i][dim - 1];
+      const bool   top_bc = T_top >= 0 && std::abs(z - z_top) < 1e-8;
+
+      const double T = top_bc ? T_top : ambient_temperature->value(Point<1>(z));
 
       q_in[i] = sigma_SB * e * std::pow(T, 4);
     }

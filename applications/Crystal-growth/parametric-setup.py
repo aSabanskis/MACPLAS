@@ -30,6 +30,7 @@ params = {
     "t2": 120,
     "Ta1": 300,
     "Ta2": 937,
+    "Ta_top": 300,
     "HTa": 30,
     "mr": 85,
     "R_crucible": 43,
@@ -195,7 +196,9 @@ zT = H_crucible + params.get("HTa") * 1e-3 - h_melt
 Ta1 = params.get("Ta1") + 273
 Ta2 = params.get("Ta2") + 273
 Tamb = f"z>{zT:g} ? {Ta1} : {Ta2}"
-print(f"Tamb={Tamb}")
+Tamb_top = params.get("Ta_top") + 273
+print(f"Tamb={Tamb} K")
+print(f"Tamb_top={Tamb_top} K")
 
 # MAX TIME
 t = 0
@@ -256,6 +259,7 @@ with open("problem-generated.prm", "w") as f:
     f.write("set Pull rate = pull-rate.dat\n")
     f.write("set Interface shape = interface-shape.dat\n")
     f.write(f"set Ambient temperature = {Tamb}\n")
+    f.write(f"set Ambient temperature top = {Tamb_top}\n")
     f.write(f"set Max time = {t_max:g}\n")
 
 lines = open("problem.prm").readlines()
