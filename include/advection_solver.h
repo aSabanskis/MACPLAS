@@ -177,7 +177,7 @@ private:
   std::string
   output_name_suffix() const;
 
-  /** Velocity field split into components, m/s
+  /** Velocity field split into components and magnitude, m/s
    */
   BlockVector<double> velocity;
 
@@ -449,7 +449,7 @@ AdvectionSolver<dim>::initialize()
   dh.distribute_dofs(fe);
   const unsigned int n_dofs = dh.n_dofs();
 
-  velocity.reinit(dim, n_dofs);
+  velocity.reinit(dim + 1, n_dofs); // dim components and magnitude
   stabilization_factor.reinit(n_dofs);
 
   std::cout << " " << format_time(timer) << "\n";
@@ -542,13 +542,17 @@ AdvectionSolver<dim>::set_velocity(const std::vector<Tensor<1, dim>> &u)
 
   AssertDimension(n_dofs, u.size());
 
-  velocity.reinit(dim, n_dofs, true);
+  velocity.reinit(dim + 1, n_dofs, true); // dim components and magnitude
   for (unsigned int k = 0; k < dim; ++k)
     {
       auto &U = velocity.block(k);
       for (unsigned int i = 0; i < n_dofs; ++i)
         U[i] = u[i][k];
     }
+
+  auto &U_mag = velocity.block(dim);
+  for (unsigned int i = 0; i < n_dofs; ++i)
+    U_mag[i] = u[i].norm();
 }
 
 template <int dim>
@@ -585,6 +589,8 @@ AdvectionSolver<dim>::prepare_for_solve()
       ++k;
     }
 
+  const double dt = get_time_step();
+
   const unsigned int dofs_per_cell = fe.dofs_per_cell;
 
   std::vector<types::global_dof_index> local_dof_indices(dofs_per_cell);
@@ -600,9 +606,12 @@ AdvectionSolver<dim>::prepare_for_solve()
 
         for (unsigned int i = 0; i < dofs_per_cell; ++i)
           {
-            stabilization_factor[local_dof_indices[i]] =
-              std::max(stabilization_factor[local_dof_indices[i]],
-                       h / (2 * get_degree()));
+            const unsigned int j = local_dof_indices[i];
+
+            stabilization_factor[j] =
+              std::max(stabilization_factor[j],
+                       1 / std::sqrt(sqr(2 / dt) +
+                                     sqr(2 * velocity.block(dim)[j] / h)));
           }
       }
 
@@ -675,18 +684,13 @@ AdvectionSolver<dim>::assemble_system()
 
       for (unsigned int q = 0; q < n_q_points; ++q)
         {
-          Tensor<1, dim> u_unit = u_q[q];
-          const double   u_norm = u_unit.norm();
-          if (u_norm > 0)
-            u_unit /= u_norm;
-
           const double weight = fe_values.JxW(q);
 
           for (unsigned int i = 0; i < dofs_per_cell; ++i)
             {
               const double tau   = stabilization_factor[local_dof_indices[i]];
               const double phi_i = fe_values.shape_value(i, q) +
-                                   tau * (u_unit * fe_values.shape_grad(i, q));
+                                   tau * (u_q[q] * fe_values.shape_grad(i, q));
 
               for (unsigned int j = 0; j < dofs_per_cell; ++j)
                 {
