@@ -1,17 +1,23 @@
+R0 = 0.002;
 R1 = 0.002;
 
 z0 = 0;
 z1 = 0.008;
 z2 = 0.008;
 
-nR = 25;
-nZ = 100;
+// slope = 0.8;
+// R1 = 0.0002;
+// z1 = z0 + (R0-R1)/slope;
+// z2 = z1;
 
-qR = 1.08;
-qZ = 1.02;
+nR = 31;
+nZ = 126;
+
+qR = 1.04;
+qZ = 0.3;
 
 Point(1) = {0,  z0, 0};
-Point(2) = {R1, z0, 0};
+Point(2) = {R0, z0, 0};
 Point(3) = {R1, z1, 0};
 Point(4) = {0,  z2, 0};
 
@@ -30,7 +36,7 @@ Physical Line(2) = {4};
 Physical Surface(0) = {1};
 
 Transfinite Line {-1,3} = nR Using Progression qR;
-Transfinite Line {2,-4} = nZ Using Progression qZ;
+Transfinite Line {2,-4} = nZ Using Bump qZ;
 Transfinite Surface "*";
 
 Recombine Surface "*";
