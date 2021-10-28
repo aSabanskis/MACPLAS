@@ -17,12 +17,15 @@ clean_results
 
 mkdir -p "$r"
 
-cp parameters/*.prm .
+cp parameters/* .
 
 setup_parameters
 
 sed -Ei "s|(set Temperature only *= *).*|\1 true|" problem.prm
 sed -Ei "s|(set Time step *= *).*|\1 1|" temperature.prm
+
+# sed -Ei "s|(Ta1 *= *).*|\1 300|" problem.ini
+./parametric-setup.py
 
 cp -- *.prm "$r"
 

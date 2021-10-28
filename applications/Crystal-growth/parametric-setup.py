@@ -8,7 +8,9 @@ Script for setting-up parametric crystal model
 import numpy as np
 from scipy import interpolate
 import matplotlib.pyplot as plt
+from os.path import exists
 
+# DEFAULT PARAMETERS
 params = {
     "L0": 8,
     "r0": 2,
@@ -36,6 +38,27 @@ params = {
     "rho_c": 5370,
     "rho_m": 5534,
 }
+
+# READ PARAMETERS
+filename = "problem.ini"
+if exists(filename):
+    print(f"Reading {filename}")
+    data = open(filename).readlines()
+    for line in data:
+        k_v = line.strip().split("=")
+
+        if len(k_v) == 2:
+            key = k_v[0].strip()
+            val = float(k_v[1])
+
+            if key in params:
+                print(f"Setting {key} to {val}")
+                params[key] = val
+            else:
+                print(f"Parameter {key} not supported")
+    print("Done.")
+else:
+    print(f"{filename} does not exist, skipping")
 
 
 # RADIUS

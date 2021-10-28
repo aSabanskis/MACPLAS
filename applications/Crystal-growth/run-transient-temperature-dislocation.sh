@@ -17,7 +17,7 @@ clean_results
 
 mkdir -p "$r"
 
-cp parameters/*.prm .
+cp parameters/* .
 
 setup_parameters
 
@@ -39,6 +39,9 @@ sed -Ei "s|(set Min time step *= *).*|\1 0.01|" dislocation.prm
 sed -Ei "s|(set Time substep *= *).*|\1 0.01|" dislocation.prm
 sed -Ei "s|(set Max time substeps *= *).*|\1 5|" dislocation.prm
 sed -Ei "s|(set Refresh stress for substeps *= *).*|\1 true|" dislocation.prm
+
+# sed -Ei "s|(Ta1 *= *).*|\1 300|" problem.ini
+./parametric-setup.py
 
 cp -- *.prm "$r"
 
