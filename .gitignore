@@ -43,6 +43,7 @@ latex
 # Data files
 *.vt[uk]
 *.msh
+*.geo
 *.pvsm
 *.txt
 *.dat
@@ -58,6 +59,7 @@ latex
 
 # Parameter files
 *.prm
+*.ini
 
 # Allow some ignored files
 !CMakeLists.txt
