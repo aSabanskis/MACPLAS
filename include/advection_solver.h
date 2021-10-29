@@ -642,7 +642,7 @@ AdvectionSolver<dim>::prepare_for_solve()
 
             stabilization_factor[j] =
               std::max(stabilization_factor[j],
-                       tau0 / (std::sqrt(sqr(2 / dt) +
+                       tau0 / (std::sqrt(sqr(1 / dt) +
                                          sqr(2 * velocity.block(dim)[j] / h))));
           }
       }
