@@ -146,6 +146,14 @@ public:
   output_boundary_values(const unsigned int id) const;
 
 private:
+  /** Stabilization type
+   */
+  enum StabilizationType
+  {
+    supg, ///< Streamline-Upwind Petrov-Galerkin
+    gls   ///< Galerkin Least-Squares
+  };
+
   /** Initialize parameters. Called by the constructor
    */
   void
@@ -190,9 +198,13 @@ private:
    */
   BlockVector<double> fields_prev;
 
-  /** SUPG stabilization factor for all DoFs
+  /** Stabilization factor for all DoFs
    */
   Vector<double> stabilization_factor;
+
+  /** Stabilization type
+   */
+  StabilizationType stabilization_type;
 
   /** Mesh
    */
@@ -302,10 +314,15 @@ AdvectionSolver<dim>::AdvectionSolver(const unsigned int order,
                     Patterns::Bool(),
                     "Report final achieved convergence of linear solver");
 
+  prm.declare_entry("Stabilization type",
+                    "SUPG",
+                    Patterns::Selection("SUPG|GLS"),
+                    "Type of numerical stabilization");
+
   prm.declare_entry("Stabilization multiplier",
                     "1",
                     Patterns::Double(0),
-                    "Multiplier for SUPG stabilization (0: no stabilization)");
+                    "Multiplier for stabilization (0: no stabilization)");
 
   prm.declare_entry("Number of cell quadrature points",
                     "0",
@@ -361,6 +378,14 @@ AdvectionSolver<dim>::initialize_parameters()
 
   if (prm.get_integer("Output subdivisions") == 0)
     prm.set("Output subdivisions", n_vtk_default);
+
+  const std::string st = prm.get("Stabilization type");
+  if (st == "SUPG")
+    stabilization_type = supg;
+  else if (st == "GLS")
+    stabilization_type = gls;
+  else
+    AssertThrow(false, ExcMessage("Unsupported stabilization type " + st));
 
   std::cout << "  done\n";
 
@@ -634,7 +659,8 @@ AdvectionSolver<dim>::assemble_system()
 
   std::cout << solver_name() << "  Assembling system";
 
-  const double dt = get_time_step();
+  const double dt     = get_time_step();
+  const double tau_dt = stabilization_type == gls ? 1 / dt : 0;
 
   const QGauss<dim> quadrature(
     prm.get_integer("Number of cell quadrature points"));
@@ -689,9 +715,11 @@ AdvectionSolver<dim>::assemble_system()
 
           for (unsigned int i = 0; i < dofs_per_cell; ++i)
             {
-              const double tau   = stabilization_factor[local_dof_indices[i]];
-              const double phi_i = fe_values.shape_value(i, q) +
-                                   tau * (u_q[q] * fe_values.shape_grad(i, q));
+              const double tau    = stabilization_factor[local_dof_indices[i]];
+              const double phi_i0 = fe_values.shape_value(i, q);
+              const double phi_i =
+                phi_i0 +
+                tau * (phi_i0 * tau_dt + u_q[q] * fe_values.shape_grad(i, q));
 
               for (unsigned int j = 0; j < dofs_per_cell; ++j)
                 {

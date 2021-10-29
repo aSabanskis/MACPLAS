@@ -1,3 +1,4 @@
+set Stabilization type               = SUPG
 set Stabilization multiplier         = 1
 set Linear solver iterations         = 1000
 set Linear solver tolerance          = 1e-12
