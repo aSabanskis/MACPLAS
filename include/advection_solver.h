@@ -816,7 +816,6 @@ AdvectionSolver<dim>::solve_system()
     {
       const unsigned int solver_iterations =
         prm.get_integer("Linear solver iterations");
-      const double solver_tolerance = prm.get_double("Linear solver tolerance");
       const double solver_rel_tolerance =
         prm.get_double("Linear solver relative tolerance");
 
@@ -825,16 +824,6 @@ AdvectionSolver<dim>::solve_system()
 
       if (log_history || log_result)
         std::cout << "\n";
-
-      ReductionControl control(solver_iterations,
-                               solver_tolerance,
-                               solver_rel_tolerance,
-                               log_history,
-                               log_result);
-
-      SolverSelector<> solver;
-      solver.select(solver_type);
-      solver.set_control(control);
 
       const std::string preconditioner_type = prm.get("Preconditioner type");
       const double      preconditioner_relaxation =
@@ -846,13 +835,40 @@ AdvectionSolver<dim>::solve_system()
 
       for (unsigned int k = 0; k < n_fields; ++k)
         {
-          solver.solve(system_matrix,
-                       fields_prev.block(k),
-                       system_rhs.block(k),
-                       preconditioner);
+          double solver_tolerance = prm.get_double("Linear solver tolerance");
+
+          const double rhs_norm = system_rhs.block(k).l2_norm();
+
+          if (rhs_norm > 0)
+            solver_tolerance *= rhs_norm;
+
+          ReductionControl control(solver_iterations,
+                                   solver_tolerance,
+                                   solver_rel_tolerance,
+                                   log_history,
+                                   log_result);
+          SolverSelector<> solver;
+          solver.select(solver_type);
+          solver.set_control(control);
+
+          try
+            {
+              solver.solve(system_matrix,
+                           fields_prev.block(k),
+                           system_rhs.block(k),
+                           preconditioner);
+            }
+          catch (dealii::SolverControl::NoConvergence &e)
+            {
+              if (control.last_step() < solver_iterations)
+                throw;
+              // otherwise: maximum number of iterations reached, do nothing
+            }
 
           if (control.last_step() >= solver_iterations ||
-              control.last_value() >= solver_tolerance)
+              (control.last_value() >= solver_tolerance &&
+               control.last_value() >=
+                 control.initial_value() * solver_rel_tolerance))
             {
               if (!(log_history || log_result))
                 std::cout << "\n";
@@ -861,7 +877,7 @@ AdvectionSolver<dim>::solve_system()
                         << "  Warning: not converged! Residual(0)="
                         << control.initial_value() << " Residual("
                         << control.last_step() << ")=" << control.last_value()
-                        << "\n";
+                        << " tol=" << solver_tolerance << "\n";
             }
         }
     }
