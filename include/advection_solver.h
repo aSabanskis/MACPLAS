@@ -302,10 +302,10 @@ AdvectionSolver<dim>::AdvectionSolver(const unsigned int order,
                     Patterns::Bool(),
                     "Report final achieved convergence of linear solver");
 
-  prm.declare_entry("Enable stabilization",
-                    "true",
-                    Patterns::Bool(),
-                    "Enable SUPG stabilization");
+  prm.declare_entry("Stabilization multiplier",
+                    "1",
+                    Patterns::Double(0),
+                    "Multiplier for SUPG stabilization (0: no stabilization)");
 
   prm.declare_entry("Number of cell quadrature points",
                     "0",
@@ -589,7 +589,8 @@ AdvectionSolver<dim>::prepare_for_solve()
       ++k;
     }
 
-  const double dt = get_time_step();
+  const double dt   = get_time_step();
+  const double tau0 = prm.get_double("Stabilization multiplier");
 
   const unsigned int dofs_per_cell = fe.dofs_per_cell;
 
@@ -597,7 +598,7 @@ AdvectionSolver<dim>::prepare_for_solve()
 
   typename DoFHandler<dim>::active_cell_iterator cell = dh.begin_active(),
                                                  endc = dh.end();
-  if (prm.get_bool("Enable stabilization"))
+  if (tau0 > 0)
     for (; cell != endc; ++cell)
       {
         const double h = cell->diameter();
@@ -610,8 +611,8 @@ AdvectionSolver<dim>::prepare_for_solve()
 
             stabilization_factor[j] =
               std::max(stabilization_factor[j],
-                       1 / std::sqrt(sqr(2 / dt) +
-                                     sqr(2 * velocity.block(dim)[j] / h)));
+                       tau0 / (std::sqrt(sqr(2 / dt) +
+                                         sqr(2 * velocity.block(dim)[j] / h))));
           }
       }
 
