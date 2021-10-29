@@ -6,6 +6,7 @@ source ./helper.sh
 initialize # 2 2 0
 
 r=results-transient
+dt=0.1
 
 if [[ -f $r/$probes ]]
 then
@@ -22,9 +23,9 @@ cp parameters/* .
 setup_parameters
 
 sed -Ei "s|(set Temperature only *= *).*|\1 false|" problem.prm
-sed -Ei "s|(set Time step *= *).*|\1 1|" dislocation.prm
-sed -Ei "s|(set Time step *= *).*|\1 1|" temperature.prm
-sed -Ei "s|(set Max time step *= *).*|\1 1|" dislocation.prm
+sed -Ei "s|(set Time step *= *).*|\1 $dt|" dislocation.prm
+sed -Ei "s|(set Time step *= *).*|\1 $dt|" temperature.prm
+sed -Ei "s|(set Max time step *= *).*|\1 $dt|" dislocation.prm
 sed -Ei "s|(set Min time step *= *).*|\1 0.01|" dislocation.prm
 
 sed -Ei "s|(set Initial dislocation density *= *).*|\1 1e0|" dislocation.prm
