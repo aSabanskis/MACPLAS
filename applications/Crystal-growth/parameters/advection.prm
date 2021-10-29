@@ -2,6 +2,7 @@ set Stabilization type               = SUPG
 set Stabilization multiplier         = 1
 set Linear solver iterations         = 1000
 set Linear solver tolerance          = 1e-12
+set Linear solver relative tolerance = 1e-2
 set Linear solver type               = fgmres
 set Log convergence final            = false
 set Log convergence full             = false

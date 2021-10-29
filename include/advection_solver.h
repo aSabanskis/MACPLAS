@@ -289,9 +289,15 @@ AdvectionSolver<dim>::AdvectionSolver(const unsigned int order,
                     "Maximum number of iterations of linear solver");
 
   prm.declare_entry("Linear solver tolerance",
-                    "1e-8",
+                    "1e-12",
                     Patterns::Double(0),
                     "Tolerance (maximum residual norm) of linear solver");
+
+  prm.declare_entry(
+    "Linear solver relative tolerance",
+    "1e-2",
+    Patterns::Double(0),
+    "Relative tolerance (residual improvement) of linear solver");
 
   prm.declare_entry("Preconditioner type",
                     "jacobi",
@@ -811,6 +817,8 @@ AdvectionSolver<dim>::solve_system()
       const unsigned int solver_iterations =
         prm.get_integer("Linear solver iterations");
       const double solver_tolerance = prm.get_double("Linear solver tolerance");
+      const double solver_rel_tolerance =
+        prm.get_double("Linear solver relative tolerance");
 
       const bool log_history = prm.get_bool("Log convergence full");
       const bool log_result  = prm.get_bool("Log convergence final");
@@ -818,10 +826,11 @@ AdvectionSolver<dim>::solve_system()
       if (log_history || log_result)
         std::cout << "\n";
 
-      IterationNumberControl control(solver_iterations,
-                                     solver_tolerance,
-                                     log_history,
-                                     log_result);
+      ReductionControl control(solver_iterations,
+                               solver_tolerance,
+                               solver_rel_tolerance,
+                               log_history,
+                               log_result);
 
       SolverSelector<> solver;
       solver.select(solver_type);
