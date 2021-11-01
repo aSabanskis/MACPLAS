@@ -81,6 +81,9 @@ private:
                  const bool boundary = dim == 2,
                  const bool mesh     = true) const;
 
+  void
+  postprocess();
+
   // false if only the temperature field is calculated
   bool
   with_dislocation() const;
@@ -109,6 +112,10 @@ private:
 
   // for testing of interpolation
   Vector<double> f_test;
+
+  std::vector<Point<dim>> crystal_probes;
+
+  std::ofstream crystal_probe_file;
 
   // crystallization interface
   constexpr static unsigned int boundary_id_interface = 0;
@@ -255,6 +262,16 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     Patterns::List(Patterns::Double(), 1),
                     "Comma-separated vertical coordinates");
 
+  prm.declare_entry("Custom probes x relative to crystal top",
+                    "",
+                    Patterns::List(Patterns::Double(), 0),
+                    "Comma-separated radial coordinates");
+
+  prm.declare_entry("Custom probes z relative to crystal top",
+                    "",
+                    Patterns::List(Patterns::Double(), 0),
+                    "Comma-separated vertical coordinates");
+
   if (use_default_prm)
     {
       std::ofstream of("problem.prm");
@@ -317,6 +334,20 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
 
   initialize_function(interface_shape, prm.get("Interface shape"), "r,L");
 
+  const std::vector<double> X =
+    split_string(prm.get("Custom probes x relative to crystal top"));
+  const std::vector<double> Z =
+    split_string(prm.get("Custom probes z relative to crystal top"));
+  AssertDimension(X.size(), Z.size());
+
+  crystal_probes.resize(X.size());
+
+  for (unsigned int i = 0; i < X.size(); ++i)
+    {
+      crystal_probes[i][0]       = X[i];
+      crystal_probes[i][dim - 1] = Z[i];
+    }
+
   next_output_time = prm.get_double("Output time step");
 }
 
@@ -338,6 +369,7 @@ Problem<dim>::run()
 
   calculate_field_gradients();
 
+  postprocess();
   output_results();
 
   // now run transient simulations unless the time step is zero
@@ -1114,6 +1146,8 @@ Problem<dim>::solve_temperature()
 
       const bool keep_going_temp = temperature_solver.solve();
 
+      postprocess();
+
       if (!keep_going_temp)
         break;
 
@@ -1153,6 +1187,8 @@ Problem<dim>::solve_temperature_dislocation()
         temperature_solver.get_temperature();
 
       const bool keep_going_disl = dislocation_solver.solve();
+
+      postprocess();
 
       if (!keep_going_temp || !keep_going_disl)
         break;
@@ -1213,6 +1249,99 @@ Problem<dim>::output_results(const bool data,
     {
       temperature_solver.output_mesh();
     }
+}
+
+template <int dim>
+void
+Problem<dim>::postprocess()
+{
+  if (!crystal_probe_file.is_open())
+    {
+      const std::string s = "probes-crystal-" + std::to_string(dim) + "d.txt";
+
+      std::cout << "Writing header to '" << s << "'\n";
+
+      crystal_probe_file.open(s);
+
+      for (unsigned int i = 0; i < crystal_probes.size(); ++i)
+        crystal_probe_file << "# probe " << i << ":\t" << crystal_probes[i]
+                           << "\n";
+
+      crystal_probe_file << "t[s]\tdt[s]\twall_time[s]"
+                            "\tV[m/s]\tz_top[m]\tL[m]\tR[m]\td[m]"
+                            "\tT_min[K]\tT_max[K]";
+
+      for (unsigned int i = 0; i < crystal_probes.size(); ++i)
+        crystal_probe_file << "\tT_" << i << "[K]";
+
+      if (with_dislocation())
+        {
+          for (unsigned int i = 0; i < crystal_probes.size(); ++i)
+            crystal_probe_file << "\tN_m_" << i << "[m^-2]";
+          for (unsigned int i = 0; i < crystal_probes.size(); ++i)
+            crystal_probe_file << "\ttau_eff_" << i << "[Pa]";
+        }
+
+      crystal_probe_file << "\n";
+    }
+
+  const double t  = temperature_solver.get_time();
+  const double dt = temperature_solver.get_time_step();
+  const double V  = pull_rate->value(Point<1>(t));
+
+  const auto &mesh_points = temperature_solver.get_mesh().get_vertices();
+
+  const Point<dim> p_axis_1 = mesh_points.at(point_id_axis_z_min),
+                   p_axis_2 = mesh_points.at(point_id_axis_z_max),
+                   p_triple = mesh_points.at(point_id_triple);
+
+  const double z_top = p_axis_2[dim - 1];
+  const double L     = z_top - p_triple[dim - 1];
+  const double R     = p_triple[0];
+  const double d     = (p_triple - p_axis_1)[dim - 1];
+
+  const Vector<double> &temperature = temperature_solver.get_temperature();
+
+  // Convert the vertical coordinate from inductor to crystal reference frame
+  std::vector<Point<dim>> points = crystal_probes;
+  for (auto &p : points)
+    p[dim - 1] += z_top;
+
+  const std::vector<double> values_T =
+    temperature_solver.get_field_at_points(temperature, points);
+
+  const auto limits_T = minmax(temperature);
+
+  const int precision =
+    temperature_solver.get_parameters().get_integer("Output precision");
+  crystal_probe_file << std::setprecision(precision);
+
+  crystal_probe_file << t << '\t' << dt << '\t' << timer.wall_time() << '\t'
+                     << V << '\t' << z_top << '\t' << L << '\t' << R << '\t'
+                     << d << '\t' << limits_T.first << '\t' << limits_T.second;
+
+  for (const auto &v : values_T)
+    crystal_probe_file << '\t' << v;
+
+  if (with_dislocation())
+    {
+      Vector<double> tau;
+      dislocation_solver.get_tau_eff(tau);
+
+      const Vector<double> &N_m = dislocation_solver.get_dislocation_density();
+
+      const std::vector<double> values_N_m =
+        dislocation_solver.get_field_at_points(N_m, points);
+      const std::vector<double> values_tau =
+        dislocation_solver.get_field_at_points(tau, points);
+
+      for (const auto &v : values_N_m)
+        crystal_probe_file << '\t' << v;
+      for (const auto &v : values_tau)
+        crystal_probe_file << '\t' << v;
+    }
+
+  crystal_probe_file << "\n";
 }
 
 template <int dim>
