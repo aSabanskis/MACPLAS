@@ -1276,8 +1276,11 @@ Problem<dim>::postprocess()
 
       if (with_dislocation())
         {
+          crystal_probe_file << "\tN_m_min[m^-2]\tN_m_max[m^-2]";
           for (unsigned int i = 0; i < crystal_probes.size(); ++i)
             crystal_probe_file << "\tN_m_" << i << "[m^-2]";
+
+          crystal_probe_file << "\ttau_eff_min[Pa]\ttau_eff_max[Pa]";
           for (unsigned int i = 0; i < crystal_probes.size(); ++i)
             crystal_probe_file << "\ttau_eff_" << i << "[Pa]";
         }
@@ -1330,13 +1333,21 @@ Problem<dim>::postprocess()
 
       const Vector<double> &N_m = dislocation_solver.get_dislocation_density();
 
+      const auto limits_N_m = minmax(N_m);
+      const auto limits_tau = minmax(tau);
+
       const std::vector<double> values_N_m =
         dislocation_solver.get_field_at_points(N_m, points);
       const std::vector<double> values_tau =
         dislocation_solver.get_field_at_points(tau, points);
 
+      crystal_probe_file << '\t' << limits_N_m.first << '\t'
+                         << limits_N_m.second;
       for (const auto &v : values_N_m)
         crystal_probe_file << '\t' << v;
+
+      crystal_probe_file << '\t' << limits_tau.first << '\t'
+                         << limits_tau.second;
       for (const auto &v : values_tau)
         crystal_probe_file << '\t' << v;
     }
