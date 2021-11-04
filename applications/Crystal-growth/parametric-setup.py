@@ -51,7 +51,8 @@ if exists(filename):
     for line in data:
         for c in comment_signs:
             pos = line.find(c)
-            line = line[:pos]
+            if pos >= 0:
+                line = line[:pos]
         k_v = line.strip().split("=")
 
         if len(k_v) == 2:
@@ -92,7 +93,7 @@ L_0 = x[1]
 print(f"L_total={L_total*1e3:g} mm")
 print(f"L_0={L_0*1e3:g} mm")
 np.savetxt("crystal-shape.dat", np.c_[x, y], fmt="%g")
-R = interpolate.interp1d(x, y)
+R = interpolate.interp1d(x, y, fill_value="extrapolate")
 # save for later use
 Length = x
 
@@ -116,7 +117,7 @@ plt.savefig("pull-rate.png", dpi=150, bbox_inches="tight")
 x = x * 60
 y = y * 1e-3 / 60
 np.savetxt("pull-rate.dat", np.c_[x, y], fmt="%g")
-V = interpolate.interp1d(x, y)
+V = interpolate.interp1d(x, y, fill_value="extrapolate")
 
 
 # MASS
@@ -164,7 +165,7 @@ y = y * 1e-3
 np.savetxt("crucible-shape.dat", np.c_[x, y], fmt="%g")
 H_crucible = y[-1]
 print(f"H_crucible={H_crucible*1e3:g} mm")
-R_crucible = interpolate.interp1d(x, y)
+R_crucible = interpolate.interp1d(x, y, fill_value="extrapolate")
 
 # MELT LEVEL
 rho_m = params.get("rho_m")
@@ -189,7 +190,7 @@ for L in L_arr:
     h_arr = np.append(h_arr, [h])
 
 np.savetxt("melt-height.dat", np.c_[L_arr, h_arr], fmt="%g")
-H_melt = interpolate.interp1d(L_arr, h_arr)
+H_melt = interpolate.interp1d(L_arr, h_arr, fill_value="extrapolate")
 
 fig = plt.figure(figsize=(6, 4))
 plt.plot(L_arr * 1e3, h_arr * 1e3, "-")
@@ -235,7 +236,7 @@ plt.savefig("deflection.png", dpi=150, bbox_inches="tight")
 # convert to SI
 x = x * 1e-3
 y = y * 1e-3
-deflection = interpolate.interp1d(x, y)
+deflection = interpolate.interp1d(x, y, fill_value="extrapolate")
 
 L_arr = np.linspace(0, L_max, int(L_max / 1e-3))
 R_arr = np.linspace(0, 1, 11)
