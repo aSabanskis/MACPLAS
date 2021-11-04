@@ -29,8 +29,8 @@ params = {
     "t1": 30,
     "t2": 120,
     "Ta1": 300,
-    "Ta2": 937,
-    "Ta_top": 300,
+    "Ta2": 930,
+    "Ta_top": -274,
     "HTa": 30,
     "mr": 85,
     "R_crucible": 43,
@@ -42,10 +42,15 @@ params = {
 
 # READ PARAMETERS
 filename = "problem.ini"
+comment_signs = (";", "#")
+
 if exists(filename):
     print(f"Reading {filename}")
     data = open(filename).readlines()
     for line in data:
+        for c in comment_signs:
+            pos = line.find(c)
+            line = line[:pos]
         k_v = line.strip().split("=")
 
         if len(k_v) == 2:
