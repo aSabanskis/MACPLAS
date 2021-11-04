@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from os.path import exists
 
 # DEFAULT PARAMETERS
-params = {
+params_default = {
     "L0": 8,
     "r0": 2,
     "L1": 38,
@@ -39,6 +39,7 @@ params = {
     "rho_c": 5370,
     "rho_m": 5534,
 }
+params = params_default.copy()
 
 # READ PARAMETERS
 filename = "problem.ini"
@@ -256,6 +257,15 @@ with open("interface-shape.dat", "w") as f:
             f.write(f" {z:g}")
         f.write("\n")
 
+# SUMMARY
+s = ""
+for key, val in params.items():
+    if params_default[key] != val:
+        s += f"-{key}_{val:g}"
+if s == "":
+    print("Default parameters are used")
+else:
+    print(f"Changed parameters: {s[1:]}")
 
 # PARAMETER FILE
 with open("problem-generated.prm", "w") as f:
