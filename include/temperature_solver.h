@@ -249,14 +249,6 @@ public:
   double
   calc_V_z() const;
 
-  /** Apply first-type boundary condition previously set by
-   * TemperatureSolver::set_bc1.
-   * Needs to be called by the user only in special cases, such as simulations
-   * on a moving mesh.
-   */
-  void
-  apply_bc1();
-
   /** Set first-type boundary condition \f$T = \mathrm{val}\f$
    */
   void
@@ -336,6 +328,12 @@ private:
    */
   void
   prepare_for_solve();
+
+  /** Apply first-type boundary condition previously set by
+   * TemperatureSolver::set_bc1.
+   */
+  void
+  apply_bc1();
 
   /** Assemble the system matrix and right-hand-side vector
    */
