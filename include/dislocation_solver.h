@@ -1217,7 +1217,9 @@ DislocationSolver<dim>::output_vtk() const
   const Vector<double> &J_2 = get_stress_J_2();
 
   data_out.add_data_vector(T, "T");
-  data_out.add_data_vector(N_m, "N_m");
+
+  if (isfinite(N_m))
+    data_out.add_data_vector(N_m, "N_m");
 
   const Vector<double> tau = tau_eff(N_m, J_2, T);
 
@@ -1250,39 +1252,45 @@ DislocationSolver<dim>::output_vtk() const
   for (unsigned int i = 0; i < displacement.n_blocks(); ++i)
     {
       const std::string name = "displacement_" + std::to_string(i);
-      data_out.add_data_vector(displacement.block(i), name);
+      if (isfinite(displacement.block(i)))
+        data_out.add_data_vector(displacement.block(i), name);
     }
 
   const BlockVector<double> &stress = get_stress();
   for (unsigned int i = 0; i < stress.n_blocks(); ++i)
     {
       const std::string name = "stress_" + std::to_string(i);
-      data_out.add_data_vector(stress.block(i), name);
+      if (isfinite(stress.block(i)))
+        data_out.add_data_vector(stress.block(i), name);
     }
 
   const BlockVector<double> &stress_deviator = get_stress_deviator();
   for (unsigned int i = 0; i < stress_deviator.n_blocks(); ++i)
     {
       const std::string name = "stress_deviator_" + std::to_string(i);
-      data_out.add_data_vector(stress_deviator.block(i), name);
+      if (isfinite(stress_deviator.block(i)))
+        data_out.add_data_vector(stress_deviator.block(i), name);
     }
 
   const BlockVector<double> &epsilon_e = get_strain_e();
   for (unsigned int i = 0; i < epsilon_e.n_blocks(); ++i)
     {
       const std::string name = "epsilon_e_" + std::to_string(i);
-      data_out.add_data_vector(epsilon_e.block(i), name);
+      if (isfinite(epsilon_e.block(i)))
+        data_out.add_data_vector(epsilon_e.block(i), name);
     }
 
   const BlockVector<double> &epsilon_c = get_strain_c();
   for (unsigned int i = 0; i < epsilon_c.n_blocks(); ++i)
     {
       const std::string name = "epsilon_c_" + std::to_string(i);
-      data_out.add_data_vector(epsilon_c.block(i), name);
+      if (isfinite(epsilon_c.block(i)))
+        data_out.add_data_vector(epsilon_c.block(i), name);
     }
 
   const Vector<double> &stress_hydrostatic = get_stress_hydrostatic();
-  data_out.add_data_vector(stress_hydrostatic, "stress_hydrostatic");
+  if (isfinite(stress_hydrostatic))
+    data_out.add_data_vector(stress_hydrostatic, "stress_hydrostatic");
 
   const Vector<double> dot_N_m = derivative_N_m(N_m, J_2, T);
   const Vector<double> v       = dislocation_velocity(N_m, J_2, T);
@@ -1294,14 +1302,20 @@ DislocationSolver<dim>::output_vtk() const
         derivative_strain(N_m, J_2, T, stress_deviator.block(i));
     }
 
-  data_out.add_data_vector(J_2, "stress_J_2");
-  data_out.add_data_vector(tau, "tau_eff");
-  data_out.add_data_vector(dot_N_m, "dot_N_m");
-  data_out.add_data_vector(v, "v");
+  if (isfinite(J_2))
+    data_out.add_data_vector(J_2, "stress_J_2");
+  if (isfinite(tau))
+    data_out.add_data_vector(tau, "tau_eff");
+  if (isfinite(dot_N_m))
+    data_out.add_data_vector(dot_N_m, "dot_N_m");
+  if (isfinite(v))
+    data_out.add_data_vector(v, "v");
+
   for (unsigned int i = 0; i < dot_epsilon_c.n_blocks(); ++i)
     {
       const std::string name = "dot_epsilon_c_" + std::to_string(i);
-      data_out.add_data_vector(dot_epsilon_c.block(i), name);
+      if (isfinite(dot_epsilon_c.block(i)))
+        data_out.add_data_vector(dot_epsilon_c.block(i), name);
     }
 
   for (const auto &it : additional_fields)
@@ -2440,17 +2454,11 @@ DislocationSolver<dim>::has_converged() const
   if (!stress_solver.has_converged())
     return false;
 
-  for (const auto &n : get_dislocation_density())
-    {
-      if (!std::isfinite(n))
-        return false;
-    }
+  if (!isfinite(get_dislocation_density()))
+    return false;
 
-  for (const auto &n : get_stress_J_2())
-    {
-      if (!std::isfinite(n))
-        return false;
-    }
+  if (!isfinite(get_stress_J_2()))
+    return false;
 
   return true;
 }

@@ -36,6 +36,11 @@ using namespace dealii;
 inline double
 sqr(const double x);
 
+/** Check if no \c Inf and \c Nan values are present
+ */
+inline bool
+isfinite(const Vector<double> &data);
+
 /** Convert string to a vector of double
  */
 inline std::vector<double>
@@ -559,6 +564,17 @@ double
 sqr(const double x)
 {
   return x * x;
+}
+
+bool
+isfinite(const Vector<double> &data)
+{
+  for (const auto &x : data)
+    {
+      if (!std::isfinite(x))
+        return false;
+    }
+  return true;
 }
 
 std::vector<double>
