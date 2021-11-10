@@ -138,6 +138,8 @@ private:
 
   DoFGradientEvaluation<dim> grad_eval;
 
+  double N0;
+
   double previous_time_step;
   double next_output_time;
 
@@ -836,6 +838,9 @@ Problem<dim>::update_fields()
 
       update_one_field(N_m, "N_m", interface_dofs);
 
+      // disallow non-physical behaviour
+      for (unsigned int i = 0; i < n; ++i)
+        N_m[i] = std::max(N_m[i], N0);
 
       BlockVector<double> &e_c = dislocation_solver.get_strain_c();
 
@@ -942,6 +947,8 @@ Problem<dim>::initialize_dislocation()
   // initialize dislocations and stresses
   dislocation_solver.initialize();
   dislocation_solver.get_temperature() = temperature_solver.get_temperature();
+
+  N0 = dislocation_solver.get_dislocation_density()[0];
 
   dislocation_solver.add_output("V[m/s]", pull_rate->value(Point<1>()));
   dislocation_solver.add_output("shift_relative");
