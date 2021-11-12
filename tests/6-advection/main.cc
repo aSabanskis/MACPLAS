@@ -21,11 +21,13 @@ private:
   initialize();
 
   void
-  calculate_f();
+  calculate_f_v();
 
   AdvectionSolver<dim> solver;
 
-  Tensor<1, dim> velocity;
+  std::vector<Tensor<1, dim>> velocity;
+
+  FunctionParser<dim> calc_v;
 
   Vector<double> f;
 
@@ -37,6 +39,7 @@ private:
 template <int dim>
 Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
   : solver(order, use_default_prm)
+  , calc_v(dim)
 {
   prm.declare_entry("Function",
                     "tanh((1-x-y)*10)",
@@ -44,9 +47,9 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     "Function for advection test");
 
   prm.declare_entry("Velocity",
-                    "0.02, 0.02",
-                    Patterns::List(Patterns::Double(), 1),
-                    "Comma-separated velocity components in m/s");
+                    "0.02; 0.02",
+                    Patterns::Anything(),
+                    "Semicolon-separated velocity field in m/s");
 
   if (use_default_prm)
     {
@@ -65,13 +68,6 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
         std::ofstream of("problem-default.prm");
         prm.print_parameters(of, ParameterHandler::Text);
       }
-
-  const std::vector<double> u = split_string(prm.get("Velocity"));
-
-  for (unsigned int k = 0; k < u.size(); ++k)
-    velocity[k] = u[k];
-
-  std::cout << "velocity = " << velocity << '\n';
 }
 
 template <int dim>
@@ -88,9 +84,6 @@ Problem<dim>::run()
       if (!keep_going)
         break;
     };
-
-  calculate_f();
-  solver.add_field("f_exact", f);
 
   solver.output_vtk();
   solver.output_boundary_values(0);
@@ -118,24 +111,25 @@ Problem<dim>::initialize()
 {
   solver.initialize();
 
-  const std::string expr = prm.get("Function");
-  const std::string vars = dim == 1 ? "x" : dim == 2 ? "x,y" : "x,y,z";
+  const std::string vars   = FunctionParser<dim>::default_variable_names();
+  const std::string expr_f = prm.get("Function");
+  const std::string expr_v = prm.get("Velocity");
 
-  std::cout << "f(" << vars << ")=" << expr << '\n';
+  std::cout << "f(" << vars << ")=" << expr_f << '\n';
+  std::cout << "v(" << vars << ")=" << expr_v << '\n';
 
-  calc_f.initialize(vars, expr, typename FunctionParser<dim>::ConstMap());
+  calc_f.initialize(vars, expr_f, typename FunctionParser<dim>::ConstMap());
+  calc_v.initialize(vars, expr_v, typename FunctionParser<dim>::ConstMap());
 
-  calculate_f();
+  calculate_f_v();
   solver.add_field("f", f);
+  solver.set_velocity(velocity);
 
   // add multiple functions to test implementation of BC1
   Vector<double> tmp(f.size());
   solver.add_field("another_function", tmp);
   tmp.add(1);
   solver.add_field("yet_another_function", tmp);
-
-  const std::vector<Tensor<1, dim>> u(f.size(), velocity);
-  solver.set_velocity(u);
 
   solver.set_bc1(0);
 
@@ -145,7 +139,7 @@ Problem<dim>::initialize()
 
 template <int dim>
 void
-Problem<dim>::calculate_f()
+Problem<dim>::calculate_f_v()
 {
   std::vector<Point<dim>> points;
   solver.get_support_points(points);
@@ -153,11 +147,17 @@ Problem<dim>::calculate_f()
   const unsigned int n = points.size();
 
   f.reinit(n);
+  velocity.resize(n);
 
-  const double t = solver.get_time();
+  Vector<double> v(3);
 
   for (unsigned int i = 0; i < n; ++i)
-    f[i] = calc_f.value(points[i] - velocity * t);
+    {
+      f[i] = calc_f.value(points[i]);
+      calc_v.vector_value(points[i], v);
+      for (unsigned int k = 0; k < dim; ++k)
+        velocity[i][k] = v[k];
+    }
 }
 
 int
