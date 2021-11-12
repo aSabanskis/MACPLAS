@@ -620,7 +620,6 @@ AdvectionSolver<dim>::prepare_for_solve()
       ++k;
     }
 
-  const double dt   = get_time_step();
   const double tau0 = prm.get_double("Stabilization multiplier");
 
   const unsigned int dofs_per_cell = fe.dofs_per_cell;
@@ -640,10 +639,10 @@ AdvectionSolver<dim>::prepare_for_solve()
           {
             const unsigned int j = local_dof_indices[i];
 
-            stabilization_factor[j] =
-              std::max(stabilization_factor[j],
-                       tau0 / (std::sqrt(sqr(1 / dt) +
-                                         sqr(2 * velocity.block(dim)[j] / h))));
+            if (velocity.block(dim)[j] > 0)
+              stabilization_factor[j] =
+                std::max(stabilization_factor[j],
+                         tau0 * h / (2 * velocity.block(dim)[j]));
           }
       }
 
