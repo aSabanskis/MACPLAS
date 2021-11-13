@@ -60,6 +60,8 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
   m_T.initialize(FunctionParser<dim>::default_variable_names(),
                  prm.get("Temperature"),
                  typename FunctionParser<dim>::ConstMap());
+
+  solver.output_parameter_table();
 }
 
 template <int dim>

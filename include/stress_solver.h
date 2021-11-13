@@ -455,6 +455,22 @@ private:
    */
   ParameterHandler prm;
 
+  /** Use elastic constants instead of Young's modulus and Poisson's ratio
+   */
+  bool use_elastic_constants;
+
+  /** Elastic constant (temperature function) \f$C_{11}\f$, Pa
+   */
+  FunctionParser<1> m_C_11;
+
+  /** Elastic constant (temperature function) \f$C_{12}\f$, Pa
+   */
+  FunctionParser<1> m_C_12;
+
+  /** Elastic constant (temperature function) \f$C_{44}\f$, Pa
+   */
+  FunctionParser<1> m_C_44;
+
   /** Young's modulus (temperature function) \f$E\f$, Pa
    */
   FunctionParser<1> m_E;
@@ -502,6 +518,21 @@ StressSolver<dim>::StressSolver(const unsigned int order,
     std::cout << i << " " << names[i] << "\n";
 
   const std::string info_T = " (temperature function)";
+
+  prm.declare_entry("Elastic constant C_11",
+                    "",
+                    Patterns::Anything(),
+                    "Optional elastic constant C_11 in Pa" + info_T);
+
+  prm.declare_entry("Elastic constant C_12",
+                    "",
+                    Patterns::Anything(),
+                    "Optional elastic constant C_12 in Pa" + info_T);
+
+  prm.declare_entry("Elastic constant C_44",
+                    "",
+                    Patterns::Anything(),
+                    "Optional elastic constant C_44 in Pa" + info_T);
 
   // Physical parameters from https://doi.org/10.1016/S0022-0248(01)01322-7
   prm.declare_entry("Young's modulus",
@@ -654,6 +685,30 @@ StressSolver<dim>::initialize_parameters()
 {
   std::cout << solver_name() << "  Initializing parameters";
 
+  const std::string m_C_11_expression = prm.get("Elastic constant C_11");
+  const std::string m_C_12_expression = prm.get("Elastic constant C_12");
+  const std::string m_C_44_expression = prm.get("Elastic constant C_44");
+
+  use_elastic_constants =
+    !(m_C_11_expression.empty() || m_C_12_expression.empty() ||
+      m_C_44_expression.empty());
+
+  if (use_elastic_constants)
+    {
+      prm.set("Young's modulus", "0");
+      prm.set("Poisson's ratio", "0");
+
+      m_C_11.initialize("T",
+                        m_C_11_expression,
+                        typename FunctionParser<1>::ConstMap());
+      m_C_12.initialize("T",
+                        m_C_12_expression,
+                        typename FunctionParser<1>::ConstMap());
+      m_C_44.initialize("T",
+                        m_C_44_expression,
+                        typename FunctionParser<1>::ConstMap());
+    }
+
   const std::string m_E_expression = prm.get("Young's modulus");
   m_E.initialize("T", m_E_expression, typename FunctionParser<1>::ConstMap());
 
@@ -682,9 +737,15 @@ StressSolver<dim>::initialize_parameters()
 
   std::cout << "  done\n";
 
-  std::cout << "E=" << m_E_expression << "\n"
-            << "alpha=" << m_alpha_expression << "\n"
-            << "nu=" << m_nu << "\n"
+  if (use_elastic_constants)
+    std::cout << "C_11=" << m_C_11_expression << "\n"
+              << "C_12=" << m_C_12_expression << "\n"
+              << "C_44=" << m_C_44_expression << "\n";
+  else
+    std::cout << "E=" << m_E_expression << "\n"
+              << "nu=" << m_nu << "\n";
+
+  std::cout << "alpha=" << m_alpha_expression << "\n"
             << "T_ref=" << m_T_ref << "\n";
 
   std::cout << "n_q_cell=" << prm.get("Number of cell quadrature points")
@@ -1384,6 +1445,9 @@ template <int dim>
 double
 StressSolver<dim>::calc_C_11(const double T) const
 {
+  if (use_elastic_constants)
+    return m_C_11.value(Point<1>(T));
+
   return calc_E(T) * (1 - m_nu) / ((1 + m_nu) * (1 - 2 * m_nu));
 }
 
@@ -1391,6 +1455,9 @@ template <int dim>
 double
 StressSolver<dim>::calc_C_12(const double T) const
 {
+  if (use_elastic_constants)
+    return m_C_12.value(Point<1>(T));
+
   return calc_E(T) * m_nu / ((1 + m_nu) * (1 - 2 * m_nu));
 }
 
@@ -1398,6 +1465,9 @@ template <int dim>
 double
 StressSolver<dim>::calc_C_44(const double T) const
 {
+  if (use_elastic_constants)
+    return m_C_44.value(Point<1>(T));
+
   return calc_E(T) / (2 * (1 + m_nu));
 }
 
