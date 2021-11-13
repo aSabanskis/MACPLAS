@@ -79,7 +79,7 @@ private:
   output_results(const bool data     = false,
                  const bool vtk      = true,
                  const bool boundary = dim == 2,
-                 const bool mesh     = true) const;
+                 const bool mesh     = false) const;
 
   void
   postprocess();
@@ -795,6 +795,7 @@ Problem<dim>::update_fields()
       // reverse the velocity direction and specify velocity=shift
       advection_solver.get_time_step() = -1;
       advection_solver.set_velocity(shift);
+      advection_solver.get_time() = temperature_solver.get_time();
 
       if (prm.get_bool("Fix interface fields"))
         advection_solver.set_bc1(boundary_id_interface);
@@ -1235,6 +1236,8 @@ Problem<dim>::output_results(const bool data,
       temperature_solver.output_vtk();
       if (has_dislocation)
         dislocation_solver.output_vtk();
+      if (use_advection())
+        advection_solver.output_vtk();
     }
 
   // Exports values at all the boundaries in 2D.
@@ -1360,6 +1363,9 @@ Problem<dim>::postprocess()
     }
 
   crystal_probe_file << "\n";
+
+  if (use_advection())
+    advection_solver.get_time() = temperature_solver.get_time();
 }
 
 template <int dim>

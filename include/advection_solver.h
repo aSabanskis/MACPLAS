@@ -193,6 +193,10 @@ private:
    */
   std::map<std::string, Vector<double>> fields;
 
+  /** Calculated change of all FE fields
+   */
+  std::map<std::string, Vector<double>> delta_fields;
+
   /** All FE fields at the previous time step.
    * \c map is not used for convenience in \c solve.
    */
@@ -617,6 +621,7 @@ AdvectionSolver<dim>::prepare_for_solve()
     {
       AssertDimension(n_dofs, it.second.size());
       fields_prev.block(k) = it.second;
+      delta_fields[it.first].reinit(n_dofs);
       ++k;
     }
 
@@ -884,6 +889,8 @@ AdvectionSolver<dim>::solve_system()
   unsigned int k = 0;
   for (auto &it : fields)
     {
+      delta_fields[it.first] += fields_prev.block(k);
+      delta_fields[it.first] -= it.second;
       it.second = fields_prev.block(k);
       ++k;
     }
@@ -924,6 +931,9 @@ AdvectionSolver<dim>::output_vtk() const
 
   for (const auto &it : fields)
     data_out.add_data_vector(it.second, it.first);
+
+  for (const auto &it : delta_fields)
+    data_out.add_data_vector(it.second, "d" + it.first);
 
   for (unsigned int k = 0; k < dim; ++k)
     data_out.add_data_vector(velocity.block(k), "u_" + std::to_string(k));
