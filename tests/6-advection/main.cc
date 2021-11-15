@@ -29,9 +29,9 @@ private:
 
   FunctionParser<dim> calc_v;
 
-  Vector<double> f;
+  BlockVector<double> function_values;
 
-  FunctionParser<dim> calc_f;
+  std::vector<std::string> functions;
 
   ParameterHandler prm;
 };
@@ -41,13 +41,13 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
   : solver(order, use_default_prm)
   , calc_v(dim)
 {
-  prm.declare_entry("Function",
-                    "tanh((1-x-y)*10)",
+  prm.declare_entry("Functions",
+                    "0; 1; tanh(sin(x)+(y-0.5)^2)",
                     Patterns::Anything(),
-                    "Function for advection test");
+                    "Semicolon-separated functions for advection test");
 
   prm.declare_entry("Velocity",
-                    "0.02; 0.02",
+                    "-y*0.02; x*0.02",
                     Patterns::Anything(),
                     "Semicolon-separated velocity field in m/s");
 
@@ -111,25 +111,31 @@ Problem<dim>::initialize()
 {
   solver.initialize();
 
-  const std::string vars   = FunctionParser<dim>::default_variable_names();
-  const std::string expr_f = prm.get("Function");
+  const std::string vars = FunctionParser<dim>::default_variable_names();
+
   const std::string expr_v = prm.get("Velocity");
-
-  std::cout << "f(" << vars << ")=" << expr_f << '\n';
   std::cout << "v(" << vars << ")=" << expr_v << '\n';
-
-  calc_f.initialize(vars, expr_f, typename FunctionParser<dim>::ConstMap());
   calc_v.initialize(vars, expr_v, typename FunctionParser<dim>::ConstMap());
 
-  calculate_f_v();
-  solver.add_field("f", f);
-  solver.set_velocity(velocity);
+  const std::string  expr_f  = prm.get("Functions");
+  const auto         f_split = Utilities::split_string_list(expr_f, ';');
+  const unsigned int n_f     = f_split.size();
 
-  // add multiple functions to test implementation of BC1
-  Vector<double> tmp(f.size());
-  solver.add_field("another_function", tmp);
-  tmp.add(1);
-  solver.add_field("yet_another_function", tmp);
+  function_values.reinit(n_f);
+  functions.resize(n_f);
+
+  for (unsigned int k = 0; k < n_f; ++k)
+    {
+      functions[k] = f_split[k];
+      std::cout << "f_" << k << "(" << vars << ")=" << functions[k] << '\n';
+    }
+
+  calculate_f_v();
+
+  for (unsigned int k = 0; k < n_f; ++k)
+    solver.add_field("f_" + std::to_string(k), function_values.block(k));
+
+  solver.set_velocity(velocity);
 
   solver.set_bc1(0);
 
@@ -146,17 +152,30 @@ Problem<dim>::calculate_f_v()
 
   const unsigned int n = points.size();
 
-  f.reinit(n);
   velocity.resize(n);
 
   Vector<double> v(3);
 
   for (unsigned int i = 0; i < n; ++i)
     {
-      f[i] = calc_f.value(points[i]);
       calc_v.vector_value(points[i], v);
       for (unsigned int k = 0; k < dim; ++k)
         velocity[i][k] = v[k];
+    }
+
+  const unsigned int n_f = functions.size();
+
+  for (unsigned int k = 0; k < n_f; ++k)
+    {
+      FunctionParser<dim> calc_f;
+      calc_f.initialize(FunctionParser<dim>::default_variable_names(),
+                        functions[k],
+                        typename FunctionParser<dim>::ConstMap());
+
+      Vector<double> &f = function_values.block(k);
+      f.reinit(n);
+      for (unsigned int i = 0; i < n; ++i)
+        f[i] = calc_f.value(points[i]);
     }
 }
 
