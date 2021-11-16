@@ -271,6 +271,11 @@ AdvectionSolver<dim>::AdvectionSolver(const unsigned int order,
 #endif
                ")\n";
 
+  prm.declare_entry("Time stepping theta",
+                    "1",
+                    Patterns::Double(0, 1),
+                    "Factor theta for time stepping (1 - Euler implicit)");
+
   prm.declare_entry("Time step",
                     "1",
                     Patterns::Double(0),
@@ -671,6 +676,7 @@ AdvectionSolver<dim>::assemble_system()
 
   const double dt     = get_time_step();
   const double tau_dt = stabilization_type == gls ? 1 / dt : 0;
+  const double theta  = prm.get_double("Time stepping theta");
 
   const QGauss<dim> quadrature(
     prm.get_integer("Number of cell quadrature points"));
@@ -686,6 +692,9 @@ AdvectionSolver<dim>::assemble_system()
 
   std::vector<std::vector<double>> f_prev_q(n_fields,
                                             std::vector<double>(n_q_points));
+
+  std::vector<std::vector<Tensor<1, dim>>> grad_f_prev_q(
+    n_fields, std::vector<Tensor<1, dim>>(n_q_points));
 
   std::vector<double>         u_component_q(n_q_points);
   std::vector<Tensor<1, dim>> u_q(n_q_points);
@@ -710,7 +719,11 @@ AdvectionSolver<dim>::assemble_system()
       cell->get_dof_indices(local_dof_indices);
 
       for (unsigned int k = 0; k < n_fields; ++k)
-        fe_values.get_function_values(fields_prev.block(k), f_prev_q[k]);
+        {
+          fe_values.get_function_values(fields_prev.block(k), f_prev_q[k]);
+          fe_values.get_function_gradients(fields_prev.block(k),
+                                           grad_f_prev_q[k]);
+        }
 
       for (unsigned int k = 0; k < dim; ++k)
         {
@@ -737,11 +750,15 @@ AdvectionSolver<dim>::assemble_system()
                   const Tensor<1, dim> &grad_phi_j = fe_values.shape_grad(j, q);
 
                   cell_matrix(i, j) +=
-                    (phi_j / dt + (u_q[q] * grad_phi_j)) * phi_i * weight;
+                    (phi_j / dt + theta * (u_q[q] * grad_phi_j)) * phi_i *
+                    weight;
                 }
 
               for (unsigned int k = 0; k < n_fields; ++k)
-                cell_rhs.block(k)(i) += f_prev_q[k][q] / dt * phi_i * weight;
+                cell_rhs.block(k)(i) +=
+                  (f_prev_q[k][q] / dt +
+                   (theta - 1) * (u_q[q] * grad_f_prev_q[k][q])) *
+                  phi_i * weight;
             }
         }
 
