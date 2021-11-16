@@ -100,12 +100,12 @@ Length = x
 
 
 # PULL RATE
+# If v2 != v1 then t2 should be modified (manually) to match the crystal end.
 x = np.array([params.get(f"t{x}") for x in range(3)])
 y = np.array([params.get(f"v{x}") for x in range(3)])
 if x[0] > 0:
     x = np.append([0], x)
     y = np.append([0], y)
-x = np.cumsum(x)
 
 fig = plt.figure(figsize=(6, 4))
 plt.plot(x, y, "o-")
