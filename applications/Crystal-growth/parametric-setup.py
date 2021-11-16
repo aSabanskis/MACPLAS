@@ -32,6 +32,7 @@ params_default = {
     "Ta2": 930,
     "Ta_top": -274,
     "HTa": 30,
+    "dz_Ta": 1,
     "mr": 85,
     "R_crucible": 43,
     "H0_crucible": 13,
@@ -202,7 +203,8 @@ plt.savefig("melt-height.png", dpi=150, bbox_inches="tight")
 zT = H_crucible + params.get("HTa") * 1e-3 - h_melt
 Ta1 = params.get("Ta1") + 273
 Ta2 = params.get("Ta2") + 273
-Tamb = f"{Ta2:g} + ({Ta1:g}-{Ta2:g})/(1+exp(-2000*(z-{zT:g})))"
+dz = params.get("dz_Ta") * 1e-3 / 2
+Tamb = f"{Ta2:g} + ({Ta1:g}-{Ta2:g})/(1+exp(-(z-{zT:g})/{dz:g}))"
 Tamb_top = params.get("Ta_top") + 273
 print(f"Tamb={Tamb} K")
 print(f"Tamb_top={Tamb_top} K")
