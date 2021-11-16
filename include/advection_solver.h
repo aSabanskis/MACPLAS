@@ -262,7 +262,7 @@ AdvectionSolver<dim>::AdvectionSolver(const unsigned int order,
   , current_time(0)
   , current_time_step(0)
 {
-  std::cout << "Creating advection solver"
+  std::cout << "Creating advection solver, order=" << order << ", dim=" << dim
             << " ("
 #ifdef DEBUG
                "Debug"

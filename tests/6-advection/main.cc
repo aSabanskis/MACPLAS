@@ -154,7 +154,7 @@ Problem<dim>::calculate_f_v()
 
   velocity.resize(n);
 
-  Vector<double> v(3);
+  Vector<double> v(dim);
 
   for (unsigned int i = 0; i < n; ++i)
     {
