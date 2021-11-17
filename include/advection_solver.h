@@ -249,6 +249,11 @@ private:
   /** Time stepping: current time step \f$\Delta t\f$, s
    */
   double current_time_step;
+
+  /** Time stepping: scale for internal time step.
+   * Calculated based on the Courant number.
+   */
+  double time_step_scale;
 };
 
 
@@ -261,6 +266,7 @@ AdvectionSolver<dim>::AdvectionSolver(const unsigned int order,
   , dh(triangulation)
   , current_time(0)
   , current_time_step(0)
+  , time_step_scale(1)
 {
   std::cout << "Creating advection solver, order=" << order << ", dim=" << dim
             << " ("
@@ -285,6 +291,12 @@ AdvectionSolver<dim>::AdvectionSolver(const unsigned int order,
                     "10",
                     Patterns::Double(0),
                     "Maximum time in seconds");
+
+  prm.declare_entry(
+    "Courant number",
+    "0",
+    Patterns::Double(0),
+    "Internally adjust the time step to achieve specified C (0 - disabled)");
 
   prm.declare_entry("Linear solver type",
                     "fgmres",
@@ -569,7 +581,7 @@ AdvectionSolver<dim>::solve()
   std::cout << solver_name() << "  "
             << "Time " << t << " s"
             << " step " << dt << " s"
-            << " n_fields=" << n_fields << "\n";
+            << " scale=" << time_step_scale << " n_fields=" << n_fields << "\n";
 
   return t + 1e-4 * dt < t_max;
 }
@@ -620,6 +632,7 @@ AdvectionSolver<dim>::prepare_for_solve()
   system_rhs.reinit(n_fields, n_dofs);
   fields_prev.reinit(n_fields);
   stabilization_factor.reinit(n_dofs);
+  time_step_scale = 1;
 
   unsigned int k = 0;
   for (const auto &it : fields)
@@ -631,6 +644,9 @@ AdvectionSolver<dim>::prepare_for_solve()
     }
 
   const double tau0 = prm.get_double("Stabilization multiplier");
+  const double C    = prm.get_double("Courant number");
+  const double dt   = get_time_step();
+  double       dt_C = std::numeric_limits<double>::max();
 
   const unsigned int dofs_per_cell = fe.dofs_per_cell;
 
@@ -638,23 +654,28 @@ AdvectionSolver<dim>::prepare_for_solve()
 
   typename DoFHandler<dim>::active_cell_iterator cell = dh.begin_active(),
                                                  endc = dh.end();
-  if (tau0 > 0)
-    for (; cell != endc; ++cell)
-      {
-        const double h = cell->diameter();
+  for (; cell != endc; ++cell)
+    {
+      const double h = cell->diameter();
 
-        cell->get_dof_indices(local_dof_indices);
+      cell->get_dof_indices(local_dof_indices);
 
-        for (unsigned int i = 0; i < dofs_per_cell; ++i)
-          {
-            const unsigned int j = local_dof_indices[i];
+      for (unsigned int i = 0; i < dofs_per_cell; ++i)
+        {
+          const unsigned int j = local_dof_indices[i];
+          const double       u = velocity.block(dim)[j];
 
-            if (velocity.block(dim)[j] > 0)
+          if (u > 0)
+            {
               stabilization_factor[j] =
-                std::max(stabilization_factor[j],
-                         tau0 * h / (2 * velocity.block(dim)[j]));
-          }
-      }
+                std::max(stabilization_factor[j], tau0 * h / (2 * u));
+              dt_C = std::min(dt_C, C * h / u);
+            }
+        }
+    }
+
+  if (dt_C > 0 && dt_C < std::numeric_limits<double>::max())
+    time_step_scale = dt_C / dt;
 
   if (!sparsity_pattern.empty() && !system_matrix.empty())
     return;
@@ -674,7 +695,7 @@ AdvectionSolver<dim>::assemble_system()
 
   std::cout << solver_name() << "  Assembling system";
 
-  const double dt     = get_time_step();
+  const double dt     = get_time_step() * time_step_scale;
   const double tau_dt = stabilization_type == gls ? 1 / dt : 0;
   const double theta  = prm.get_double("Time stepping theta");
 
@@ -906,9 +927,15 @@ AdvectionSolver<dim>::solve_system()
   unsigned int k = 0;
   for (auto &it : fields)
     {
+      // calculate the correct field change
       delta_fields[it.first] += fields_prev.block(k);
       delta_fields[it.first] -= it.second;
-      it.second = fields_prev.block(k);
+      delta_fields[it.first] /= time_step_scale;
+
+      // apply the field change
+      it.second += delta_fields[it.first];
+      fields_prev.block(k) = it.second;
+
       ++k;
     }
 
