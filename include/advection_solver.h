@@ -45,7 +45,7 @@ public:
    * @returns \c true if the final time has not been reached
    */
   bool
-  solve();
+  solve(const bool skip_time_advance = false);
 
   /** Set the velocity field
    */
@@ -560,9 +560,11 @@ AdvectionSolver<dim>::add_field(const std::string &   name,
 
 template <int dim>
 bool
-AdvectionSolver<dim>::solve()
+AdvectionSolver<dim>::solve(const bool skip_time_advance)
 {
-  advance_time();
+  // needed so that the automatic time step adjustment is not called
+  if (!skip_time_advance)
+    advance_time();
 
   const double t     = get_time();
   const double dt    = get_time_step();

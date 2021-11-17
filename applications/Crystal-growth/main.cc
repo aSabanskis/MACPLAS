@@ -800,7 +800,7 @@ Problem<dim>::update_fields()
       if (prm.get_bool("Fix interface fields"))
         advection_solver.set_bc1(boundary_id_interface);
 
-      advection_solver.solve();
+      advection_solver.solve(true);
     }
 
   std::vector<Point<dim>> points;
