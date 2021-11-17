@@ -13,3 +13,5 @@ set Output subdivisions              = 0
 set Preconditioner relaxation        = 1.0
 set Preconditioner type              = jacobi
 set Time step                        = 1
+set Time stepping theta              = 1
+set Courant number                   = 1
