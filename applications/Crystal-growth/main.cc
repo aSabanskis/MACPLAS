@@ -792,9 +792,14 @@ Problem<dim>::update_fields()
 {
   if (use_advection())
     {
-      // reverse the velocity direction and specify velocity=shift
-      advection_solver.get_time_step() = -1;
-      advection_solver.set_velocity(shift);
+      // reverse the velocity direction and specify velocity=-shift/dt
+      const double                dt = temperature_solver.get_time_step();
+      std::vector<Tensor<1, dim>> U  = shift;
+      for (auto &u : U)
+        u /= -dt;
+
+      advection_solver.get_time_step() = dt;
+      advection_solver.set_velocity(U);
       advection_solver.get_time() = temperature_solver.get_time();
 
       if (prm.get_bool("Fix interface fields"))
