@@ -209,18 +209,29 @@ Tamb_top = params.get("Ta_top") + 273
 print(f"Tamb={Tamb} K")
 print(f"Tamb_top={Tamb_top} K")
 
-# MAX TIME
+# MAX TIME, VELOCITY(L)
 t = 0
 dt = 2.0
 L = 0
 z_top = L_0
+x = []
+y = []
 while L < L_max:
     t += dt
     dz = V(t) * dt
     z_top += dz
     L = z_top + (h_melt - H_melt(L))
+    x.append(L * 1e3)
+    y.append(V(t) * 1e3 * 60)
 t_max = t
 print(f"t_max={t_max:g} s")
+
+fig = plt.figure(figsize=(6, 4))
+plt.plot(x, y, "-")
+plt.grid(True)
+plt.xlabel("Length, mm")
+plt.ylabel("Pull rate, mm/min")
+plt.savefig("pull-rate-length.png", dpi=150, bbox_inches="tight")
 
 # INTERFACE SHAPE
 x = Length * 1e3
