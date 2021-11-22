@@ -193,9 +193,9 @@ private:
    */
   std::map<std::string, Vector<double>> fields;
 
-  /** Calculated change of all FE fields
+  /** Time derivative of all FE fields
    */
-  std::map<std::string, Vector<double>> delta_fields;
+  std::map<std::string, Vector<double>> dot_fields;
 
   /** All FE fields at the previous time step.
    * \c map is not used for convenience in \c solve.
@@ -641,7 +641,7 @@ AdvectionSolver<dim>::prepare_for_solve()
     {
       AssertDimension(n_dofs, it.second.size());
       fields_prev.block(k) = it.second;
-      delta_fields[it.first].reinit(n_dofs);
+      dot_fields[it.first].reinit(n_dofs);
       ++k;
     }
 
@@ -930,13 +930,15 @@ AdvectionSolver<dim>::solve_system()
   for (auto &it : fields)
     {
       // calculate the correct field change
-      delta_fields[it.first] += fields_prev.block(k);
-      delta_fields[it.first] -= it.second;
-      delta_fields[it.first] /= time_step_scale;
+      dot_fields[it.first] += fields_prev.block(k);
+      dot_fields[it.first] -= it.second;
+      dot_fields[it.first] /= time_step_scale;
 
       // apply the field change
-      it.second += delta_fields[it.first];
+      it.second += dot_fields[it.first];
       fields_prev.block(k) = it.second;
+
+      dot_fields[it.first] /= get_time_step();
 
       ++k;
     }
@@ -978,8 +980,8 @@ AdvectionSolver<dim>::output_vtk() const
   for (const auto &it : fields)
     data_out.add_data_vector(it.second, it.first);
 
-  for (const auto &it : delta_fields)
-    data_out.add_data_vector(it.second, "d" + it.first);
+  for (const auto &it : dot_fields)
+    data_out.add_data_vector(it.second, "dot_" + it.first);
 
   for (unsigned int k = 0; k < dim; ++k)
     data_out.add_data_vector(velocity.block(k), "u_" + std::to_string(k));
