@@ -9,8 +9,11 @@ set Poisson's ratio                  = 0.26
 set Preconditioner relaxation        = 1.0
 set Preconditioner type              = jacobi
 set Reference temperature            = 280
-set Thermal expansion coefficient    = 7.5e-6
+set Thermal expansion coefficient    = 6.68706e-06*(1-exp(-0.00236063*(T+509.324)))+3.12223e-10*T
 set Young's modulus                  = 1.03e11
+set Elastic constant C_11            = 13.2e10 - 1.7e7*T
+set Elastic constant C_12            = 2.8e10 - 8.2e6*T
+set Elastic constant C_44            = 5.2e10 - 5.4e6*T
 set Log convergence full             = false
 set Log convergence final            = false
 subsection Stress recovery

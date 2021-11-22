@@ -1,6 +1,6 @@
 set Stabilization type               = SUPG
-set Stabilization multiplier         = 1
-set Linear solver iterations         = 1000
+set Stabilization multiplier         = 0
+set Linear solver iterations         = 100
 set Linear solver tolerance          = 1e-12
 set Linear solver relative tolerance = 1e-2
 set Linear solver type               = fgmres
@@ -14,4 +14,4 @@ set Preconditioner relaxation        = 1.0
 set Preconditioner type              = jacobi
 set Time step                        = 1
 set Time stepping theta              = 1
-set Courant number                   = 1
+set Courant number                   = 0
