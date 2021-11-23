@@ -493,6 +493,60 @@ private:
   SmartPointer<const DoFHandler<dim>> dh;
 };
 
+/** Class for smoothing fields
+ */
+template <int dim>
+class DoFFieldSmoother
+{
+public:
+  /** Smoothing type
+   */
+  enum SmoothType
+  {
+    Cell, ///< Cell-based
+    None  ///< No smoothing
+  };
+
+  /** Delete all data
+   */
+  inline void
+  clear();
+
+  /** Add a FE field
+   */
+  inline void
+  add_field(const std::string &name, const Vector<double> &field);
+
+  /** Attach a DoF handler corresponding to the added FE fields
+   */
+  inline void
+  attach_dof_handler(const DoFHandler<dim> &dof_handler);
+
+  /** Smooth all fields.
+   */
+  inline void
+  calculate(SmoothType st = Cell);
+
+  /** Get field by name
+   */
+  inline const Vector<double> &
+  get_field(const std::string &name) const;
+
+private:
+  /** Smooth using cell-based method
+   */
+  inline void
+  smooth_cell();
+
+  /** All FE fields
+   */
+  std::map<std::string, Vector<double>> fields;
+
+  /** DoF handler
+   */
+  SmartPointer<const DoFHandler<dim>> dh;
+};
+
 /**
  * Transform the given triangulation smoothly to a different domain where,
  * typically, each of the vertices at the boundary of the triangulation is
@@ -2043,6 +2097,110 @@ const std::vector<Tensor<1, dim>> &
 DoFGradientEvaluation<dim>::get_gradient(const std::string &name) const
 {
   return gradients.at(name);
+}
+
+// DoFFieldSmoother
+
+template <int dim>
+void
+DoFFieldSmoother<dim>::clear()
+{
+  dh = nullptr;
+  fields.clear();
+}
+
+template <int dim>
+void
+DoFFieldSmoother<dim>::add_field(const std::string &   name,
+                                 const Vector<double> &field)
+{
+  fields[name] = field;
+}
+
+template <int dim>
+void
+DoFFieldSmoother<dim>::attach_dof_handler(const DoFHandler<dim> &dof_handler)
+{
+  dh = &dof_handler;
+}
+
+template <int dim>
+void
+DoFFieldSmoother<dim>::calculate(SmoothType st)
+{
+  if (st == SmoothType::Cell)
+    smooth_cell();
+  else
+    Assert(st == SmoothType::None, ExcNotImplemented());
+}
+
+template <int dim>
+void
+DoFFieldSmoother<dim>::smooth_cell()
+{
+  const auto &fe = dh->get_fe();
+
+  const unsigned int n_dofs        = dh->n_dofs();
+  const unsigned int dofs_per_cell = fe.dofs_per_cell;
+
+  std::vector<unsigned int> count(n_dofs, 0);
+
+  std::vector<types::global_dof_index> local_dof_indices(dofs_per_cell);
+
+  std::map<std::string, Vector<double>> fields_new;
+
+  for (const auto &it : fields)
+    fields_new[it.first].reinit(n_dofs);
+
+  typename DoFHandler<dim>::active_cell_iterator cell = dh->begin_active(),
+                                                 endc = dh->end();
+  for (; cell != endc; ++cell)
+    {
+      cell->get_dof_indices(local_dof_indices);
+
+      for (unsigned int i = 0; i < dofs_per_cell; ++i)
+        count[local_dof_indices[i]] += 1;
+
+      for (auto &it : fields)
+        {
+          const Vector<double> &f = it.second;
+
+          // average value in cell
+          double f_cell = 0;
+          for (unsigned int i = 0; i < dofs_per_cell; ++i)
+            f_cell += f[local_dof_indices[i]];
+          f_cell /= dofs_per_cell;
+
+          Vector<double> &f_new = fields_new.at(it.first);
+
+          for (unsigned int i = 0; i < dofs_per_cell; ++i)
+            f_new[local_dof_indices[i]] +=
+              0.5 * (f_cell + f[local_dof_indices[i]]);
+        }
+    }
+
+  // average contributions from neighbouring cells
+  for (auto &it : fields_new)
+    {
+      for (unsigned int i = 0; i < n_dofs; ++i)
+        {
+          AssertThrow(count[i] > 0,
+                      ExcMessage("count[" + std::to_string(i) +
+                                 "]=" + std::to_string(count[i]) +
+                                 ", positive value expected"));
+
+          it.second[i] /= count[i];
+        }
+    }
+
+  fields = fields_new;
+}
+
+template <int dim>
+const Vector<double> &
+DoFFieldSmoother<dim>::get_field(const std::string &name) const
+{
+  return fields.at(name);
 }
 
 namespace
