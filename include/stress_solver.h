@@ -1597,14 +1597,14 @@ StressSolver<dim>::recover_strain_global()
   strain_e.reinit(n_components, n_dofs_temp, true);
 
   // prepare the global mass matrix and RHS
-  SparseMatrix<double> global_matrix;
-  BlockVector<double>  global_rhs(n_components, n_dofs_temp);
-
   DynamicSparsityPattern dsp(n_dofs_temp);
   DoFTools::make_sparsity_pattern(dh_temp, dsp);
 
   SparsityPattern sp;
   sp.copy_from(dsp);
+
+  SparseMatrix<double> global_matrix;
+  BlockVector<double>  global_rhs(n_components, n_dofs_temp);
   global_matrix.reinit(sp);
 
   FullMatrix<double>  cell_matrix(dofs_per_cell_temp, dofs_per_cell_temp);
