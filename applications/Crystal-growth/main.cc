@@ -138,10 +138,13 @@ private:
 
   DoFGradientEvaluation<dim> grad_eval;
 
+  DoFFieldSmoother<dim> smoother;
+
   double N0;
 
   double previous_time_step;
   double next_output_time;
+  double next_smooth_time;
 
   ParameterHandler prm;
 };
@@ -254,6 +257,12 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     "Time interval in s between result output (0 - disabled). "
                     "The time step is adjusted to match the required time.");
 
+  prm.declare_entry(
+    "Smooth time step",
+    "0",
+    Patterns::Double(0),
+    "Time interval in s between field smoothing (0 - disabled)");
+
   prm.declare_entry("Probe coordinates x",
                     "0, 0.01",
                     Patterns::List(Patterns::Double(), 1),
@@ -351,6 +360,7 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
     }
 
   next_output_time = prm.get_double("Output time step");
+  next_smooth_time = prm.get_double("Smooth time step");
 }
 
 template <int dim>
@@ -680,6 +690,9 @@ Problem<dim>::calculate_field_gradients()
   grad_eval.clear();
   grad_eval.attach_dof_handler(temperature_solver.get_dof_handler());
 
+  smoother.clear();
+  smoother.attach_dof_handler(temperature_solver.get_dof_handler());
+
   const Vector<double> &T = temperature_solver.get_temperature();
 
   grad_eval.add_field("T", T);
@@ -857,6 +870,11 @@ Problem<dim>::update_fields()
           update_one_field(e, "e_c_" + std::to_string(j), interface_dofs);
         }
     }
+
+  const double t         = temperature_solver.get_time();
+  const double dt_smooth = prm.get_double("Smooth time step");
+  if (t - next_smooth_time >= dt_smooth)
+    next_smooth_time += dt_smooth;
 }
 
 template <int dim>
@@ -865,33 +883,43 @@ Problem<dim>::update_one_field(Vector<double> &         field,
                                const std::string &      name,
                                const std::vector<bool> &do_not_change)
 {
-  const Vector<double> field0 = field;
+  const double t      = temperature_solver.get_time();
+  const bool   smooth = (next_smooth_time > 0 && t >= next_smooth_time);
+
+  Vector<double> df(field.size());
 
   if (use_advection())
     {
-      field = advection_solver.get_field(name);
-
-#ifdef DEBUG
-      Vector<double> df = field;
-      df -= field0;
-      temperature_solver.add_field("d" + name + "_adv", df);
-#endif
-      return;
+      df += advection_solver.get_field(name);
+      df -= field;
     }
+  else
+    {
+      const auto &grad = grad_eval.get_gradient(name);
 
-  const auto &grad = grad_eval.get_gradient(name);
-
-  for (unsigned int i = 0; i < field.size(); ++i)
-    field[i] += shift[i] * grad[i];
+      for (unsigned int i = 0; i < field.size(); ++i)
+        df[i] = shift[i] * grad[i];
+    }
 
   for (unsigned int i = 0; i < do_not_change.size(); ++i)
     if (do_not_change[i])
-      field[i] = field0[i];
+      df[i] = 0;
+
+  if (smooth)
+    {
+      smoother.add_field("df", df);
+      smoother.calculate();
+      df = smoother.get_field("df");
+
+      for (unsigned int i = 0; i < do_not_change.size(); ++i)
+        if (do_not_change[i])
+          df[i] = 0;
+    }
+
+  field += df;
 
 #ifdef DEBUG
-  Vector<double> df = field;
-  df -= field0;
-  temperature_solver.add_field("d" + name + "_grad", df);
+  temperature_solver.add_field("d_" + name, df);
 #endif
 }
 

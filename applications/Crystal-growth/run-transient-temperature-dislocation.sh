@@ -32,6 +32,7 @@ sed -Ei "s|(set Time stepping theta *= *).*|\1 1|" advection.prm
 sed -Ei "s|(set Courant number *= *).*|\1 0|" advection.prm
 
 sed -Ei "s|(set Temperature only *= *).*|\1 false|" problem.prm
+sed -Ei "s|(set Smooth time step *= *).*|\1 $dt|" problem.prm
 sed -Ei "s|(set Time step *= *).*|\1 $dt|" dislocation.prm
 sed -Ei "s|(set Time step *= *).*|\1 $dt|" temperature.prm
 sed -Ei "s|(set Max time step *= *).*|\1 $dt|" dislocation.prm
