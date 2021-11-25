@@ -181,22 +181,24 @@ main(int argc, char *argv[])
 {
   const std::vector<std::string> arguments(argv, argv + argc);
 
-  bool init = false;
+  bool         init  = false;
+  unsigned int order = 2;
 
   for (unsigned int i = 1; i < arguments.size(); ++i)
     {
       if (arguments[i] == "init" || arguments[i] == "use_default_prm")
         init = true;
+
+      if (arguments[i] == "order" && i + 1 < arguments.size())
+        order = std::stoi(arguments[i + 1]);
     }
 
   deallog.attach(std::cout);
   deallog.depth_console(2);
 
-  for (unsigned int k = 1; k <= 3; ++k)
-    {
-      Problem<2> p(k, init);
-      p.run();
-    }
+  Problem<2> p(order, init);
+  if (!init)
+    p.run();
 
   return 0;
 }
