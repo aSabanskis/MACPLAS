@@ -30,6 +30,7 @@ sed -Ei "s|(set Linear solver type *= *).*|\1 fgmres|" advection.prm
 sed -Ei "s|(set Linear solver iterations *= *).*|\1 100|" advection.prm
 sed -Ei "s|(set Time stepping theta *= *).*|\1 1|" advection.prm
 sed -Ei "s|(set Courant number *= *).*|\1 0|" advection.prm
+sed -Ei "s|(set Limit field minmax *= *).*|\1 true|" advection.prm
 
 sed -Ei "s|(set Temperature only *= *).*|\1 false|" problem.prm
 sed -Ei "s|(set Smooth time step *= *).*|\1 $dt|" problem.prm

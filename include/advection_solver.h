@@ -179,6 +179,11 @@ private:
   void
   solve_system();
 
+  /** Calculate field change and limit if necessary
+   */
+  void
+  postprocess_fields();
+
   /** Helper method for creating output file name.
    * @returns \c "-<dim>d-order<order>-t<time>"
    */
@@ -297,6 +302,11 @@ AdvectionSolver<dim>::AdvectionSolver(const unsigned int order,
     "0",
     Patterns::Double(0),
     "Internally adjust the time step to achieve specified C (0 - disabled)");
+
+  prm.declare_entry("Limit field minmax",
+                    "true",
+                    Patterns::Bool(),
+                    "Do not allow field values below min and above max");
 
   prm.declare_entry("Linear solver type",
                     "fgmres",
@@ -579,6 +589,7 @@ AdvectionSolver<dim>::solve(const bool skip_time_advance)
   prepare_for_solve();
   assemble_system();
   solve_system();
+  postprocess_fields();
 
   std::cout << solver_name() << "  "
             << "Time " << t << " s"
@@ -926,24 +937,51 @@ AdvectionSolver<dim>::solve_system()
         }
     }
 
+  std::cout << " " << format_time(timer) << "\n";
+}
+
+template <int dim>
+void
+AdvectionSolver<dim>::postprocess_fields()
+{
   unsigned int k = 0;
   for (auto &it : fields)
     {
+      Vector<double> &f_new = fields_prev.block(k);
+      Vector<double> &f_old = it.second;
+      Vector<double> &df    = dot_fields[it.first];
+
       // calculate the correct field change
-      dot_fields[it.first] += fields_prev.block(k);
-      dot_fields[it.first] -= it.second;
-      dot_fields[it.first] /= time_step_scale;
+      df = f_new;
+      df -= f_old;
+      df /= time_step_scale;
 
       // apply the field change
-      it.second += dot_fields[it.first];
-      fields_prev.block(k) = it.second;
+      f_new = f_old;
+      f_new += df;
 
-      dot_fields[it.first] /= get_time_step();
+      // check min and max values
+      if (prm.get_bool("Limit field minmax"))
+        {
+          const auto limits = minmax(f_old);
+
+          for (auto &x : f_new)
+            {
+              if (x < limits.first)
+                x = limits.first;
+              else if (x > limits.second)
+                x = limits.second;
+            }
+
+          df = f_new;
+          df -= f_old;
+        }
+
+      f_old = f_new;
+      df /= get_time_step();
 
       ++k;
     }
-
-  std::cout << " " << format_time(timer) << "\n";
 }
 
 template <int dim>
