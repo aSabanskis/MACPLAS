@@ -95,7 +95,7 @@ Problem<dim>::make_grid()
   p2[dim - 1] = 1;
 
   Triangulation<dim> &triangulation = solver.get_mesh();
-  GridGenerator::hyper_rectangle(triangulation, p1, p2);
+  GridGenerator::hyper_rectangle(triangulation, p1, p2, true);
 
   triangulation.refine_global(3);
 }
@@ -165,6 +165,8 @@ Problem<dim>::smooth()
     }
 
   smoother.attach_dof_handler(solver.get_dof_handler());
+  smoother.set_bc1(0);
+  smoother.set_bc1(2);
   smoother.calculate();
 
   for (unsigned int k = 0; k < n_f; ++k)

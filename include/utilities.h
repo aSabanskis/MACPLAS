@@ -512,6 +512,12 @@ public:
   inline void
   clear();
 
+  /** Set first-type boundary condition \f$f = f_0\f$.
+   * The value does not need to be specified.
+   */
+  void
+  set_bc1(const unsigned int id);
+
   /** Add a FE field
    */
   inline void
@@ -541,6 +547,10 @@ private:
   /** All FE fields
    */
   std::map<std::string, Vector<double>> fields;
+
+  /** Boundary IDs for first-type BC
+   */
+  std::set<unsigned int> bc1;
 
   /** DoF handler
    */
@@ -2111,6 +2121,13 @@ DoFFieldSmoother<dim>::clear()
 
 template <int dim>
 void
+DoFFieldSmoother<dim>::set_bc1(const unsigned int id)
+{
+  bc1.insert(id);
+}
+
+template <int dim>
+void
 DoFFieldSmoother<dim>::add_field(const std::string &   name,
                                  const Vector<double> &field)
 {
@@ -2190,6 +2207,28 @@ DoFFieldSmoother<dim>::smooth_cell()
                                  ", positive value expected"));
 
           it.second[i] /= count[i];
+        }
+    }
+
+  // apply Dirichlet boundary conditions
+  for (const auto &b : bc1)
+    {
+      std::vector<bool> boundary_dofs(n_dofs, false);
+
+      DoFTools::extract_boundary_dofs(*dh,
+                                      ComponentMask(),
+                                      boundary_dofs,
+                                      {static_cast<types::boundary_id>(b)});
+
+      for (const auto &it : fields)
+        {
+          Vector<double> &f_new = fields_new.at(it.first);
+
+          for (unsigned int i = 0; i < n_dofs; ++i)
+            {
+              if (boundary_dofs[i])
+                f_new[i] = it.second[i];
+            }
         }
     }
 
