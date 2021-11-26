@@ -2119,6 +2119,7 @@ DoFFieldSmoother<dim>::clear()
 {
   dh = nullptr;
   fields.clear();
+  bc1.clear();
 }
 
 template <int dim>
