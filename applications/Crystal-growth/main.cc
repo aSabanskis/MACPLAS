@@ -883,8 +883,6 @@ Problem<dim>::update_fields()
           update_one_field(e, "e_c_" + std::to_string(j), interface_dofs);
         }
     }
-
-  const double t = temperature_solver.get_time();
 }
 
 template <int dim>
@@ -893,8 +891,6 @@ Problem<dim>::update_one_field(Vector<double> &         field,
                                const std::string &      name,
                                const std::vector<bool> &do_not_change)
 {
-  const double t = temperature_solver.get_time();
-
   Vector<double> df(field.size());
 
   if (use_advection())
