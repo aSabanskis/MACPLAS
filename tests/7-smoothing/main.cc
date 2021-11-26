@@ -51,6 +51,11 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     Patterns::Double(),
                     "Relaxation factor for smoothing");
 
+  prm.declare_entry("Boundary relaxation factor",
+                    "0.5",
+                    Patterns::Double(),
+                    "Relaxation factor for smoothing at boundaries");
+
   if (use_default_prm)
     {
       std::ofstream of("problem.prm");
@@ -173,7 +178,8 @@ Problem<dim>::smooth()
   smoother.set_bc1(0);
   smoother.set_bc1(2);
 
-  smoother.calculate(prm.get_double("Relaxation factor"));
+  smoother.calculate(prm.get_double("Relaxation factor"),
+                     prm.get_double("Boundary relaxation factor"));
 
   for (unsigned int k = 0; k < n_f; ++k)
     {
