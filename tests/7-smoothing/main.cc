@@ -46,6 +46,11 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
     Patterns::Anything(),
     "Semicolon-separated functions for smoothing test");
 
+  prm.declare_entry("Relaxation factor",
+                    "0.5",
+                    Patterns::Double(),
+                    "Relaxation factor for smoothing");
+
   if (use_default_prm)
     {
       std::ofstream of("problem.prm");
@@ -167,7 +172,8 @@ Problem<dim>::smooth()
   smoother.attach_dof_handler(solver.get_dof_handler());
   smoother.set_bc1(0);
   smoother.set_bc1(2);
-  smoother.calculate();
+
+  smoother.calculate(prm.get_double("Relaxation factor"));
 
   for (unsigned int k = 0; k < n_f; ++k)
     {

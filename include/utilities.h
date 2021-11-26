@@ -531,7 +531,7 @@ public:
   /** Smooth all fields.
    */
   inline void
-  calculate(SmoothType st = Cell);
+  calculate(const double relax = 0.5, SmoothType st = Cell);
 
   /** Get field by name
    */
@@ -542,7 +542,7 @@ private:
   /** Smooth using cell-based method
    */
   inline void
-  smooth_cell();
+  smooth_cell(const double relax);
 
   /** All FE fields
    */
@@ -2143,17 +2143,17 @@ DoFFieldSmoother<dim>::attach_dof_handler(const DoFHandler<dim> &dof_handler)
 
 template <int dim>
 void
-DoFFieldSmoother<dim>::calculate(SmoothType st)
+DoFFieldSmoother<dim>::calculate(const double relax, SmoothType st)
 {
   if (st == SmoothType::Cell)
-    smooth_cell();
+    smooth_cell(relax);
   else
     Assert(st == SmoothType::None, ExcNotImplemented());
 }
 
 template <int dim>
 void
-DoFFieldSmoother<dim>::smooth_cell()
+DoFFieldSmoother<dim>::smooth_cell(const double relax)
 {
   const auto &fe = dh->get_fe();
 
@@ -2192,7 +2192,7 @@ DoFFieldSmoother<dim>::smooth_cell()
 
           for (unsigned int i = 0; i < dofs_per_cell; ++i)
             f_new[local_dof_indices[i]] +=
-              0.5 * (f_cell + f[local_dof_indices[i]]);
+              relax * f_cell + (1 - relax) * f[local_dof_indices[i]];
         }
     }
 
