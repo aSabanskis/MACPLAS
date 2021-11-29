@@ -32,7 +32,7 @@ params_default = {
     "Ta2": 900,
     "Ta_top": -274,
     "HTa": 30,
-    "dz_Ta": 1,
+    "dz_Ta": 20,
     "mr": 5,
     "R_crucible": 43,
     "H0_crucible": 13,
@@ -252,7 +252,7 @@ y = y * 1e-3
 deflection = interpolate.interp1d(x, y, fill_value="extrapolate")
 
 L_arr = np.linspace(0, L_max, int(L_max / 1e-3))
-R_arr = np.linspace(0, 1, 11)
+R_arr = np.linspace(0, 1, 101)
 with open("interface-shape.dat", "w") as f:
     f.write(f"{R_arr.size} {L_arr.size}\n")
     f.write(f"-1")  # dummy value
@@ -267,7 +267,7 @@ with open("interface-shape.dat", "w") as f:
         z0 = H_melt(L) - H_melt(L_0)
 
         for r in R_arr:
-            z = z0 + d * (r ** 2 - 1)
+            z = z0 - d * (r ** 2 - 1)
             f.write(f" {z:g}")
         f.write("\n")
 
