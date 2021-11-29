@@ -1282,8 +1282,10 @@ Problem<dim>::output_results(const bool data,
       temperature_solver.output_vtk();
       if (has_dislocation)
         dislocation_solver.output_vtk();
+#ifdef DEBUG
       if (use_advection())
         advection_solver.output_vtk();
+#endif
     }
 
   // Exports values at all the boundaries in 2D.
