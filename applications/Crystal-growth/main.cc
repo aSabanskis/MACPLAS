@@ -624,15 +624,30 @@ Problem<dim>::deform_grid()
 
   for (const auto &it : points_surface)
     {
-      const auto dp = dp_triple * (p_axis_2 - it.second)[dim - 1] /
+      const Point<dim> &p_prev = it.second;
+
+      const auto dp = dp_triple * (p_axis_2 - p_prev)[dim - 1] /
                       (p_axis_2 - p_triple)[dim - 1];
 
-      const auto p = it.second + dp;
+      const auto p = p_prev + dp;
 
-      points_new[it.first] = surface_projector.project(p);
+      // estimate the slope
+      const auto p1 = surface_projector.project(p_prev);
+      const auto p2 = surface_projector.project(p);
+
+      const double a      = std::atan2((p2 - p1)[dim - 1], (p2 - p1)[0]);
+      const double tan_a  = std::tan(a);
+      auto         dp_new = dp;
+
+      // calculate new radial shift according to the slope
+      dp_new[0] = tan_a == 0 ? 0 : dp[dim - 1] / tan_a;
+
+      const auto p_new = p_prev + dp_new;
+
+      points_new[it.first] = surface_projector.project(p_new);
 
 #ifdef DEBUG
-      out << it.second << ' ' << p << ' ' << points_new[it.first] << '\n';
+      out << p_prev << ' ' << p << ' ' << points_new[it.first] << '\n';
 #endif
     }
 
