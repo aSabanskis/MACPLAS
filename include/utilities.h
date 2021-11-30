@@ -678,6 +678,22 @@ initialize_function(std::unique_ptr<Function<1>> &f,
           data.push_back(y);
         }
 
+      if (points.empty())
+        {
+          std::cout << expression << " contains no data\n";
+        }
+      else
+        {
+          std::cout << expression << " contains " << points.size()
+                    << " datapoints\n";
+
+          std::cout << expression << " f(" << points.front()
+                    << ")=" << data.front() << '\n';
+          if (points.size() > 1)
+            std::cout << expression << " f(" << points.back()
+                      << ")=" << data.back() << '\n';
+        }
+
       using F = Functions::InterpolatedTensorProductGridData<1>;
 
       const unsigned int n = points.size();
@@ -743,6 +759,21 @@ initialize_function(std::unique_ptr<Function<2>> &f,
             {
               infile >> data[i][j];
             }
+        }
+
+      if (points[0].empty())
+        {
+          std::cout << expression << " contains no data\n";
+        }
+      else
+        {
+          std::cout << expression << " contains " << points[0].size() << " x "
+                    << points[1].size() << " datapoints\n";
+
+          std::cout << expression << " points[0]=" << points[0].front()
+                    << " .. " << points[0].back() << '\n';
+          std::cout << expression << " points[1]=" << points[1].front()
+                    << " .. " << points[1].back() << '\n';
         }
 
       using F = Functions::InterpolatedTensorProductGridData<2>;
