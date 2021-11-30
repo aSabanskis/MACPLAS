@@ -271,6 +271,24 @@ with open("interface-shape.dat", "w") as f:
             f.write(f" {z:g}")
         f.write("\n")
 
+fig = plt.figure(figsize=(6, 6))
+Z = L_arr + H_melt(L_arr[-1]) - H_melt(0)
+z_top = Z[-1]
+print(f"z={Z[0]*1e3:g}..{Z[-1]*1e3:g} m")
+for L in L_arr:
+    d = deflection(L)
+    r = R(L) * R_arr
+    z = z_top - L - d * (R_arr ** 2 - 1)
+    plt.plot(r * 1e3, z * 1e3, "-", c="#cccccc")
+    plt.plot(-r * 1e3, z * 1e3, "-", c="#cccccc")
+plt.plot(R(L_max - L_arr) * 1e3, Z * 1e3, "-")
+plt.plot(-R(L_max - L_arr) * 1e3, Z * 1e3, "-")
+plt.grid(True)
+plt.gca().set_aspect("equal")
+plt.xlabel("r, mm")
+plt.ylabel("z, mm")
+plt.savefig("crystal.png", dpi=150, bbox_inches="tight")
+
 # SUMMARY
 s = ""
 for key, val in params.items():
