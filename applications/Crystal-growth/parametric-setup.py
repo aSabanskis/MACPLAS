@@ -32,7 +32,7 @@ params_default = {
     "Ta2": 900,
     "Ta_top": -274,
     "HTa": 30,
-    "dz_Ta": 20,
+    "dz_Ta": 10,
     "mr": 5,
     "R_crucible": 43,
     "H0_crucible": 13,
@@ -91,8 +91,10 @@ x = x * 1e-3
 y = y * 1e-3
 L_total = x[-1]
 L_0 = x[1]
+R_max = y.max()
 print(f"L_total={L_total*1e3:g} mm")
 print(f"L_0={L_0*1e3:g} mm")
+print(f"R_max={R_max*1e3:g} mm")
 np.savetxt("crystal-shape.dat", np.c_[x, y], fmt="%g")
 R = interpolate.interp1d(x, y, fill_value="extrapolate")
 # save for later use
@@ -203,8 +205,8 @@ plt.savefig("melt-height.png", dpi=150, bbox_inches="tight")
 zT = H_crucible + params.get("HTa") * 1e-3 - h_melt
 Ta1 = params.get("Ta1") + 273
 Ta2 = params.get("Ta2") + 273
-dz = params.get("dz_Ta") * 1e-3 / 2
-Tamb = f"{Ta2:g} + ({Ta1:g}-{Ta2:g})/(1+exp(-(z-{zT:g})/{dz:g}))"
+dz_T = params.get("dz_Ta") * 1e-3 / 2
+Tamb = f"{Ta2:g} + ({Ta1:g}-{Ta2:g})/(1+exp(-(z-{zT:g})/{dz_T:g}))"
 Tamb_top = params.get("Ta_top") + 273
 print(f"Tamb={Tamb} K")
 print(f"Tamb_top={Tamb_top} K")
@@ -273,6 +275,7 @@ with open("interface-shape.dat", "w") as f:
 
 fig = plt.figure(figsize=(6, 6))
 Z = L_arr + H_melt(L_arr[-1]) - H_melt(0)
+z_bot = Z[0]
 z_top = Z[-1]
 print(f"z={Z[0]*1e3:g}..{Z[-1]*1e3:g} m")
 for L in L_arr:
@@ -283,6 +286,11 @@ for L in L_arr:
     plt.plot(-r * 1e3, z * 1e3, "-", c="#cccccc")
 plt.plot(R(L_max - L_arr) * 1e3, Z * 1e3, "-")
 plt.plot(-R(L_max - L_arr) * 1e3, Z * 1e3, "-")
+# ambient temperature
+x = Ta2 + (Ta1 - Ta2) / (1 + np.exp(-(Z - zT) / dz_T)) - (Ta1 + Ta2) / 2
+scale = 0.8 * R_max * 1e3 / x.max()
+plt.plot(x * scale, Z * 1e3, "-")
+
 plt.grid(True)
 plt.gca().set_aspect("equal")
 plt.xlabel("r, mm")
