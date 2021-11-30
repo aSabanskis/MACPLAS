@@ -861,7 +861,7 @@ DislocationSolver<dim>::solve(const bool stress_only)
       get_dislocation_density() = N_m;
       ss.get_displacement()     = displacement;
       ss.get_strain_c()         = strain_c;
-      write_data(N_m, "dislocation_density" + output_name_suffix());
+      output_mesh();
       return false;
     }
 
