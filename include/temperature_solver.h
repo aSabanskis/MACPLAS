@@ -971,7 +971,9 @@ TemperatureSolver<dim>::get_field_at_points(
     }
   catch (std::exception &e)
     {
+#ifdef DEBUG
       std::cout << e.what() << "\n";
+#endif
 
       for (unsigned int i = 0; i < points.size(); ++i)
         {
