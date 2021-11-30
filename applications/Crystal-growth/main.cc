@@ -647,7 +647,8 @@ Problem<dim>::deform_grid()
       auto         dp_new = dp;
 
       // calculate new radial shift according to the slope
-      dp_new[0] = tan_a == 0 ? 0 : dp[dim - 1] / tan_a;
+      if (std::abs(tan_a) > 1e-6)
+        dp_new[0] = dp[dim - 1] / tan_a;
 
       const auto p_new = p_prev + dp_new;
 
