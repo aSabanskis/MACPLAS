@@ -21,7 +21,7 @@ public:
   Problem(const unsigned int order = 2, const bool use_default_prm = false);
 
   void
-  run();
+  run(const bool dry_run);
 
 private:
   void
@@ -48,7 +48,7 @@ private:
   initialize_temperature();
 
   void
-  initialize_dislocation();
+  initialize_dislocation(const bool dry_run = false);
 
   void
   set_temperature_BC();
@@ -377,12 +377,19 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
 
 template <int dim>
 void
-Problem<dim>::run()
+Problem<dim>::run(const bool dry_run)
 {
   // initialize the mesh, all fields (steady T) and output the results at t=0
   make_grid();
 
   initialize_temperature();
+
+  if (dry_run)
+    {
+      if (with_dislocation())
+        initialize_dislocation(dry_run);
+      return;
+    }
 
   calculate_dof_distance();
 
@@ -1004,7 +1011,7 @@ Problem<dim>::initialize_temperature()
 
 template <int dim>
 void
-Problem<dim>::initialize_dislocation()
+Problem<dim>::initialize_dislocation(const bool dry_run)
 {
   // initialize dislocations and stresses
   dislocation_solver.initialize();
@@ -1016,6 +1023,9 @@ Problem<dim>::initialize_dislocation()
   dislocation_solver.add_output("shift_relative");
 
   dislocation_solver.output_parameter_table();
+
+  if (dry_run)
+    return;
 
   if (dim == 2)
     dislocation_solver.get_stress_solver().set_bc1(boundary_id_axis, 0, 0);
@@ -1451,6 +1461,7 @@ main(int argc, char *argv[])
   const std::vector<std::string> arguments(argv, argv + argc);
 
   bool init      = false;
+  bool dry_run   = false;
   int  order     = 2;
   int  dimension = 2;
 
@@ -1458,6 +1469,8 @@ main(int argc, char *argv[])
     {
       if (arguments[i] == "init" || arguments[i] == "use_default_prm")
         init = true;
+      if (arguments[i] == "dry-run" || arguments[i] == "dry_run")
+        dry_run = true;
       if (arguments[i] == "order" && i + 1 < arguments.size())
         order = std::stoi(arguments[i + 1]);
     }
@@ -1469,7 +1482,7 @@ main(int argc, char *argv[])
     {
       Problem<2> p2d(order, init);
       if (!init)
-        p2d.run();
+        p2d.run(dry_run);
     }
   else
     {
