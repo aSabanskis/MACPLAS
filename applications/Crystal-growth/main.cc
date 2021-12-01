@@ -506,6 +506,8 @@ Problem<dim>::make_grid()
   const double R0 = crystal_radius->value(Point<1>(L));
   const double R  = points_surface.at(point_id_triple)[0];
 
+  std::cout << "Initial R = " << R << " m, L = " << L << " m\n";
+
   AssertThrow(std::fabs(R - R0) < 1e-4,
               ExcMessage("The actual radius R = " + std::to_string(R) +
                          " m differs from the expected R0 = " +
@@ -561,6 +563,11 @@ Problem<dim>::deform_grid()
   const double R  = p_triple[0];
   const double R0 = crystal_radius->value(Point<1>(L + dL)); // at the end
 
+  std::cout << "t = " << t + dt << " s, R_old = " << R << " m, L_old = " << L
+            << " m, V = " << V << " m/s\n"
+            << "t = " << t + dt << " s, R_new = " << R0
+            << " m, L_new = " << L + dL << " m\n";
+
   temperature_solver.add_output("L[m]", L + dL);
   temperature_solver.add_output("R[m]", R0);
   temperature_solver.add_output("V[m/s]", V);
@@ -589,8 +596,7 @@ Problem<dim>::deform_grid()
   const auto dp_triple = calc_interface_displacement(p_triple);
 
 #ifdef DEBUG
-  std::cout << '\n'
-            << "p_axis = " << p_axis_1 << " dp_axis = " << dp_axis << '\n'
+  std::cout << "p_axis = " << p_axis_1 << " dp_axis = " << dp_axis << '\n'
             << "p_triple = " << p_triple << " dp_triple = " << dp_triple
             << '\n';
 #endif
