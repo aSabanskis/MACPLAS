@@ -557,16 +557,33 @@ Problem<dim>::deform_grid()
   Point<dim> dz;
   dz[dim - 1] = V * dt;
 
+  const double R = p_triple[0];
   const double L = (p_axis_2 - p_triple)[dim - 1];
-  const double dL =
-    V * dt + p_triple[dim - 1] - interface_shape->value(Point<2>(1, L + dL));
-  const double R  = p_triple[0];
+
+  // Calculate the length change. This is tricky since the melt level also
+  // changes, therefore an iterative procedure is used:
+  const double dL0 = V * dt;
+  double       dL  = dL0;
+  double       dL2 = dL0;
+  unsigned int i_L = 0;
+  do
+    {
+      dL2 = dL;
+      dL =
+        dL0 + p_triple[dim - 1] - interface_shape->value(Point<2>(1, L + dL));
+      ++i_L;
+
+#ifdef DEBUG
+      std::cout << "L=" << L << " dL=" << dL << " ddL=" << dL - dL2 << '\n';
+#endif
+  } while (std::abs(dL - dL2) > std::min(1e-10, 1e-8 * L));
+
   const double R0 = crystal_radius->value(Point<1>(L + dL)); // at the end
 
   std::cout << "t = " << t + dt << " s, R_old = " << R << " m, L_old = " << L
             << " m, V = " << V << " m/s\n"
             << "t = " << t + dt << " s, R_new = " << R0
-            << " m, L_new = " << L + dL << " m\n";
+            << " m, L_new = " << L + dL << " m (" << i_L << " iterations)\n";
 
   temperature_solver.add_output("L[m]", L + dL);
   temperature_solver.add_output("R[m]", R0);
