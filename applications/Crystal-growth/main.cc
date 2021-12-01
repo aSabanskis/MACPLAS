@@ -278,12 +278,12 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
 
   prm.declare_entry("Probe coordinates x",
                     "0, 0.01",
-                    Patterns::List(Patterns::Double(), 1),
+                    Patterns::List(Patterns::Double(), 0),
                     "Comma-separated radial coordinates");
 
   prm.declare_entry("Probe coordinates z",
                     "0.002, 0.002",
-                    Patterns::List(Patterns::Double(), 1),
+                    Patterns::List(Patterns::Double(), 0),
                     "Comma-separated vertical coordinates");
 
   prm.declare_entry("Custom probes x relative to crystal top",
