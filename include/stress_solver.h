@@ -599,6 +599,11 @@ StressSolver<dim>::StressSolver(const unsigned int order,
                       "true",
                       Patterns::Bool(),
                       "Report final achieved convergence of linear solver");
+
+    prm.declare_entry("Number of cell quadrature points",
+                      "0",
+                      Patterns::Integer(0),
+                      "Number of QGauss<dim> quadrature points (0: order+1)");
   }
   prm.leave_subsection();
 
@@ -729,6 +734,11 @@ StressSolver<dim>::initialize_parameters()
 
   if (prm.get_integer("Number of cell quadrature points") == 0)
     prm.set("Number of cell quadrature points", n_q_default);
+
+  prm.enter_subsection("Stress recovery");
+  if (prm.get_integer("Number of cell quadrature points") == 0)
+    prm.set("Number of cell quadrature points", n_q_default);
+  prm.leave_subsection();
 
   const long int n_vtk_default = get_degree();
 
@@ -1482,8 +1492,10 @@ template <int dim>
 void
 StressSolver<dim>::recover_strain_extrapolation()
 {
+  prm.enter_subsection("Stress recovery");
   const QGauss<dim> quadrature(
     prm.get_integer("Number of cell quadrature points"));
+  prm.leave_subsection();
 
   FEValues<dim> fe_values_temp(fe_temp, quadrature, update_default);
   FEValues<dim> fe_values(fe,
@@ -1581,8 +1593,10 @@ template <int dim>
 void
 StressSolver<dim>::recover_strain_global()
 {
+  prm.enter_subsection("Stress recovery");
   const QGauss<dim> quadrature(
     prm.get_integer("Number of cell quadrature points"));
+  prm.leave_subsection();
 
   FEValues<dim> fe_values_temp(fe_temp, quadrature, update_values);
   FEValues<dim> fe_values(fe,
