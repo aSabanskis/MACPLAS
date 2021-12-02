@@ -229,6 +229,12 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
     "Do not interpolate fields on the crystallization interface");
 
   prm.declare_entry(
+    "Reset interface fields",
+    "false",
+    Patterns::Bool(),
+    "Use initial value for dislocation density and plastic strain on the crystallization interface");
+
+  prm.declare_entry(
     "Max relative shift",
     "0",
     Patterns::Double(0),
@@ -928,6 +934,24 @@ Problem<dim>::update_fields()
 
           update_one_field(e, "e_c_" + std::to_string(j), interface_dofs);
         }
+
+      if (prm.get_bool("Reset interface fields"))
+        {
+          std::vector<bool> mask(N_m.size());
+          DoFTools::extract_boundary_dofs(temperature_solver.get_dof_handler(),
+                                          ComponentMask(),
+                                          mask,
+                                          {static_cast<types::boundary_id>(
+                                            boundary_id_interface)});
+
+          for (unsigned int i = 0; i < n; ++i)
+            if (mask[i])
+              {
+                N_m[i] = N0;
+                for (unsigned int j = 0; j < e_c.n_blocks(); ++j)
+                  e_c.block(j)[i] = 0;
+              }
+        }
     }
 }
 
@@ -1041,6 +1065,7 @@ Problem<dim>::initialize_dislocation(const bool dry_run)
   dislocation_solver.initialize();
   dislocation_solver.get_temperature() = temperature_solver.get_temperature();
 
+  // homogeneous field
   N0 = dislocation_solver.get_dislocation_density()[0];
 
   dislocation_solver.add_output("V[m/s]", pull_rate->value(Point<1>()));

@@ -27,6 +27,7 @@ sed -Ei "s|(set Field change relaxation factor at boundary *= *).*|\1 0|" proble
 sed -Ei "s|(set Field relaxation factor *= *).*|\1 0|" problem.prm
 sed -Ei "s|(set Field relaxation factor at boundary *= *).*|\1 0|" problem.prm
 sed -Ei "s|(set Fix interface fields *= *).*|\1 true|" problem.prm
+sed -Ei "s|(set Reset interface fields *= *).*|\1 false|" problem.prm
 sed -Ei "s|(set Interpolation method *= *).*|\1 advection|" problem.prm
 sed -Ei "s|(set Stabilization multiplier *= *).*|\1 0|" advection.prm
 sed -Ei "s|(set Stabilization type *= *).*|\1 SUPG|" advection.prm
