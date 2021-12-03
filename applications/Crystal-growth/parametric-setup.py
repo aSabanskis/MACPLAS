@@ -12,7 +12,7 @@ from os.path import exists
 
 # DEFAULT PARAMETERS
 params_default = {
-    "L0": 8,
+    "L0": 3.10345,
     "r0": 2,
     "L1": 38,
     "r1": 24,
@@ -166,7 +166,7 @@ plt.savefig("crucible-shape.png", dpi=150, bbox_inches="tight")
 x = x * 1e-3
 y = y * 1e-3
 np.savetxt("crucible-shape.dat", np.c_[x, y], fmt="%g")
-H_crucible = y[-1]
+H_crucible = x[-1]
 print(f"H_crucible={H_crucible*1e3:g} mm")
 R_crucible = interpolate.interp1d(x, y, fill_value="extrapolate")
 
@@ -286,6 +286,11 @@ for L in L_arr:
     plt.plot(-r * 1e3, z * 1e3, "-", c="#cccccc")
 plt.plot(R(L_max - L_arr) * 1e3, Z * 1e3, "-")
 plt.plot(-R(L_max - L_arr) * 1e3, Z * 1e3, "-")
+# crucible
+z = np.array([0, H0, H0 + H1]) - H_melt(0) * 1e3
+r = np.array([0, Rc, Rc])
+plt.plot(r, z, "-")
+plt.plot(-r, z, "-")
 # ambient temperature
 x = Ta2 + (Ta1 - Ta2) / (1 + np.exp(-(Z - zT) / dz_T)) - (Ta1 + Ta2) / 2
 scale = 0.8 * R_max * 1e3 / x.max()
@@ -295,7 +300,7 @@ plt.grid(True)
 plt.gca().set_aspect("equal")
 plt.xlabel("r, mm")
 plt.ylabel("z, mm")
-plt.savefig("crystal.png", dpi=150, bbox_inches="tight")
+plt.savefig("system.png", dpi=150, bbox_inches="tight")
 
 # SUMMARY
 s = ""

@@ -25,7 +25,6 @@ sed -Ei "s|(set Temperature only *= *).*|\1 true|" problem.prm
 sed -Ei "s|(set Time step *= *).*|\1 1|" temperature.prm
 
 # sed -Ei "s|(Ta1 *= *).*|\1 300|" problem.ini
-sed -Ei "s|(L0 *= *).*|\1 3.10345|" problem.ini
 ./parametric-setup.py
 
 cp -- *.prm "$r"
