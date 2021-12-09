@@ -55,6 +55,7 @@ sed -Ei "s|(set Max v\*dt *= *).*|\1 5e-5|" dislocation.prm
 sed -Ei "s|(set Time substep *= *).*|\1 0|" dislocation.prm
 sed -Ei "s|(set Max time substeps *= *).*|\1 1|" dislocation.prm
 sed -Ei "s|(set Refresh stress for substeps *= *).*|\1 true|" dislocation.prm
+sed -Ei "s|(set Stress recalculation strategy *= *).*|\1 after|" dislocation.prm
 
 # sed -Ei "s|(Ta1 *= *).*|\1 300|" problem.ini
 ./parametric-setup.py

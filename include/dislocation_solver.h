@@ -475,6 +475,18 @@ private:
   void
   integrate_implicit();
 
+  /** Recalculate stress before time integration.
+   * Does nothing if \c after is specified in the parameters.
+   */
+  void
+  recalculate_stress_before();
+
+  /** Recalculate stress after time integration.
+   * Does nothing if \c before is specified in the parameters.
+   */
+  void
+  recalculate_stress_after();
+
   /** Check if DislocationSolver::solve and StressSolver::solve produced finite
    * values at all DOFs
    */
@@ -720,6 +732,11 @@ DislocationSolver<dim>::DislocationSolver(const unsigned int order,
                     "true",
                     Patterns::Bool(),
                     "Fast update of stress during time substeps");
+
+  prm.declare_entry("Stress recalculation strategy",
+                    "after",
+                    Patterns::Selection("after|before|always|both"),
+                    "Recalculate stress before or after integration, or both");
 
   prm.declare_entry(
     "Max relative time step increase",
@@ -2215,6 +2232,8 @@ DislocationSolver<dim>::integrate_Euler()
 
   add_output("substeps", n_sub);
 
+  recalculate_stress_before();
+
   for (unsigned int n = 0; n < n_sub; ++n)
     {
       for (unsigned int i = 0; i < N; ++i)
@@ -2232,7 +2251,7 @@ DislocationSolver<dim>::integrate_Euler()
         stress_solver.solve(true);
     }
 
-  stress_solver.solve();
+  recalculate_stress_after();
 }
 
 template <int dim>
@@ -2257,6 +2276,8 @@ DislocationSolver<dim>::integrate_midpoint()
   // save values at the beginning of time step
   Vector<double>      N_m_0       = N_m;
   BlockVector<double> epsilon_c_0 = epsilon_c;
+
+  recalculate_stress_before();
 
   // first, take a half step
   for (unsigned int i = 0; i < N; ++i)
@@ -2286,7 +2307,7 @@ DislocationSolver<dim>::integrate_midpoint()
       N_m[i] = N_m_0[i] + derivative_N_m(N_m[i], J_2[i], T[i]) * dt;
     }
 
-  stress_solver.solve();
+  recalculate_stress_after();
 }
 
 template <int dim>
@@ -2307,6 +2328,8 @@ DislocationSolver<dim>::integrate_linearized_N_m()
   const bool update_stress = prm.get_bool("Refresh stress for substeps");
 
   add_output("substeps", n_sub);
+
+  recalculate_stress_before();
 
   for (unsigned int n = 0; n < n_sub; ++n)
     {
@@ -2332,7 +2355,7 @@ DislocationSolver<dim>::integrate_linearized_N_m()
         stress_solver.solve(true);
     }
 
-  stress_solver.solve();
+  recalculate_stress_after();
 }
 
 template <int dim>
@@ -2357,6 +2380,8 @@ DislocationSolver<dim>::integrate_linearized_N_m_midpoint()
   // save values at the beginning of time step
   const Vector<double>      N_m_0       = N_m;
   const BlockVector<double> epsilon_c_0 = epsilon_c;
+
+  recalculate_stress_before();
 
   // first, take a half step
   for (unsigned int i = 0; i < N; ++i)
@@ -2394,7 +2419,7 @@ DislocationSolver<dim>::integrate_linearized_N_m_midpoint()
       N_m[i] = N_m_0[i] + dx_analytical(a, b, dt);
     }
 
-  stress_solver.solve();
+  recalculate_stress_after();
 }
 
 template <int dim>
@@ -2419,6 +2444,8 @@ DislocationSolver<dim>::integrate_implicit()
   // save values at the beginning of time step
   const Vector<double>      N_m_0       = N_m;
   const BlockVector<double> epsilon_c_0 = epsilon_c;
+
+  recalculate_stress_before();
 
   // get number of fixed-point iterations
   const std::vector<std::string> tmp =
@@ -2447,6 +2474,22 @@ DislocationSolver<dim>::integrate_implicit()
 
       stress_solver.solve();
     }
+}
+
+template <int dim>
+void
+DislocationSolver<dim>::recalculate_stress_before()
+{
+  if (prm.get("Stress recalculation strategy") != "after")
+    stress_solver.solve();
+}
+
+template <int dim>
+void
+DislocationSolver<dim>::recalculate_stress_after()
+{
+  if (prm.get("Stress recalculation strategy") != "before")
+    stress_solver.solve();
 }
 
 template <int dim>
