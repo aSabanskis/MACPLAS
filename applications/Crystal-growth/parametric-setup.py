@@ -293,7 +293,10 @@ plt.plot(r, z, "-")
 plt.plot(-r, z, "-")
 # ambient temperature
 x = Ta2 + (Ta1 - Ta2) / (1 + np.exp(-(Z - zT) / dz_T)) - (Ta1 + Ta2) / 2
-scale = 0.8 * R_max * 1e3 / x.max()
+if x.max() > 0:
+    scale = 0.8 * R_max * 1e3 / x.max()
+else:
+    scale = 1
 plt.plot(x * scale, Z * 1e3, "-")
 
 plt.grid(True)
