@@ -214,17 +214,16 @@ print(f"Tamb_top={Tamb_top} K")
 # MAX TIME, VELOCITY(L)
 t = 0
 dt = 2.0
-L = 0
+L = L_0
 z_top = L_0
 x = []
 y = []
 while L < L_max:
-    t += dt
-    dz = V(t) * dt
-    z_top += dz
-    L = z_top + (h_melt - H_melt(L))
     x.append(L * 1e3)
     y.append(V(t) * 1e3 * 60)
+    t += dt
+    z_top += V(t) * dt
+    L = z_top + (h_melt - H_melt(L))
 t_max = t
 print(f"t_max={t_max:g} s")
 
@@ -234,6 +233,12 @@ plt.grid(True)
 plt.xlabel("Length, mm")
 plt.ylabel("Pull rate, mm/min")
 plt.savefig("pull-rate-length.png", dpi=150, bbox_inches="tight")
+
+# convert to SI
+x = np.array(x) * 1e-3
+y = np.array(y) * 1e-3 / 60
+np.savetxt("pull-rate-length.dat", np.c_[x, y], fmt="%g")
+
 
 # INTERFACE SHAPE
 x = Length * 1e3
@@ -253,7 +258,8 @@ x = x * 1e-3
 y = y * 1e-3
 deflection = interpolate.interp1d(x, y, fill_value="extrapolate")
 
-L_arr = np.linspace(0, L_max, int(L_max / 1e-3))
+# simulations will start from L_0, not 0
+L_arr = np.linspace(L_0, L_max, int(L_max / 1e-3))
 R_arr = np.linspace(0, 1, 101)
 with open("interface-shape.dat", "w") as f:
     f.write(f"{R_arr.size} {L_arr.size}\n")
@@ -274,6 +280,7 @@ with open("interface-shape.dat", "w") as f:
         f.write("\n")
 
 fig = plt.figure(figsize=(6, 6))
+L_arr = np.linspace(0, L_max, int(L_max / 1e-3))
 Z = L_arr + H_melt(L_arr[-1]) - H_melt(0)
 z_bot = Z[0]
 z_top = Z[-1]
