@@ -75,8 +75,9 @@ x = np.array([params.get(f"L{x}") for x in range(4)])
 y = np.array([params.get(f"r{x}") for x in range(4)])
 if x[0] > 0:
     x = np.append([0], x)
-    y = np.append([y[0]], y)
+    y = np.append([0], y)
 x = np.cumsum(x)
+print("Slope=", np.diff(y) / np.diff(x))
 
 fig = plt.figure(figsize=(6, 4))
 plt.plot(x, y, "o-")
@@ -299,6 +300,9 @@ r = np.array([0, Rc, Rc])
 plt.plot(r, z, "-")
 plt.plot(-r, z, "-")
 # ambient temperature
+z1 = min(Z[0], z[0] * 1e-3)
+z2 = max(Z[-1], z[-1] * 1e-3)
+Z = np.linspace(z1, z2, int((z2 - z1) / 1e-3))
 x = Ta2 + (Ta1 - Ta2) / (1 + np.exp(-(Z - zT) / dz_T)) - (Ta1 + Ta2) / 2
 if x.max() > 0:
     scale = 0.8 * R_max * 1e3 / x.max()
