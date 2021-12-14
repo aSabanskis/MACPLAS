@@ -12,4 +12,4 @@ Command-line arguments:
 
 The default mode is 2D simulation using second-order finite elements.
 
-![Crystal shape at different times](results-crystal-shape.png)
+![Calculated temperature and dislocation density distributions at different times](results-T-N_m.png)
