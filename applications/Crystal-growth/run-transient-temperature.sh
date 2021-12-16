@@ -6,6 +6,7 @@ source ./helper.sh
 initialize # 2 2 0
 
 r=results-transient
+dt=1
 
 if [[ -f $r/$probes ]]
 then
@@ -21,8 +22,9 @@ cp parameters/* .
 
 setup_parameters
 
+sed -Ei "s|(set Output time step *= *).*|\1 300|" problem.prm
 sed -Ei "s|(set Temperature only *= *).*|\1 true|" problem.prm
-sed -Ei "s|(set Time step *= *).*|\1 1|" temperature.prm
+sed -Ei "s|(set Time step *= *).*|\1 $dt|" temperature.prm
 
 # sed -Ei "s|(Ta1 *= *).*|\1 300|" problem.ini
 ./parametric-setup.py

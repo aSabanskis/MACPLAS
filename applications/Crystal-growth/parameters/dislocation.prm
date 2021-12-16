@@ -25,6 +25,6 @@ set Strain hardening factor         = 0
 set Time scheme                     = Linearized N_m
 set Time step                       = 1
 set Time substep                    = 0
-set Max time substeps               = 0
+set Max time substeps               = 1
 set Refresh stress for substeps     = true
 set Stress recalculation strategy   = after
