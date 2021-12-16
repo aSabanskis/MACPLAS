@@ -17,7 +17,8 @@ set Elastic constant C_44            = 5.2e10 - 5.4e6*T
 set Log convergence full             = false
 set Log convergence final            = false
 subsection Stress recovery
-  set Method                    = extrapolation # global
+  set Method                    = global # extrapolation
+  set Number of cell quadrature points = 0
   set Linear solver iterations  = 1000
   set Linear solver tolerance   = 1e-12
   set Linear solver type        = minres

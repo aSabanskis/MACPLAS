@@ -27,6 +27,8 @@ sed -Ei "s|(set Time step *= *).*|\1 1|" temperature.prm
 # sed -Ei "s|(Ta1 *= *).*|\1 300|" problem.ini
 ./parametric-setup.py
 
+./create-mesh.sh
+
 cp -- *.prm "$r"
 
 ./macplas-crystal-growth "$dim"d order "$order" > $r/log

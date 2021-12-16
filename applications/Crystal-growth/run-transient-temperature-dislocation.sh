@@ -6,7 +6,7 @@ source ./helper.sh
 initialize # 2 2 0
 
 r=results-transient
-dt=0.1
+dt=0.2
 
 if [[ -f $r/$probes ]]
 then
@@ -57,8 +57,12 @@ sed -Ei "s|(set Max time substeps *= *).*|\1 1|" dislocation.prm
 sed -Ei "s|(set Refresh stress for substeps *= *).*|\1 true|" dislocation.prm
 sed -Ei "s|(set Stress recalculation strategy *= *).*|\1 after|" dislocation.prm
 
+sed -Ei "s|(set Method *= *).*|\1 global|" stress.prm
+
 # sed -Ei "s|(Ta1 *= *).*|\1 300|" problem.ini
 ./parametric-setup.py
+
+./create-mesh.sh
 
 cp -- *.prm "$r"
 
