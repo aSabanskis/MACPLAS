@@ -9,6 +9,7 @@ import numpy as np
 from scipy import interpolate
 import matplotlib.pyplot as plt
 from os.path import exists
+from sys import exit
 
 # DEFAULT PARAMETERS
 params_default = {
@@ -336,9 +337,13 @@ with open("problem-generated.prm", "w") as f:
     f.write(f"set Ambient temperature top = {Tamb_top}\n")
     f.write(f"set Max time = {t_max:g}\n")
 
-lines = open("problem.prm").readlines()
+prm = "problem.prm"
+if not exists(prm):
+    print(f"{prm} not found, please add 'include problem-generated.prm' manually")
+    exit()
+lines = open(prm).readlines()
 include_found = False
-with open("problem.prm", "w") as f:
+with open(prm, "w") as f:
     for line in lines:
         f.write(line)
         if line.startswith("include "):
