@@ -13,14 +13,14 @@ from sys import exit
 
 # DEFAULT PARAMETERS
 params_default = {
-    "L0": 3.10345,
+    "L0": 2.45854,
     "r0": 2,
-    "L1": 38,
-    "r1": 24,
-    "L2": 70,
-    "r2": 21,
-    "L3": 23,
-    "r3": 12,
+    "L1": 28,
+    "r1": 22.5,
+    "L2": 60,
+    "r2": 20,
+    "L3": 29,
+    "r3": 11,
     "d1": 0,
     "d2": 0,
     "v0": 0,
@@ -34,7 +34,7 @@ params_default = {
     "Ta_top": -274,
     "HTa": 30,
     "dz_Ta": 20,
-    "mr": 5,
+    "mr": 1,
     "R_crucible": 43,
     "H0_crucible": 13,
     "H1_crucible": 58,
@@ -98,7 +98,7 @@ print(f"L_total={L_total*1e3:g} mm")
 print(f"L_0={L_0*1e3:g} mm")
 print(f"R_max={R_max*1e3:g} mm")
 np.savetxt("crystal-shape.dat", np.c_[x, y], fmt="%g")
-R = interpolate.interp1d(x, y, fill_value="extrapolate")
+R = interpolate.interp1d(x, y, fill_value=(y[0], y[-1]), bounds_error=False)
 # save for later use
 Length = x
 
@@ -122,7 +122,7 @@ plt.savefig("pull-rate.png", dpi=150, bbox_inches="tight")
 x = x * 60
 y = y * 1e-3 / 60
 np.savetxt("pull-rate.dat", np.c_[x, y], fmt="%g")
-V = interpolate.interp1d(x, y, fill_value="extrapolate")
+V = interpolate.interp1d(x, y, fill_value=(y[0], y[-1]), bounds_error=False)
 
 
 # MASS
@@ -170,7 +170,7 @@ y = y * 1e-3
 np.savetxt("crucible-shape.dat", np.c_[x, y], fmt="%g")
 H_crucible = x[-1]
 print(f"H_crucible={H_crucible*1e3:g} mm")
-R_crucible = interpolate.interp1d(x, y, fill_value="extrapolate")
+R_crucible = interpolate.interp1d(x, y, fill_value=(y[0], y[-1]), bounds_error=False)
 
 # MELT LEVEL
 rho_m = params.get("rho_m")
@@ -194,11 +194,13 @@ for L in L_arr:
     h -= dh
     h_arr = np.append(h_arr, [h])
 
-np.savetxt("melt-height.dat", np.c_[L_arr, h_arr], fmt="%g")
-H_melt = interpolate.interp1d(L_arr, h_arr, fill_value="extrapolate")
+x = L_arr
+y = h_arr
+np.savetxt("melt-height.dat", np.c_[x, y], fmt="%g")
+H_melt = interpolate.interp1d(x, y, fill_value=(y[0], y[-1]), bounds_error=False)
 
 fig = plt.figure(figsize=(6, 4))
-plt.plot(L_arr * 1e3, h_arr * 1e3, "-")
+plt.plot(x * 1e3, y * 1e3, "-")
 plt.grid(True)
 plt.xlabel("Length, mm")
 plt.ylabel("Melt height, mm")
@@ -258,7 +260,7 @@ plt.savefig("deflection.png", dpi=150, bbox_inches="tight")
 # convert to SI
 x = x * 1e-3
 y = y * 1e-3
-deflection = interpolate.interp1d(x, y, fill_value="extrapolate")
+deflection = interpolate.interp1d(x, y, fill_value=(y[0], y[-1]), bounds_error=False)
 
 # simulations will start from L_0, not 0
 L_arr = np.linspace(L_0, L_max, int(L_max / 1e-3))
