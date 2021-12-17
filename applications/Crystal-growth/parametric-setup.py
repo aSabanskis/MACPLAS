@@ -104,25 +104,27 @@ Length = x
 
 
 # PULL RATE
-# If v2 != v1 then t2 should be modified (manually) to match the crystal end.
-x = np.array([params.get(f"t{x}") for x in range(3)])
-y = np.array([params.get(f"v{x}") for x in range(3)])
-if x[0] > 0:
-    x = np.append([0], x)
-    y = np.append([0], y)
+# If v2 != v1 then t2 should be modified to match the crystal end, this is done by an external loop.
+def create_V():
+    x = np.array([params.get(f"t{x}") for x in range(3)])
+    y = np.array([params.get(f"v{x}") for x in range(3)])
+    if x[0] > 0:
+        x = np.append([0], x)
+        y = np.append([0], y)
 
-fig = plt.figure(figsize=(6, 4))
-plt.plot(x, y, "o-")
-plt.grid(True)
-plt.xlabel("Time, min")
-plt.ylabel("Pull rate, mm/min")
-plt.savefig("pull-rate.png", dpi=150, bbox_inches="tight")
+    fig = plt.figure(figsize=(6, 4))
+    plt.plot(x, y, "o-")
+    plt.grid(True)
+    plt.xlabel("Time, min")
+    plt.ylabel("Pull rate, mm/min")
+    plt.savefig("pull-rate.png", dpi=150, bbox_inches="tight")
 
-# convert to SI
-x = x * 60
-y = y * 1e-3 / 60
-np.savetxt("pull-rate.dat", np.c_[x, y], fmt="%g")
-V = interpolate.interp1d(x, y, fill_value=(y[0], y[-1]), bounds_error=False)
+    # convert to SI
+    x = x * 60
+    y = y * 1e-3 / 60
+    np.savetxt("pull-rate.dat", np.c_[x, y], fmt="%g")
+    V = interpolate.interp1d(x, y, fill_value=(y[0], y[-1]), bounds_error=False)
+    return V
 
 
 # MASS
@@ -205,33 +207,40 @@ print(f"Tamb={Tamb} K")
 print(f"Tamb_top={Tamb_top} K")
 
 # MAX TIME, VELOCITY(L)
-t = 0
 dt = 2.0
-L = L_0
-z_top = L_0
-x = []
-y = []
-while L < L_max:
-    x.append(L * 1e3)
-    y.append(V(t) * 1e3 * 60)
-    t += dt
-    z_top += V(t) * dt
-    L = z_top + (h_melt - H_melt(L))
-t_max = t
-print(f"t_max={t_max:g} s")
+t_max = params.get("t2") * 60
+print(f"t_max={t_max:g} s (initial)")
+while True:
+    t = 0
+    L = L_0
+    z_top = L_0
+    x = []
+    y = []
+    params["t2"] = t_max / 60
+    V = create_V()
+    while L < L_max:
+        x.append(L * 1e3)
+        y.append(V(t) * 1e3 * 60)
+        t += dt
+        z_top += V(t) * dt
+        L = z_top + (h_melt - H_melt(L))
+    t_change = t - t_max
+    t_max = t
+    print(f"t_max={t_max:g} s, change={t_change} s")
 
-fig = plt.figure(figsize=(6, 4))
-plt.plot(x, y, "-")
-plt.grid(True)
-plt.xlabel("Length, mm")
-plt.ylabel("Pull rate, mm/min")
-plt.savefig("pull-rate-length.png", dpi=150, bbox_inches="tight")
+    fig = plt.figure(figsize=(6, 4))
+    plt.plot(x, y, "-")
+    plt.grid(True)
+    plt.xlabel("Length, mm")
+    plt.ylabel("Pull rate, mm/min")
+    plt.savefig("pull-rate-length.png", dpi=150, bbox_inches="tight")
 
-# convert to SI
-x = np.array(x) * 1e-3
-y = np.array(y) * 1e-3 / 60
-np.savetxt("pull-rate-length.dat", np.c_[x, y], fmt="%g")
-
+    # convert to SI
+    x = np.array(x) * 1e-3
+    y = np.array(y) * 1e-3 / 60
+    np.savetxt("pull-rate-length.dat", np.c_[x, y], fmt="%g")
+    if abs(t_change) < 1:
+        break
 
 # INTERFACE SHAPE
 x = Length * 1e3
