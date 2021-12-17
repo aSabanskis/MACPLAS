@@ -789,6 +789,7 @@ StressSolver<dim>::solve(const bool postprocess_only)
   try
     {
       solve_system();
+      calculate_stress();
     }
   catch (std::exception &e)
     {
@@ -801,7 +802,6 @@ StressSolver<dim>::solve(const bool postprocess_only)
       output_data();
       output_vtk();
     }
-  calculate_stress();
 }
 
 template <int dim>
