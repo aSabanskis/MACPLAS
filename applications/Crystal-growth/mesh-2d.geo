@@ -5,7 +5,7 @@ z0 = 0;
 z1 = 0.008;
 z2 = 0.008;
 
-slope = 0.73214286;
+slope = 0.58;
 If ( slope > 0 )
   R1 = 0.0002;
   z1 = z0 + (R0-R1)/slope;
@@ -14,12 +14,12 @@ EndIf
 
 Printf("z1 = %g mm", z1*1e3);
 
-nR = 31;
+nR = 36;
 nZ = 126;
 
-qR_bot = 1.04;
+qR_bot = 1.03;
 qR_top = 1.0;
-qZ = 0.3;
+qZ = 1.02;
 
 Point(1) = {0,  z0, 0};
 Point(2) = {R0, z0, 0};
@@ -42,7 +42,7 @@ Physical Surface(0) = {1};
 
 Transfinite Line {-1} = nR Using Progression qR_bot;
 Transfinite Line {3}  = nR Using Progression qR_top;
-Transfinite Line {2,-4} = nZ Using Bump qZ;
+Transfinite Line {2,-4} = nZ Using Progression qZ;
 Transfinite Surface "*";
 
 Recombine Surface "*";
