@@ -91,10 +91,10 @@ plt.savefig("crystal-shape.png", dpi=150, bbox_inches="tight")
 # convert to SI
 x = x * 1e-3
 y = y * 1e-3
-L_total = x[-1]
+L_max = x[-1]
 L_0 = x[1]
 R_max = y.max()
-print(f"L_total={L_total*1e3:g} mm")
+print(f"L_max={L_max*1e3:g} mm")
 print(f"L_0={L_0*1e3:g} mm")
 print(f"R_max={R_max*1e3:g} mm")
 np.savetxt("crystal-shape.dat", np.c_[x, y], fmt="%g")
@@ -126,28 +126,16 @@ V = interpolate.interp1d(x, y, fill_value=(y[0], y[-1]), bounds_error=False)
 
 
 # MASS
-m_total = 0
+m_crystal = 0
 rho_c = params.get("rho_c")
-L_arr, dL = np.linspace(0, L_total, int(L_total / 1e-4), retstep=True)
-for L in L_arr:
-    m_total += rho_c * dL * np.pi * R(L) ** 2
-print(f"m_total={m_total*1e3:g} g")
-
-# MAX LENGTH
-m_melt = m_total
+L_arr, dL = np.linspace(0, L_max, int(L_max / 1e-4), retstep=True)
+L_mid = (L_arr[1:] + L_arr[:-1]) / 2
+for L in L_mid:
+    m_crystal += rho_c * dL * np.pi * R(L) ** 2
 m_residual = params.get("mr") * 1e-3
-L = 0
-dL = 1e-4
-while True:
-    L += dL
-    dm = rho_c * dL * np.pi * R(L) ** 2
-    m_melt -= dm
-    if L >= L_total or m_melt <= m_residual:
-        break
-L_max = L
-m_crystal = m_total - m_melt
-print(f"L_max={L_max*1e3:g} mm")
+m_total = m_crystal + m_residual
 print(f"m_crystal={m_crystal*1e3:g} g")
+print(f"m_total={m_total*1e3:g} g")
 
 # CRUCIBLE SHAPE
 H0 = params.get("H0_crucible")
@@ -185,9 +173,10 @@ print(f"h_melt={h_melt*1e3:g} mm")
 
 m = m_total
 h = h_melt
-h_arr = []
+h_arr = [h]
 L_arr, dL = np.linspace(0, L_max, int(L_max / 1e-4), retstep=True)
-for L in L_arr:
+L_mid = (L_arr[1:] + L_arr[:-1]) / 2
+for L in L_mid:
     dm = rho_c * dL * np.pi * R(L) ** 2
     dh = dm / (rho_m * np.pi * R_crucible(h) ** 2)
     m -= dm
