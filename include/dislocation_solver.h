@@ -835,7 +835,11 @@ DislocationSolver<dim>::solve(const bool stress_only)
     }
 
   if (!stress_solver.has_converged())
-    return false;
+    {
+      std::cout << solver_name()
+                << "  Stress calculation diverged, stopping.\n";
+      return false;
+    }
 
   advance_time();
   const double dt    = get_time_step();
