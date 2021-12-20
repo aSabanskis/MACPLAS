@@ -23,6 +23,7 @@ params_default = {
     "r3": 11,
     "d1": 0,
     "d2": 0,
+    "d_function": "parabola",
     "v0": 0,
     "v1": 1,
     "v2": 1,
@@ -46,6 +47,7 @@ params = params_default.copy()
 # READ PARAMETERS
 filename = "problem.ini"
 comment_signs = (";", "#")
+string_keys = ("d_function",)
 
 if exists(filename):
     print(f"Reading {filename}")
@@ -59,7 +61,10 @@ if exists(filename):
 
         if len(k_v) == 2:
             key = k_v[0].strip()
-            val = float(k_v[1])
+            if key in string_keys:
+                val = k_v[1].strip()
+            else:
+                val = float(k_v[1])
 
             if key in params:
                 print(f"Setting {key} to {val}")
@@ -260,6 +265,17 @@ x = x * 1e-3
 y = y * 1e-3
 deflection = interpolate.interp1d(x, y, fill_value=(y[0], y[-1]), bounds_error=False)
 
+
+def d_function(r):
+    name = params.get("d_function")
+    if name == "parabola":
+        return 1 - r ** 2
+    elif name == "cos":
+        return (1 + np.cos(r * np.pi)) / 2
+    else:
+        raise ValueError(f"Deflection function '{name}' not supported")
+
+
 # simulations will start from L_0, not 0
 L_arr = np.linspace(L_0, L_max, int(L_max / 1e-3))
 R_arr = np.linspace(0, 1, 101)
@@ -277,7 +293,7 @@ with open("interface-shape.dat", "w") as f:
         z0 = H_melt(L) - H_melt(L_0)
 
         for r in R_arr:
-            z = z0 - d * (r ** 2 - 1)
+            z = z0 + d * d_function(r)
             f.write(f" {z:g}")
         f.write("\n")
 
@@ -290,7 +306,7 @@ print(f"z={Z[0]*1e3:g}..{Z[-1]*1e3:g} m")
 for L in L_arr:
     d = deflection(L)
     r = R(L) * R_arr
-    z = z_top - L - d * (R_arr ** 2 - 1)
+    z = z_top - L + d * d_function(R_arr)
     plt.plot(r * 1e3, z * 1e3, "-", c="#cccccc")
     plt.plot(-r * 1e3, z * 1e3, "-", c="#cccccc")
 plt.plot(R(L_max - L_arr) * 1e3, Z * 1e3, "-")
@@ -321,7 +337,10 @@ plt.savefig("system.png", dpi=150, bbox_inches="tight")
 s = ""
 for key, val in params.items():
     if params_default[key] != val:
-        s += f"-{key}_{val:g}"
+        if key in string_keys:
+            s += f"-{key}_{val}"
+        else:
+            s += f"-{key}_{val:g}"
 if s == "":
     print("Default parameters are used")
 else:

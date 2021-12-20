@@ -53,7 +53,8 @@ sed -Ei "s|(set Max v\*dt *= *).*|\1 5e-5|" dislocation.prm
 
 sed -Ei "s|(set Method *= *).*|\1 global|" stress.prm
 
-# sed -Ei "s|(Ta1 *= *).*|\1 300|" problem.ini
+# sed -Ei "s|(d1*= *).*|\1 0|" problem.ini
+# sed -Ei "s|(d_function*= *).*|\1 parabola|" problem.ini
 ./parametric-setup.py
 
 ./create-mesh.sh
