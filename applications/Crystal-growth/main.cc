@@ -814,6 +814,10 @@ Problem<dim>::calculate_field_gradients()
 
           temperature_solver.add_field("d" + name + "_d" + dims[k],
                                        grad_component);
+
+          if (with_dislocation() && name == "T")
+            dislocation_solver.add_field("d" + name + "_d" + dims[k],
+                                         grad_component);
         }
     }
 }
