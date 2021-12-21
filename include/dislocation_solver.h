@@ -1261,24 +1261,6 @@ DislocationSolver<dim>::output_vtk() const
     tau_crit[i] = calc_tau_crit(T[i]);
   data_out.add_data_vector(tau_crit, "tau_crit");
 
-  Vector<double> E(T.size());
-  for (unsigned int i = 0; i < T.size(); ++i)
-    E[i] = stress_solver.calc_E(T[i]);
-  data_out.add_data_vector(E, "E");
-
-  Vector<double> alpha(T.size());
-  for (unsigned int i = 0; i < T.size(); ++i)
-    alpha[i] = stress_solver.calc_alpha(T[i]);
-  data_out.add_data_vector(alpha, "alpha");
-
-  const BlockVector<double> &displacement = get_displacement();
-  for (unsigned int i = 0; i < displacement.n_blocks(); ++i)
-    {
-      const std::string name = "displacement_" + std::to_string(i);
-      if (isfinite(displacement.block(i)))
-        data_out.add_data_vector(displacement.block(i), name);
-    }
-
   const BlockVector<double> &stress = get_stress();
   for (unsigned int i = 0; i < stress.n_blocks(); ++i)
     {
@@ -1293,14 +1275,6 @@ DislocationSolver<dim>::output_vtk() const
       const std::string name = "stress_deviator_" + std::to_string(i);
       if (isfinite(stress_deviator.block(i)))
         data_out.add_data_vector(stress_deviator.block(i), name);
-    }
-
-  const BlockVector<double> &epsilon_e = get_strain_e();
-  for (unsigned int i = 0; i < epsilon_e.n_blocks(); ++i)
-    {
-      const std::string name = "epsilon_e_" + std::to_string(i);
-      if (isfinite(epsilon_e.block(i)))
-        data_out.add_data_vector(epsilon_e.block(i), name);
     }
 
   const BlockVector<double> &epsilon_c = get_strain_c();
