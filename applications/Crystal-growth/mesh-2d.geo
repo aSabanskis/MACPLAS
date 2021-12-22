@@ -15,9 +15,9 @@ EndIf
 Printf("z1 = %g mm", z1*1e3);
 
 nR = 36;
-nZ = 126;
+nZ = 151;
 
-qR_bot = 1.03;
+qR_bot = 1.04;
 qR_top = 1.0;
 qZ = 1.02;
 
