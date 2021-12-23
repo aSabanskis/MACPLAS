@@ -90,6 +90,9 @@ private:
   void
   postprocess();
 
+  bool
+  is_detached(const double t) const;
+
   // false if only the temperature field is calculated
   bool
   with_dislocation() const;
@@ -261,6 +264,12 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     "0",
                     Patterns::Double(0),
                     "Maximum time in seconds (0 - use solver parameters)");
+
+  prm.declare_entry(
+    "Detachment time",
+    "0",
+    Patterns::Double(0),
+    "Time in seconds at which the crystal is detached from melt (0 - disabled)");
 
   prm.declare_entry("Output time step",
                     "0",
@@ -1100,6 +1109,9 @@ template <int dim>
 double
 Problem<dim>::calc_V(const double t) const
 {
+  if (is_detached(t))
+    return 0;
+
   return pull_rate->value(Point<1>(t));
 }
 
@@ -1116,8 +1128,12 @@ Problem<dim>::set_temperature_BC()
 {
   const double T_0 = prm.get_double("Melting point");
   const double e   = prm.get_double("Emissivity");
+  const double t   = temperature_solver.get_time();
 
-  temperature_solver.set_bc1(boundary_id_interface, T_0);
+  if (is_detached(t))
+    temperature_solver.clear_bcs();
+  else
+    temperature_solver.set_bc1(boundary_id_interface, T_0);
 
   std::function<double(const double)> emissivity_const = [=](const double) {
     return e;
@@ -1155,6 +1171,29 @@ Problem<dim>::set_temperature_BC()
                                       q_in,
                                       emissivity_const,
                                       emissivity_deriv_const);
+
+  if (is_detached(t))
+    {
+      std::vector<bool> boundary_dofs2;
+      temperature_solver.get_boundary_points(boundary_id_interface,
+                                             points,
+                                             boundary_dofs2);
+      q_in = 0;
+      for (unsigned int i = 0; i < n; ++i)
+        {
+          if (!boundary_dofs2[i])
+            continue;
+
+          const double z = points[i][dim - 1];
+          const double T = ambient_temperature->value(Point<1>(z));
+
+          q_in[i] = sigma_SB * e * std::pow(T, 4);
+        }
+      temperature_solver.set_bc_rad_mixed(boundary_id_interface,
+                                          q_in,
+                                          emissivity_const,
+                                          emissivity_deriv_const);
+    }
 }
 
 template <int dim>
@@ -1512,6 +1551,14 @@ Problem<dim>::postprocess()
 
   if (use_advection())
     advection_solver.get_time() = temperature_solver.get_time();
+}
+
+template <int dim>
+bool
+Problem<dim>::is_detached(const double t) const
+{
+  const double t0 = prm.get_double("Detachment time");
+  return t0 > 0 && t >= t0;
 }
 
 template <int dim>

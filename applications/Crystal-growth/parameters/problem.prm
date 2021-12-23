@@ -7,6 +7,7 @@ set Crystal radius            = 0.002
 set Interface shape           = 0
 set Max temperature change    = 0.1
 set Max time                  = 0
+set Detachment time           = 0
 set Output time step          = 300
 set Probe coordinates x       = 0
 set Probe coordinates z       = 0.0001
