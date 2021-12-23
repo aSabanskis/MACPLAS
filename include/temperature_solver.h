@@ -249,6 +249,11 @@ public:
   double
   calc_V_z() const;
 
+  /** Clear all applied boundary conditions
+   */
+  void
+  clear_bcs();
+
   /** Set first-type boundary condition \f$T = \mathrm{val}\f$
    */
   void
@@ -1019,6 +1024,15 @@ TemperatureSolver<dim>::apply_bc1()
 
   for (const auto &bv : boundary_values)
     temperature[bv.first] = bv.second;
+}
+
+template <int dim>
+void
+TemperatureSolver<dim>::clear_bcs()
+{
+  bc1_data.clear();
+  bc_rad_mixed_data.clear();
+  bc_convective_data.clear();
 }
 
 template <int dim>
