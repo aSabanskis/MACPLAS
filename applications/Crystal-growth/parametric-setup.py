@@ -30,6 +30,7 @@ params_default = {
     "t0": 0,
     "t1": 30,
     "t2": 111,
+    "t_cool": 0,
     "Ta1": 800,
     "Ta2": 900,
     "Ta_top": -274,
@@ -247,6 +248,15 @@ while True:
     if abs(t_change) < 1:
         break
 
+t_cool = params.get("t_cool") * 60
+detach = t_cool > 0
+if detach:
+    t_grow = t_max
+    t_max += t_cool
+    print(f"t_grow={t_grow:g} s")
+    print(f"t_max={t_max:g} s")
+
+
 # INTERFACE SHAPE
 x = Length * 1e3
 y = np.array([params.get("d1"), params.get("d2"), 0])
@@ -355,6 +365,8 @@ with open("problem-generated.prm", "w") as f:
     f.write(f"set Ambient temperature = {Tamb}\n")
     f.write(f"set Ambient temperature top = {Tamb_top}\n")
     f.write(f"set Max time = {t_max:g}\n")
+    if detach:
+        f.write(f"set Detachment time = {t_grow:g}\n")
 
 prm = "problem.prm"
 if not exists(prm):
