@@ -50,6 +50,12 @@ private:
   void
   initialize_dislocation(const bool dry_run = false);
 
+  double
+  calc_V(const double t) const;
+
+  double
+  calc_R(const double L) const;
+
   void
   set_temperature_BC();
 
@@ -509,7 +515,7 @@ Problem<dim>::make_grid()
 
   const double L  = (points_surface.at(point_id_axis_z_max) -
                     points_surface.at(point_id_triple))[dim - 1];
-  const double R0 = crystal_radius->value(Point<1>(L));
+  const double R0 = calc_R(L);
   const double R  = points_surface.at(point_id_triple)[0];
 
   std::cout << "Initial R = " << R << " m, L = " << L << " m\n";
@@ -557,7 +563,7 @@ Problem<dim>::deform_grid()
 
   const double t  = temperature_solver.get_time();
   const double dt = temperature_solver.get_time_step();
-  const double V  = pull_rate->value(Point<1>(t + dt));
+  const double V  = calc_V(t + dt);
 
   // Vertical shift of the crystal due to the pull rate
   Point<dim> dz;
@@ -584,7 +590,7 @@ Problem<dim>::deform_grid()
 #endif
   } while (std::abs(dL - dL2) > std::min(1e-10, 1e-8 * L));
 
-  const double R0 = crystal_radius->value(Point<1>(L + dL)); // at the end
+  const double R0 = calc_R(L + dL); // at the end
 
   std::cout << "t = " << t + dt << " s, R_old = " << R << " m, L_old = " << L
             << " m, V = " << V << " m/s\n"
@@ -1041,7 +1047,7 @@ Problem<dim>::initialize_temperature()
   shift.resize(temperature.size());
   shift_relative.reinit(temperature.size());
 
-  temperature_solver.add_output("V[m/s]", pull_rate->value(Point<1>()));
+  temperature_solver.add_output("V[m/s]", calc_V(0));
   temperature_solver.add_output("shift_relative");
 
   // construct a field for testing
@@ -1072,7 +1078,7 @@ Problem<dim>::initialize_dislocation(const bool dry_run)
   // homogeneous field
   N0 = dislocation_solver.get_dislocation_density()[0];
 
-  dislocation_solver.add_output("V[m/s]", pull_rate->value(Point<1>()));
+  dislocation_solver.add_output("V[m/s]", calc_V(0));
   dislocation_solver.add_output("shift_relative");
 
   dislocation_solver.output_parameter_table();
@@ -1088,6 +1094,20 @@ Problem<dim>::initialize_dislocation(const bool dry_run)
   dislocation_solver.solve(true);
 
   previous_time_step = temperature_solver.get_time_step();
+}
+
+template <int dim>
+double
+Problem<dim>::calc_V(const double t) const
+{
+  return pull_rate->value(Point<1>(t));
+}
+
+template <int dim>
+double
+Problem<dim>::calc_R(const double L) const
+{
+  return crystal_radius->value(Point<1>(L));
 }
 
 template <int dim>
@@ -1145,7 +1165,7 @@ Problem<dim>::update_grid_time_step()
   const double dt = temperature_solver.get_time_step();
   const double dt_min =
     with_dislocation() ? dislocation_solver.get_time_step_min() : dt;
-  const double V = pull_rate->value(Point<1>(t));
+  const double V = calc_V(t);
 
   // simple approach based on previous shift and the current pull rate
   const double dL_V = V * dt;
@@ -1240,7 +1260,7 @@ Problem<dim>::solve_steady_temperature()
   temperature_solver.get_time_step() = 0;
 
   // set the pull rate
-  prm_T.set("Velocity", pull_rate->value(Point<1>()));
+  prm_T.set("Velocity", calc_V(0));
 
   double max_dT;
   do
@@ -1426,7 +1446,7 @@ Problem<dim>::postprocess()
 
   const double t  = temperature_solver.get_time();
   const double dt = temperature_solver.get_time_step();
-  const double V  = pull_rate->value(Point<1>(t));
+  const double V  = calc_V(t);
 
   const auto &mesh_points = temperature_solver.get_mesh().get_vertices();
 
