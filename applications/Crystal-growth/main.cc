@@ -1201,7 +1201,8 @@ void
 Problem<dim>::update_grid_time_step()
 {
   const double t  = temperature_solver.get_time();
-  const double dt = temperature_solver.get_time_step();
+  const double dt = with_dislocation() ? dislocation_solver.get_time_step() :
+                                         temperature_solver.get_time_step();
   const double dt_min =
     with_dislocation() ? dislocation_solver.get_time_step_min() : dt;
   const double V = calc_V(t);
