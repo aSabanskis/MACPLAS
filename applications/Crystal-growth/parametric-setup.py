@@ -13,14 +13,14 @@ from sys import exit
 
 # DEFAULT PARAMETERS
 params_default = {
-    "L0": 2.45854,
+    "L0": 2.4,
     "r0": 2,
     "L1": 28,
-    "r1": 22.5,
+    "r1": 23,
     "L2": 60,
-    "r2": 20,
-    "L3": 29,
-    "r3": 11,
+    "r2": 21,
+    "L3": 30,
+    "r3": 12,
     "d1": 0,
     "d2": 0,
     "d_function": "parabola",
