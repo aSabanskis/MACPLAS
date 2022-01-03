@@ -93,6 +93,7 @@ plt.gca().set_aspect("equal")
 plt.xlabel("Length, mm")
 plt.ylabel("Radius, mm")
 plt.savefig("crystal-shape.png", dpi=150, bbox_inches="tight")
+plt.close()
 
 # convert to SI
 x = x * 1e-3
@@ -124,6 +125,7 @@ def create_V():
     plt.xlabel("Time, min")
     plt.ylabel("Pull rate, mm/min")
     plt.savefig("pull-rate.png", dpi=150, bbox_inches="tight")
+    plt.close()
 
     # convert to SI
     x = x * 60
@@ -159,6 +161,7 @@ plt.gca().set_aspect("equal")
 plt.xlabel("Height, mm")
 plt.ylabel("Radius, mm")
 plt.savefig("crucible-shape.png", dpi=150, bbox_inches="tight")
+plt.close()
 
 # convert to SI
 x = x * 1e-3
@@ -202,6 +205,7 @@ plt.grid(True)
 plt.xlabel("Length, mm")
 plt.ylabel("Melt height, mm")
 plt.savefig("melt-height.png", dpi=150, bbox_inches="tight")
+plt.close()
 
 zT = H_crucible + params.get("HTa") * 1e-3 - h_melt
 Ta1 = params.get("Ta1") + 273
@@ -248,6 +252,7 @@ while True:
     plt.xlabel("Length, mm")
     plt.ylabel("Pull rate, mm/min")
     plt.savefig("pull-rate-length.png", dpi=150, bbox_inches="tight")
+    plt.close()
 
     # convert to SI
     x = np.array(x) * 1e-3
@@ -277,6 +282,7 @@ plt.grid(True)
 plt.xlabel("Length, mm")
 plt.ylabel("Deflection, mm")
 plt.savefig("deflection.png", dpi=150, bbox_inches="tight")
+plt.close()
 
 # convert to SI
 x = x * 1e-3
@@ -350,6 +356,7 @@ plt.gca().set_aspect("equal")
 plt.xlabel("r, mm")
 plt.ylabel("z, mm")
 plt.savefig("system.png", dpi=150, bbox_inches="tight")
+plt.close()
 
 # SUMMARY
 s = ""
