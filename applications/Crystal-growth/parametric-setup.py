@@ -215,6 +215,7 @@ print(f"Tamb_top={Tamb_top} K")
 # MAX TIME, VELOCITY(L)
 dt = 2.0
 t_max = params.get("t2") * 60
+t_change_prev = 0
 print(f"t_max={t_max:g} s (initial)")
 while True:
     t = 0
@@ -231,7 +232,14 @@ while True:
         z_top += V(t) * dt
         L = z_top + (h_melt - H_melt(L))
     t_change = t - t_max
-    t_max = t
+    # apply relaxation to ensure convergence
+    if np.sign(t_change) * np.sign(t_change_prev) < 0:
+        t_change *= 0.5
+    else:
+        t_change *= 0.9
+    t_max = t_max + t_change
+    t_change_prev = t_change
+    t_max = round(t_max)
     print(f"t_max={t_max:g} s, change={t_change} s")
 
     fig = plt.figure(figsize=(6, 4))
@@ -245,7 +253,7 @@ while True:
     x = np.array(x) * 1e-3
     y = np.array(y) * 1e-3 / 60
     np.savetxt("pull-rate-length.dat", np.c_[x, y], fmt="%g")
-    if abs(t_change) < 1:
+    if abs(t_change) < 2:
         break
 
 t_cool = params.get("t_cool") * 60
