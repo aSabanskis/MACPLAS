@@ -1,18 +1,24 @@
-R0 = 0.002;
-R1 = 0.002;
+load_mesh_in = 1;
 
-z0 = 0;
-z1 = 0.008;
-z2 = 0.008;
+If ( load_mesh_in )
+  Include "mesh.in";
+Else
+  R0 = 0.002;
+  R1 = 0.002;
 
-slope = 0.75;
-If ( slope > 0 )
-  R1 = 0.0002;
-  z1 = z0 + (R0-R1)/slope;
+  z0 = 0;
+  z1 = 0.008;
   z2 = z1;
+
+  slope = 0.75;
+  If ( slope > 0 )
+    R1 = R1 / 10;
+    z1 = z0 + (R0-R1)/slope;
+    z2 = z1;
+    Printf("z1 = %g mm", z1*1e3);
+  EndIf
 EndIf
 
-Printf("z1 = %g mm", z1*1e3);
 
 nR = 36;
 nZ = 151;

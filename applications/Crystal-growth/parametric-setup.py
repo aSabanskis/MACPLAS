@@ -80,9 +80,14 @@ else:
 # RADIUS
 x = np.array([params.get(f"L{x}") for x in range(4)])
 y = np.array([params.get(f"r{x}") for x in range(4)])
-if x[0] > 0:
+slope = (y[1] - y[0]) / x[1]
+if slope > 0:
+    R0 = y[0] / 10
+    L0 = (y[0] - R0) / slope
+    params["L0"] = L0
+    x[0] = L0
     x = np.append([0], x)
-    y = np.append([0], y)
+    y = np.append([R0], y)
 x = np.cumsum(x)
 print("Slope=", np.diff(y) / np.diff(x))
 
@@ -109,6 +114,13 @@ R = interpolate.interp1d(x, y, fill_value=(y[0], y[-1]), bounds_error=False)
 # save for later use
 Length = x
 
+# save input for gmsh .geo file
+with open("mesh.in", "w") as f:
+    f.write(f"R1 = {y[0]};\n")
+    f.write(f"R0 = {y[1]};\n")
+    f.write(f"z0 = {x[0]};\n")
+    f.write(f"z1 = {x[1]};\n")
+    f.write(f"z2 = z1;\n")
 
 # PULL RATE
 # If v2 != v1 then t2 should be modified to match the crystal end, this is done by an external loop.
