@@ -8,7 +8,7 @@ Also includes the temperature solver and utilities for interpolation of the exte
 
 # Installation
 ## Library
-The MACPLAS library is designed as header-only, hence no precompilation is needed. Simply include the necessary headers from the ```include``` directory and compile as usual. MACPLAS relies on the [deal.II](https://www.dealii.org/) library which should be installed beforehand.
+The MACPLAS library (solver package) is designed as header-only, hence no precompilation is needed. Simply include the necessary headers from the ```include``` directory and compile as usual. MACPLAS relies on the [deal.II](https://www.dealii.org/) library which should be installed beforehand.
 Optionally, the header files can be installed from the top-level directory as
 ```
 cmake -DCMAKE_INSTALL_PREFIX=/my/location/include .
@@ -30,6 +30,25 @@ To generate documentation in HTML and LaTeX formats, execute the command ```doxy
 
 # License
 [GNU Lesser General Public License (LGPL) v2.1 or later](LICENSE)
+
+
+# References
+```
+@article{Sabanskis2022,
+  doi = {10.3390/cryst12020174},
+  url = {https://doi.org/10.3390/cryst12020174},
+  year = {2022},
+  month = jan,
+  publisher = {{MDPI} {AG}},
+  volume = {12},
+  number = {2},
+  pages = {174},
+  author = {Andrejs Sabanskis and Kaspars Dadzis and Robert Menzel and J{\={a}}nis Virbulis},
+  title = {Application of the {A}lexander{\textendash}{H}aasen Model for Thermally Stimulated Dislocation Generation in {FZ} Silicon Crystals},
+  journal = {Crystals}
+}
+```
+Please cite the MACPLAS library if you use it in your research.
 
 
 # Contributors
