@@ -98,6 +98,12 @@ private:
   // max temperature during the whole simulation
   Vector<double> T_max;
 
+  // temperature at the previous time step
+  Vector<double> T_prev;
+
+  // min and max temperature time derivative during the whole simulation
+  Vector<double> dot_T_min, dot_T_max;
+
   // max effective stress during the whole simulation
   Vector<double> tau_eff_max;
 
@@ -565,6 +571,8 @@ Problem<dim>::solve_temperature_dislocation()
 
       set_time_step(dislocation_solver.get_time_step());
 
+      T_prev = temperature_solver.get_temperature();
+
       const int n_outer = prm.get_integer("Outer temperature iterations");
 
       bool keep_going_temp = false;
@@ -608,6 +616,8 @@ Problem<dim>::solve_temperature()
   for (unsigned int i = 1;; ++i)
     {
       const bool output_enabled = update_output_time_step(i);
+
+      T_prev = temperature_solver.get_temperature();
 
       const int n_outer = prm.get_integer("Outer temperature iterations");
 
@@ -904,21 +914,51 @@ Problem<dim>::update_T_max()
 {
   const Vector<double> &T = temperature_solver.get_temperature();
 
+  const double dt = temperature_solver.get_time_step();
+
   if (T_max.size() == 0)
     {
       std::cout << "Initializing T_max\n";
       T_max = T;
     }
 
+  if (T_prev.size() == 0)
+    {
+      std::cout << "Initializing T_prev\n";
+      T_prev = T;
+    }
+
+  if (dot_T_min.size() == 0 || dot_T_max.size() == 0)
+    {
+      dot_T_min.reinit(T.size());
+      dot_T_max.reinit(T.size());
+    }
+
   AssertDimension(T_max.size(), T.size());
+  AssertDimension(T_prev.size(), T.size());
+  AssertDimension(dot_T_min.size(), T.size());
+  AssertDimension(dot_T_max.size(), T.size());
 
   for (unsigned int k = 0; k < T_max.size(); ++k)
-    T_max[k] = std::max(T_max[k], T[k]);
+    {
+      T_max[k] = std::max(T_max[k], T[k]);
+
+      const double dot_T = (T[k] - T_prev[k]) / dt;
+
+      dot_T_min[k] = std::min(dot_T_min[k], dot_T);
+      dot_T_max[k] = std::max(dot_T_max[k], dot_T);
+    }
 
   temperature_solver.add_field("T_max", T_max);
+  temperature_solver.add_field("dot_T_min", dot_T_min);
+  temperature_solver.add_field("dot_T_max", dot_T_max);
 
   if (with_dislocation())
-    dislocation_solver.add_field("T_max", T_max);
+    {
+      dislocation_solver.add_field("T_max", T_max);
+      dislocation_solver.add_field("dot_T_min", dot_T_min);
+      dislocation_solver.add_field("dot_T_max", dot_T_max);
+    }
 }
 
 template <int dim>
