@@ -1521,8 +1521,6 @@ SurfaceInterpolator3D::interpolate(const FieldType &              field_type,
   const unsigned int n_values    = target_points.size();
   target_values.reinit(n_values);
 
-  Triangle<dim> triangle;
-
   for (unsigned int i = 0; i < n_values; ++i)
     {
       if (!markers[i])
