@@ -17,6 +17,7 @@ set Probe coordinates x               = 0.01, 0.01, 0.01, 0.01
 set Probe coordinates z               = 0.37043, 0.39038, 0.41053, 0.43045
 set Custom probes x relative to inductor = 0.01, 0.01, 0.01, 0.01, 0.01, 0.01
 set Custom probes z relative to inductor = -0.0079, -0.00505, -0.0022, 0, 0.00505, -0.0038
+set QEM scale                         = 1e-6
 set Reference electrical conductivity = 5e4
 set Reference inductor position       = 0.26685
 set Load saved results                = false

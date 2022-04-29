@@ -169,6 +169,11 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     Patterns::Double(0),
                     "Inductor frequency f in Hz");
 
+  prm.declare_entry("QEM scale",
+                    "1e-6",
+                    Patterns::Double(),
+                    "Scale for induced heat sources");
+
   prm.declare_entry(
     "Reference electrical conductivity",
     "5e4",
@@ -896,7 +901,8 @@ Problem<dim>::interpolate_q_em(const double z)
       SurfaceInterpolator3D::PointField, "q", points, boundary_dofs, q0);
 
   // normalize for future use
-  q0 *= 1e-6 * std::sqrt(prm.get_double("Reference electrical conductivity"));
+  q0 *= prm.get_double("QEM scale") *
+        std::sqrt(prm.get_double("Reference electrical conductivity"));
 }
 
 template <int dim>
