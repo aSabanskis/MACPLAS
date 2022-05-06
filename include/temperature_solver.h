@@ -259,6 +259,11 @@ public:
   void
   set_bc1(const unsigned int id, const double val);
 
+  /** Same as above, for non-homogeneous field
+   */
+  void
+  set_bc1(const unsigned int id, const Vector<double> &val);
+
   /** Set thermal radiation and incoming heat flux density boundary condition
    * \f$q = \sigma_\mathrm{SB} \varepsilon(T) (T^4 - T_\mathrm{amb}^4) -
    * q_\mathrm{in}\f$, see radiation_heat_flux_data
@@ -479,7 +484,7 @@ private:
 
   /** Data for first-type BC
    */
-  std::map<unsigned int, double> bc1_data;
+  std::map<unsigned int, Vector<double>> bc1_data;
 
   /** Data for thermal radiation and incoming heat flux density BC
    * radiation_heat_flux_data
@@ -1014,16 +1019,45 @@ template <int dim>
 void
 TemperatureSolver<dim>::apply_bc1()
 {
-  std::map<types::global_dof_index, double> boundary_values;
-
   for (const auto &bc : bc1_data)
-    VectorTools::interpolate_boundary_values(dh,
-                                             bc.first,
-                                             ConstantFunction<dim>(bc.second),
-                                             boundary_values);
+    {
+      const auto &T1 = bc.second;
 
-  for (const auto &bv : boundary_values)
-    temperature[bv.first] = bv.second;
+      if (bc.second.size() == 1)
+        {
+          // homogeneous field
+          std::map<types::global_dof_index, double> boundary_values;
+          VectorTools::interpolate_boundary_values(dh,
+                                                   bc.first,
+                                                   ConstantFunction<dim>(T1[0]),
+                                                   boundary_values);
+
+          for (const auto &bv : boundary_values)
+            temperature[bv.first] = bv.second;
+        }
+      else
+        {
+          const auto N = temperature.size();
+          AssertThrow(N == T1.size(),
+                      ExcMessage("TemperatureSolver: temperature size " +
+                                 std::to_string(N) +
+                                 " does not match BC1 size " +
+                                 std::to_string(T1.size())));
+
+          std::vector<bool> boundary_dofs(N, false);
+          DoFTools::extract_boundary_dofs(dh,
+                                          ComponentMask(),
+                                          boundary_dofs,
+                                          {static_cast<types::boundary_id>(
+                                            bc.first)});
+
+          for (unsigned int i = 0; i < N; ++i)
+            {
+              if (boundary_dofs[i])
+                temperature[i] = T1[i];
+            }
+        }
+    }
 }
 
 template <int dim>
@@ -1038,6 +1072,15 @@ TemperatureSolver<dim>::clear_bcs()
 template <int dim>
 void
 TemperatureSolver<dim>::set_bc1(const unsigned int id, const double val)
+{
+  bc1_data[id].reinit(1);
+  bc1_data[id][0] = val;
+}
+
+template <int dim>
+void
+TemperatureSolver<dim>::set_bc1(const unsigned int    id,
+                                const Vector<double> &val)
 {
   bc1_data[id] = val;
 }
