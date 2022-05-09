@@ -525,7 +525,8 @@ Problem<dim>::solve_steady_temperature()
       max_dT = temperature.linfty_norm();
 
       std::cout << "max_dT=" << max_dT << " K\n";
-  } while (max_dT > prm.get_double("Max temperature change"));
+    }
+  while (max_dT > prm.get_double("Max temperature change"));
 
   temperature_solver.get_time_step() = dt0;
   prm_T.set("Max Newton iterations", n0);

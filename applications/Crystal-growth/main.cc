@@ -597,7 +597,8 @@ Problem<dim>::deform_grid()
 #ifdef DEBUG
       std::cout << "L=" << L << " dL=" << dL << " ddL=" << dL - dL2 << '\n';
 #endif
-  } while (std::abs(dL - dL2) > std::min(1e-10, 1e-8 * L));
+    }
+  while (std::abs(dL - dL2) > std::min(1e-10, 1e-8 * L));
 
   const double R0 = calc_R(L + dL); // at the end
 
@@ -1314,7 +1315,8 @@ Problem<dim>::solve_steady_temperature()
       max_dT = temperature.linfty_norm();
 
       std::cout << "max_dT=" << max_dT << " K\n";
-  } while (max_dT > prm.get_double("Max temperature change"));
+    }
+  while (max_dT > prm.get_double("Max temperature change"));
 
   temperature_solver.get_time_step() = dt0;
   prm_T.set("Velocity", V0);

@@ -4,9 +4,9 @@
 # Formats the source code according to .clang-format
 #
 
-# Provide full path to clang-format-6.0 or add its directory to PATH.
-# Versions below 6 are not supported.
-formatter=clang-format
+# Provide full path to clang-format or add its directory to PATH.
+# Versions below 11 are not supported.
+formatter=clang-format-11
 
 find include tests applications \
 -regextype egrep -regex ".*\.(cc|h)" -print0 | \
