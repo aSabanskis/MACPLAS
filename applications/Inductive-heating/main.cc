@@ -28,7 +28,7 @@ private:
   initialize_dislocation();
 
   void
-  apply_q_em();
+  apply_T_BC();
 
   void
   interpolate_q_em(const double z);
@@ -79,6 +79,10 @@ private:
   void
   approximate_LF_EM();
 
+  // true if first-type temperature BC is applied at crystal surface
+  bool
+  T_BC1_applied() const;
+
   // false if only the temperature field is calculated
   bool
   with_dislocation() const;
@@ -91,6 +95,9 @@ private:
   // external Joulean heat flux density data
   SurfaceInterpolator2D q2d;
   SurfaceInterpolator3D q3d;
+
+  // external temperature BC
+  SurfaceInterpolator2D T2d;
 
   // normalized Joulean heat flux density
   Vector<double> q0;
@@ -511,7 +518,7 @@ Problem<dim>::solve_steady_temperature()
     {
       Vector<double> temperature = temperature_solver.get_temperature();
 
-      apply_q_em();
+      apply_T_BC();
       temperature_solver.solve();
 
       temperature -= temperature_solver.get_temperature();
@@ -584,7 +591,7 @@ Problem<dim>::solve_temperature_dislocation()
 
       for (int n = 0; n < n_outer; ++n)
         {
-          apply_q_em();
+          apply_T_BC();
           keep_going_temp = temperature_solver.solve(n > 0);
         }
 
@@ -630,7 +637,7 @@ Problem<dim>::solve_temperature()
 
       for (int n = 0; n < n_outer; ++n)
         {
-          apply_q_em();
+          apply_T_BC();
           keep_going_temp = temperature_solver.solve(n > 0);
         }
 
@@ -739,6 +746,7 @@ Problem<dim>::initialize_temperature()
   else if (dim == 2)
     {
       q2d.read_txt("qEM-2d.txt");
+      T2d.read_txt("T-2d.txt");
     }
 
   const double t = temperature_solver.get_time();
@@ -791,7 +799,7 @@ Problem<dim>::initialize_dislocation()
 
 template <int dim>
 void
-Problem<dim>::apply_q_em()
+Problem<dim>::apply_T_BC()
 {
   const double t =
     temperature_solver.get_time() + temperature_solver.get_time_step();
@@ -805,6 +813,27 @@ Problem<dim>::apply_q_em()
     {
       dislocation_solver.add_output("z[m]", z);
       dislocation_solver.add_output("I[A]", I);
+    }
+
+  if (T_BC1_applied())
+    {
+      std::vector<Point<dim>> points;
+      std::vector<bool>       boundary_dofs;
+      temperature_solver.get_boundary_points(boundary_id_surf,
+                                             points,
+                                             boundary_dofs);
+
+      const double z0 = prm.get_double("Reference inductor position");
+      const double dz = z0 - z;
+
+      for (auto &p : points)
+        p[dim - 1] += dz;
+
+      Vector<double> T_BC = temperature_solver.get_temperature();
+      T2d.interpolate("T", points, boundary_dofs, T_BC);
+      temperature_solver.set_bc1(boundary_id_surf, T_BC);
+
+      return;
     }
 
   if (std::abs(z - previous_inductor_position) < 1e-12)
@@ -878,6 +907,13 @@ template <int dim>
 void
 Problem<dim>::interpolate_q_em(const double z)
 {
+  if (T_BC1_applied())
+    {
+      std::cout
+        << "First-type temperature BC applied, skipping EM field interpolation\n";
+      return;
+    }
+
   std::vector<Point<dim>> points;
   std::vector<bool>       boundary_dofs;
   temperature_solver.get_boundary_points(boundary_id_surf,
@@ -1120,6 +1156,13 @@ Problem<dim>::approximate_LF_EM()
 
   temperature_solver.add_field("q", q);
   temperature_solver.add_field("delta", delta);
+}
+
+template <int dim>
+bool
+Problem<dim>::T_BC1_applied() const
+{
+  return dim == 2 && T2d.get_points().size() > 0;
 }
 
 template <int dim>
