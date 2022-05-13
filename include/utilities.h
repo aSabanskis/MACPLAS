@@ -295,6 +295,11 @@ public:
           const FieldType &  target_type,
           const std::string &target_name = "");
 
+  /** Returns \c true if no data is present
+   */
+  inline bool
+  empty() const;
+
 private:
   /** Points \c (x,y,z)
    */
@@ -417,6 +422,11 @@ public:
    */
   inline Point<dim>
   project(const Point<dim> &p) const;
+
+  /** Returns \c true if no data is present
+   */
+  inline bool
+  empty() const;
 
 private:
   /** Points \c (x,y)
@@ -1616,6 +1626,12 @@ SurfaceInterpolator3D::interpolate(
   interpolate(field_type, field_name, points_3d, markers, target_values);
 }
 
+bool
+SurfaceInterpolator3D::empty() const
+{
+  return points.empty() || triangles.empty();
+}
+
 void
 SurfaceInterpolator3D::convert(const FieldType &  source_type,
                                const std::string &source_name,
@@ -1985,6 +2001,12 @@ SurfaceInterpolator2D::project(const Point<dim> &p) const
     }
 
   return p_found;
+}
+
+bool
+SurfaceInterpolator2D::empty() const
+{
+  return points.empty();
 }
 
 const std::vector<double> &

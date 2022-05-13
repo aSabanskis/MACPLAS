@@ -1163,7 +1163,7 @@ template <int dim>
 bool
 Problem<dim>::T_BC1_applied() const
 {
-  return dim == 2 && T2d.get_points().size() > 0;
+  return dim == 2 && !T2d.empty() > 0;
 }
 
 template <int dim>
