@@ -230,6 +230,12 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     "Calculate the steady-state temperature field at t=0");
 
   prm.declare_entry(
+    "Steady Newton step length",
+    "0.6",
+    Patterns::Double(0, 1),
+    "Newton step length for steady-state temperature calculation");
+
+  prm.declare_entry(
     "Outer temperature iterations",
     "1",
     Patterns::Integer(1),
@@ -511,7 +517,7 @@ Problem<dim>::solve_steady_temperature()
   // just one iteration to update external Joulean heat flux BC
   prm_T.set("Max Newton iterations", "1");
   // reduce step length to avoid divergence
-  prm_T.set("Newton step length", "0.6");
+  prm_T.set("Newton step length", prm.get("Steady Newton step length"));
 
   double max_dT;
   do
