@@ -78,6 +78,15 @@ minmax(const BlockVector<T> &x);
 inline double
 dx_analytical(const double a, const double b, const double dt);
 
+/** Computes two times t1<=t<=t2 and the corresponding interpolations weights.
+ *
+ * The \c times array does not need to be sorted.
+ * \return {{t1, w1}, {t2, w2}} if such two times could be found;
+ * \return {{t1, 1}} otherwise.
+ */
+inline std::vector<std::array<double, 2>>
+get_interpolation_weights(const std::vector<double> &times, const double t);
+
 /** Prints time in seconds, enclosed in parenthesis
  */
 inline std::string
@@ -401,6 +410,11 @@ public:
    */
   inline const std::vector<Point<dim>> &
   get_points() const;
+
+  /** Get all field names, not necessarily in the original order
+   */
+  inline const std::vector<std::string>
+  get_field_names() const;
 
   /** Interpolate field to the specified points
    */
@@ -840,6 +854,47 @@ dx_analytical(const double a, const double b, const double dt)
     return a * dt; // a*dt + b*sqr(dt)/2
 
   return a / b * (std::exp(b * dt) - 1);
+}
+
+std::vector<std::array<double, 2>>
+get_interpolation_weights(const std::vector<double> &times, const double t)
+{
+  AssertThrow(!times.empty(),
+              ExcMessage("get_interpolation_weights: empty array passed"));
+
+  // early return 1
+  if (times.size() == 1)
+    return {{times[0], 1}};
+
+  std::vector<double> T = times;
+  std::sort(T.begin(), T.end());
+
+  // early return 2
+  if (t <= T.front())
+    return {{T.front(), 1}};
+
+  // early return 2
+  if (t >= T.back())
+    return {{T.back(), 1}};
+
+  // find t1 and t2
+  for (unsigned int i = 0; i < T.size() - 1; ++i)
+    {
+      const double t1 = T[i];
+      const double t2 = T[i + 1];
+
+      if (t1 <= t && t <= t2)
+        {
+          const double dt = t2 - t1;
+          const double w1 = (t2 - t) / dt;
+          const double w2 = 1 - w1;
+
+          return {{t1, w1}, {t2, w2}};
+        }
+    }
+
+  // this should never occur
+  AssertThrow(false, ExcMessage("get_interpolation_weights: failed"));
 }
 
 std::string
@@ -1906,6 +1961,17 @@ const std::vector<Point<SurfaceInterpolator2D::dim>> &
 SurfaceInterpolator2D::get_points() const
 {
   return points;
+}
+
+const std::vector<std::string>
+SurfaceInterpolator2D::get_field_names() const
+{
+  std::vector<std::string> names;
+
+  for (const auto &it : fields)
+    names.push_back(it.first);
+
+  return names;
 }
 
 void

@@ -830,8 +830,48 @@ Problem<dim>::apply_T_BC()
       for (auto &p : points)
         p[dim - 1] += dz;
 
-      Vector<double> T_BC = temperature_solver.get_temperature();
-      T2d.interpolate("T", points, boundary_dofs, T_BC);
+      const auto fields = T2d.get_field_names();
+
+      std::map<double, std::string> T_time;
+      std::vector<double>           times;
+
+      for (const auto &f : fields)
+        {
+          if (f.substr(0, 7) == "T(K)@t=")
+            {
+              const double time = std::stod(f.substr(7));
+
+              T_time[time] = f;
+              times.push_back(time);
+            }
+        }
+
+      // special handling of the steady-state data
+      if (times.empty())
+        {
+          for (const auto &f : fields)
+            {
+              if (f == "T(K)")
+                {
+                  T_time[0] = f;
+                  times.push_back(0);
+                  break;
+                }
+            }
+        }
+
+      // interpolate and apply the BC
+      const auto weights = get_interpolation_weights(times, t);
+
+      Vector<double> T_BC(temperature_solver.get_temperature().size());
+
+      for (const auto &it : weights)
+        {
+          Vector<double> tmp(T_BC);
+          T2d.interpolate(T_time[it[0]], points, boundary_dofs, tmp);
+          T_BC.add(it[1], tmp);
+        }
+
       temperature_solver.set_bc1(boundary_id_surf, T_BC);
 
       return;
