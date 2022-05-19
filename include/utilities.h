@@ -883,6 +883,9 @@ get_interpolation_weights(const std::vector<double> &times, const double t)
       const double t1 = T[i];
       const double t2 = T[i + 1];
 
+      if (t == t1 || t == t2)
+        return {{t, 1}};
+
       if (t1 <= t && t <= t2)
         {
           const double dt = t2 - t1;
