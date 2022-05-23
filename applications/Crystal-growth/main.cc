@@ -93,6 +93,10 @@ private:
   bool
   is_detached(const double t) const;
 
+  // true if first-type temperature BC is applied at crystal surface
+  bool
+  T_BC1_applied() const;
+
   // false if only the temperature field is calculated
   bool
   with_dislocation() const;
@@ -136,6 +140,9 @@ private:
   unsigned int point_id_axis_z_min, point_id_axis_z_max, point_id_triple;
 
   SurfaceInterpolator2D surface_projector;
+
+  // external temperature BC
+  SurfaceInterpolator2D T2d;
 
   std::unique_ptr<Function<1>> ambient_temperature;
 
@@ -1054,6 +1061,8 @@ Problem<dim>::initialize_temperature()
       dislocation_solver.add_probe(p);
     }
 
+  T2d.read_txt("T-2d.txt");
+
   shift.resize(temperature.size());
   shift_relative.reinit(temperature.size());
 
@@ -1135,6 +1144,63 @@ Problem<dim>::set_temperature_BC()
     temperature_solver.clear_bcs();
   else
     temperature_solver.set_bc1(boundary_id_interface, T_0);
+
+  if (T_BC1_applied())
+    {
+      AssertThrow(!is_detached(t), ExcNotImplemented());
+
+      std::vector<Point<dim>> points;
+      std::vector<bool>       boundary_dofs;
+      temperature_solver.get_boundary_points(boundary_id_surface,
+                                             points,
+                                             boundary_dofs);
+
+      const auto fields = T2d.get_field_names();
+
+      std::map<double, std::string> T_time;
+      std::vector<double>           times;
+
+      for (const auto &f : fields)
+        {
+          if (f.substr(0, 7) == "T(K)@t=")
+            {
+              const double time = std::stod(f.substr(7));
+
+              T_time[time] = f;
+              times.push_back(time);
+            }
+        }
+
+      // special handling of the steady-state data
+      if (times.empty())
+        {
+          for (const auto &f : fields)
+            {
+              if (f == "T(K)")
+                {
+                  T_time[0] = f;
+                  times.push_back(0);
+                  break;
+                }
+            }
+        }
+
+      // interpolate and apply the BC
+      const auto weights = get_interpolation_weights(times, t);
+
+      Vector<double> T_BC(temperature_solver.get_temperature().size());
+
+      for (const auto &it : weights)
+        {
+          Vector<double> tmp(T_BC);
+          T2d.interpolate(T_time[it[0]], points, boundary_dofs, tmp);
+          T_BC.add(it[1], tmp);
+        }
+
+      temperature_solver.set_bc1(boundary_id_surface, T_BC);
+
+      return;
+    }
 
   std::function<double(const double)> emissivity_const = [=](const double) {
     return e;
@@ -1562,6 +1628,13 @@ Problem<dim>::is_detached(const double t) const
 {
   const double t0 = prm.get_double("Detachment time");
   return t0 > 0 && t >= t0;
+}
+
+template <int dim>
+bool
+Problem<dim>::T_BC1_applied() const
+{
+  return dim == 2 && !T2d.empty() > 0;
 }
 
 template <int dim>
