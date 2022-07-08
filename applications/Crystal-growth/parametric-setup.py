@@ -228,7 +228,7 @@ Tamb_top = params.get("Ta_top") + 273
 print(f"Tamb={Tamb} K")
 print(f"Tamb_top={Tamb_top} K")
 
-# MAX TIME, VELOCITY(L)
+# MAX TIME, VELOCITY(L), L(TIME)
 dt = 2.0
 t_max = params.get("t2") * 60
 t_change_prev = 0
@@ -237,13 +237,15 @@ while True:
     t = 0
     L = L_0
     z_top = L_0
-    x = []
-    y = []
+    t_arr = []
+    L_arr = []
+    V_arr = []
     params["t2"] = t_max / 60
     V = create_V()
     while L < L_max:
-        x.append(L * 1e3)
-        y.append(V(t) * 1e3 * 60)
+        t_arr.append(t)
+        L_arr.append(L * 1e3)
+        V_arr.append(V(t) * 1e3 * 60)
         t += dt
         z_top += V(t) * dt
         L = z_top + (h_melt - H_melt(L))
@@ -259,7 +261,7 @@ while True:
     print(f"t_max={t_max:g} s, change={t_change} s")
 
     fig = plt.figure(figsize=(6, 4))
-    plt.plot(x, y, "-")
+    plt.plot(L_arr, V_arr, "-")
     plt.grid(True)
     plt.xlabel("Length, mm")
     plt.ylabel("Pull rate, mm/min")
@@ -267,9 +269,23 @@ while True:
     plt.close()
 
     # convert to SI
-    x = np.array(x) * 1e-3
-    y = np.array(y) * 1e-3 / 60
+    x = np.array(L_arr) * 1e-3
+    y = np.array(V_arr) * 1e-3 / 60
     np.savetxt("pull-rate-length.dat", np.c_[x, y], fmt="%g")
+
+    fig = plt.figure(figsize=(6, 4))
+    plt.plot(t_arr, L_arr, "-")
+    plt.grid(True)
+    plt.xlabel("Time, s")
+    plt.ylabel("Length, mm")
+    plt.savefig("length-time.png", dpi=150, bbox_inches="tight")
+    plt.close()
+
+    # convert to SI
+    x = np.array(t_arr)
+    y = np.array(L_arr) * 1e-3
+    np.savetxt("length-time.dat", np.c_[x, y], fmt="%g")
+
     if abs(t_change) < 2:
         break
 
