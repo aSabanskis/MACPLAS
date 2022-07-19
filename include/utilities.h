@@ -679,6 +679,9 @@ initialize_function(std::unique_ptr<Function<1>> &f,
                     const std::string &           expression,
                     const std::string &           vars)
 {
+  if (expression.empty())
+    return;
+
   const std::string ext =
     expression.size() <= 4 ? "" : expression.substr(expression.size() - 4);
 
