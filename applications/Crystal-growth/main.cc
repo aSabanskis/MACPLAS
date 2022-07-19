@@ -54,7 +54,16 @@ private:
   calc_V(const double t) const;
 
   double
-  calc_R(const double L) const;
+  calc_actual_R() const;
+
+  double
+  calc_new_R(const double L) const;
+
+  double
+  calc_actual_L() const;
+
+  double
+  calc_new_L() const;
 
   void
   set_temperature_BC();
@@ -150,6 +159,8 @@ private:
 
   std::unique_ptr<Function<1>> crystal_radius;
 
+  std::unique_ptr<Function<1>> crystal_length; // optional
+
   std::unique_ptr<Function<2>> interface_shape;
 
   DoFGradientEvaluation<dim> grad_eval;
@@ -213,6 +224,12 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
     "0.002",
     Patterns::Anything(),
     "Crystal radius R in m (length function or data file name)");
+
+  prm.declare_entry(
+    "Crystal length",
+    "",
+    Patterns::Anything(),
+    "Crystal length L in m (time function or data file name; optional)");
 
   prm.declare_entry(
     "Interface shape",
@@ -384,6 +401,8 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
 
   initialize_function(crystal_radius, prm.get("Crystal radius"), "L");
 
+  initialize_function(crystal_length, prm.get("Crystal length"));
+
   initialize_function(interface_shape, prm.get("Interface shape"), "r,L");
 
   const std::vector<double> X =
@@ -529,17 +548,16 @@ Problem<dim>::make_grid()
 #endif
   surface_projector.set_points(points_sorted);
 
-  const double L  = (points_surface.at(point_id_axis_z_max) -
-                    points_surface.at(point_id_triple))[dim - 1];
-  const double R0 = calc_R(L);
-  const double R  = points_surface.at(point_id_triple)[0];
+  const double L     = calc_actual_L();
+  const double R     = calc_actual_R();
+  const double R_new = calc_new_R(L);
 
   std::cout << "Initial R = " << R << " m, L = " << L << " m\n";
 
-  AssertThrow(std::fabs(R - R0) < 1e-4,
+  AssertThrow(std::fabs(R - R_new) < 1e-4,
               ExcMessage("The actual radius R = " + std::to_string(R) +
-                         " m differs from the expected R0 = " +
-                         std::to_string(R0) + " m"));
+                         " m differs from the expected R_new = " +
+                         std::to_string(R_new) + " m"));
 
   temperature_solver.add_output("L[m]", L);
   temperature_solver.add_output("R[m]", R);
@@ -585,42 +603,23 @@ Problem<dim>::deform_grid()
   Point<dim> dz;
   dz[dim - 1] = V * dt;
 
-  const double R = p_triple[0];
-  const double L = (p_axis_2 - p_triple)[dim - 1];
-
-  // Calculate the length change. This is tricky since the melt level also
-  // changes, therefore an iterative procedure is used:
-  const double dL0 = V * dt;
-  double       dL  = dL0;
-  double       dL2 = dL0;
-  unsigned int i_L = 0;
-  do
-    {
-      dL2 = dL;
-      dL =
-        dL0 + p_triple[dim - 1] - interface_shape->value(Point<2>(1, L + dL));
-      ++i_L;
-
-#ifdef DEBUG
-      std::cout << "L=" << L << " dL=" << dL << " ddL=" << dL - dL2 << '\n';
-#endif
-    }
-  while (std::abs(dL - dL2) > std::min(1e-10, 1e-8 * L));
-
-  const double R0 = calc_R(L + dL); // at the end
+  const double L     = calc_actual_L();
+  const double R     = calc_actual_R();
+  const double L_new = calc_new_L();
+  const double R_new = calc_new_R(L_new); // at the end
 
   std::cout << "t = " << t + dt << " s, R_old = " << R << " m, L_old = " << L
             << " m, V = " << V << " m/s\n"
-            << "t = " << t + dt << " s, R_new = " << R0
-            << " m, L_new = " << L + dL << " m (" << i_L << " iterations)\n";
+            << "t = " << t + dt << " s, R_new = " << R_new
+            << " m, L_new = " << L_new << " m\n";
 
-  temperature_solver.add_output("L[m]", L + dL);
-  temperature_solver.add_output("R[m]", R0);
+  temperature_solver.add_output("L[m]", L_new);
+  temperature_solver.add_output("R[m]", R_new);
   temperature_solver.add_output("V[m/s]", V);
   if (with_dislocation())
     {
-      dislocation_solver.add_output("L[m]", L + dL);
-      dislocation_solver.add_output("R[m]", R0);
+      dislocation_solver.add_output("L[m]", L_new);
+      dislocation_solver.add_output("R[m]", R_new);
       dislocation_solver.add_output("V[m/s]", V);
     }
 
@@ -628,11 +627,11 @@ Problem<dim>::deform_grid()
     Point<dim> dp;
 
     // Scale radially
-    dp[0] = (R0 - R) * (p[0] / R);
+    dp[0] = (R_new - R) * (p[0] / R);
 
     // Shift vertically. The crystal pulling has to taken into account to keep
     // the correct interface position at the end of the time step.
-    dp[dim - 1] = interface_shape->value(Point<2>(p[0] / R, L + dL)) -
+    dp[dim - 1] = interface_shape->value(Point<2>(p[0] / R, L_new)) -
                   dz[dim - 1] - p[dim - 1];
 
     return dp;
@@ -1127,9 +1126,74 @@ Problem<dim>::calc_V(const double t) const
 
 template <int dim>
 double
-Problem<dim>::calc_R(const double L) const
+Problem<dim>::calc_actual_R() const
+{
+  const auto &points = temperature_solver.get_mesh().get_vertices();
+  return points.at(point_id_triple)[0];
+}
+
+template <int dim>
+double
+Problem<dim>::calc_new_R(const double L) const
 {
   return crystal_radius->value(Point<1>(L));
+}
+
+template <int dim>
+double
+Problem<dim>::calc_actual_L() const
+{
+  const auto &points = temperature_solver.get_mesh().get_vertices();
+
+  const Point<dim> p_axis_2 = points.at(point_id_axis_z_max),
+                   p_triple = points.at(point_id_triple);
+
+  return (p_axis_2 - p_triple)[dim - 1];
+}
+
+template <int dim>
+double
+Problem<dim>::calc_new_L() const
+{
+  const double t  = temperature_solver.get_time();
+  const double dt = temperature_solver.get_time_step();
+
+  // Use the crystal length data, if provided.
+  if (crystal_length)
+    return crystal_length->value(Point<1>(t + dt));
+
+
+  // Otherwise, calculate the length change. This is tricky since the melt level
+  // also changes, therefore an iterative procedure is used:
+
+  const auto &points = temperature_solver.get_mesh().get_vertices();
+
+  const Point<dim> p_triple = points.at(point_id_triple);
+
+  const double V   = calc_V(t + dt);
+  const double L   = calc_actual_L();
+  const double dL0 = V * dt;
+  double       dL  = dL0;
+  double       dL2 = dL0;
+  unsigned int i_L = 0;
+  do
+    {
+      dL2 = dL;
+      dL =
+        dL0 + p_triple[dim - 1] - interface_shape->value(Point<2>(1, L + dL));
+      ++i_L;
+
+#ifdef DEBUG
+      std::cout << "L=" << L << " dL=" << dL << " ddL=" << dL - dL2 << '\n';
+#endif
+    }
+  while (std::abs(dL - dL2) > std::min(1e-10, 1e-8 * L));
+
+  const double L_new = L + dL;
+
+  std::cout << "Calculating L_new (" << i_L << " iterations)\n";
+
+  return L_new;
 }
 
 template <int dim>
@@ -1563,8 +1627,8 @@ Problem<dim>::postprocess()
                    p_triple = mesh_points.at(point_id_triple);
 
   const double z_top = p_axis_2[dim - 1];
-  const double L     = z_top - p_triple[dim - 1];
-  const double R     = p_triple[0];
+  const double L     = calc_actual_L();
+  const double R     = calc_actual_R();
   const double d     = (p_triple - p_axis_1)[dim - 1];
 
   const Vector<double> &temperature = temperature_solver.get_temperature();
