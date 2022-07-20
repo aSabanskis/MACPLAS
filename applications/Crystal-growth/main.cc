@@ -50,6 +50,9 @@ private:
   void
   initialize_dislocation(const bool dry_run = false);
 
+  void
+  read_T_BC1();
+
   double
   calc_V(const double t) const;
 
@@ -150,8 +153,8 @@ private:
 
   SurfaceInterpolator2D surface_projector;
 
-  // external temperature BC
-  SurfaceInterpolator2D T2d;
+  // external temperature BCs
+  std::map<double, SurfaceInterpolator2D> T2d;
 
   std::unique_ptr<Function<1>> ambient_temperature;
 
@@ -1060,7 +1063,7 @@ Problem<dim>::initialize_temperature()
       dislocation_solver.add_probe(p);
     }
 
-  T2d.read_txt("T-2d.txt");
+  read_T_BC1();
 
   shift.resize(temperature.size());
   shift_relative.reinit(temperature.size());
@@ -1112,6 +1115,28 @@ Problem<dim>::initialize_dislocation(const bool dry_run)
   dislocation_solver.solve(true);
 
   previous_time_step = temperature_solver.get_time_step();
+}
+
+template <int dim>
+void
+Problem<dim>::read_T_BC1()
+{
+  std::ifstream file("T-2d-times.txt");
+
+  if (!file.is_open())
+    return;
+
+  double      t;
+  std::string s;
+
+  while (file >> t >> s)
+    {
+      SurfaceInterpolator2D T;
+      T.read_txt(s); // prints a warning if failed
+
+      if (!T.empty())
+        T2d[t] = T;
+    }
 }
 
 template <int dim>
@@ -1219,35 +1244,19 @@ Problem<dim>::set_temperature_BC()
                                              points,
                                              boundary_dofs);
 
-      const auto fields = T2d.get_field_names();
+      // normalize the dimensions
+      const double L = calc_actual_L();
+      const double R = calc_actual_R();
 
-      std::map<double, std::string> T_time;
-      std::vector<double>           times;
-
-      for (const auto &f : fields)
+      for (auto &p : points)
         {
-          if (f.substr(0, 7) == "T(K)@t=")
-            {
-              const double time = std::stod(f.substr(7));
-
-              T_time[time] = f;
-              times.push_back(time);
-            }
+          p[0] /= R;
+          p[dim - 1] /= L;
         }
 
-      // special handling of the steady-state data
-      if (times.empty())
-        {
-          for (const auto &f : fields)
-            {
-              if (f == "T(K)")
-                {
-                  T_time[0] = f;
-                  times.push_back(0);
-                  break;
-                }
-            }
-        }
+      std::vector<double> times;
+      for (const auto &it : T2d)
+        times.push_back(it.first);
 
       // interpolate and apply the BC
       const auto weights = get_interpolation_weights(times, t);
@@ -1256,8 +1265,10 @@ Problem<dim>::set_temperature_BC()
 
       for (const auto &it : weights)
         {
+          const SurfaceInterpolator2D &T_time = T2d.at(it[0]);
+
           Vector<double> tmp(T_BC);
-          T2d.interpolate(T_time[it[0]], points, boundary_dofs, tmp);
+          T_time.interpolate("T(K)", points, boundary_dofs, tmp);
           T_BC.add(it[1], tmp);
         }
 
@@ -1698,7 +1709,7 @@ template <int dim>
 bool
 Problem<dim>::T_BC1_applied() const
 {
-  return dim == 2 && !T2d.empty() > 0;
+  return dim == 2 && !T2d.empty();
 }
 
 template <int dim>
