@@ -4,6 +4,7 @@ set Ambient temperature       = 300
 set Ambient temperature top   = -1
 set Pull rate                 = 1e-3/60
 set Crystal radius            = 0.002
+set Crystal length            = 
 set Interface shape           = 0
 set Max temperature change    = 0.1
 set Max time                  = 0

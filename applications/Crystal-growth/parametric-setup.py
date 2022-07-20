@@ -246,9 +246,10 @@ while True:
         t_arr.append(t)
         L_arr.append(L * 1e3)
         V_arr.append(V(t) * 1e3 * 60)
+        z_top += V(t + dt / 2) * dt
         t += dt
-        z_top += V(t) * dt
-        L = z_top + (h_melt - H_melt(L))
+        for _ in range(3):
+            L = z_top + H_melt(L_0) - H_melt(L)
     t_change = t - t_max
     # apply relaxation to ensure convergence
     if np.sign(t_change) * np.sign(t_change_prev) < 0:
@@ -321,7 +322,7 @@ deflection = interpolate.interp1d(x, y, fill_value=(y[0], y[-1]), bounds_error=F
 def d_function(r):
     name = params.get("d_function")
     if name == "parabola":
-        return 1 - r ** 2
+        return 1 - r**2
     elif name == "cos":
         return (1 + np.cos(r * np.pi)) / 2
     else:
@@ -403,6 +404,7 @@ else:
 with open("problem-generated.prm", "w") as f:
     f.write("# Auto-generated file, please do not edit\n")
     f.write("set Crystal radius = crystal-shape.dat\n")
+    f.write("set Crystal length = length-time.dat\n")
     f.write("set Pull rate = pull-rate.dat\n")
     f.write("set Interface shape = interface-shape.dat\n")
     f.write(f"set Ambient temperature = {Tamb}\n")
