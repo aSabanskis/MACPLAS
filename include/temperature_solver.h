@@ -196,6 +196,11 @@ public:
   void
   get_support_points(std::vector<Point<dim>> &points) const;
 
+  /** Extract coordinates of boundary DOFs
+   */
+  std::map<unsigned int, Point<dim>>
+  get_boundary_dofs(const unsigned int boundary_id) const;
+
   /** Evaluate values of \c source field at \c points.
    * Handles error for points outside the mesh by setting the value to zero.
    */
@@ -963,6 +968,24 @@ TemperatureSolver<dim>::get_support_points(
 {
   points.resize(dh.n_dofs());
   DoFTools::map_dofs_to_support_points(MappingQ1<dim>(), dh, points);
+}
+
+template <int dim>
+std::map<unsigned int, Point<dim>>
+TemperatureSolver<dim>::get_boundary_dofs(const unsigned int boundary_id) const
+{
+  std::vector<Point<dim>> all_points;
+  std::vector<bool>       boundary_dofs;
+
+  get_boundary_points(boundary_id, all_points, boundary_dofs);
+
+  std::map<unsigned int, Point<dim>> boundary_points;
+  for (unsigned int i = 0; i < all_points.size(); ++i)
+    {
+      if (boundary_dofs[i])
+        boundary_points[i] = all_points[i];
+    }
+  return boundary_points;
 }
 
 template <int dim>

@@ -116,6 +116,11 @@ private:
   bool
   use_advection() const;
 
+  // preprocess some point indices
+  static bool
+  cmp_z(const std::pair<unsigned int, Point<dim>> &it1,
+        const std::pair<unsigned int, Point<dim>> &it2);
+
   Timer timer;
 
   TemperatureSolver<dim> temperature_solver;
@@ -150,6 +155,7 @@ private:
   constexpr static unsigned int boundary_id_axis = 2;
 
   unsigned int point_id_axis_z_min, point_id_axis_z_max, point_id_triple;
+  unsigned int dof_id_axis, dof_id_triple;
 
   SurfaceInterpolator2D surface_projector;
 
@@ -502,11 +508,6 @@ Problem<dim>::make_grid()
                 << " points\n";
     }
 
-  // preprocess some point indices
-  auto cmp_z = [](const std::pair<unsigned int, Point<dim>> &it1,
-                  const std::pair<unsigned int, Point<dim>> &it2) {
-    return it1.second[dim - 1] < it2.second[dim - 1];
-  };
 
   const auto points_axis = get_boundary_points(triangulation, boundary_id_axis),
              points_surface =
@@ -1063,6 +1064,23 @@ Problem<dim>::initialize_temperature()
       dislocation_solver.add_probe(p);
     }
 
+  const auto points_interface =
+    temperature_solver.get_boundary_dofs(boundary_id_interface);
+  dof_id_axis =
+    std::min_element(points_interface.begin(), points_interface.end(), cmp_z)
+      ->first;
+  dof_id_triple =
+    std::max_element(points_interface.begin(), points_interface.end(), cmp_z)
+      ->first;
+
+#ifdef DEBUG
+  std::cout << "dof_id_axis = " << dof_id_axis << " "
+            << points_interface.at(dof_id_axis) << '\n'
+            << "dof_id_triple = " << dof_id_triple << " "
+            << points_interface.at(dof_id_triple) << '\n';
+#endif
+
+
   read_T_BC1();
 
   shift.resize(temperature.size());
@@ -1616,10 +1634,12 @@ Problem<dim>::postprocess()
       if (with_dislocation())
         {
           crystal_probe_file << "\tN_m_min[m^-2]\tN_m_max[m^-2]";
+          crystal_probe_file << "\tN_m_axis[m^-2]\tN_m_triple[m^-2]";
           for (unsigned int i = 0; i < crystal_probes.size(); ++i)
             crystal_probe_file << "\tN_m_" << i << "[m^-2]";
 
           crystal_probe_file << "\ttau_eff_min[Pa]\ttau_eff_max[Pa]";
+          crystal_probe_file << "\ttau_eff_axis[Pa]\ttau_eff_triple[Pa]";
           for (unsigned int i = 0; i < crystal_probes.size(); ++i)
             crystal_probe_file << "\ttau_eff_" << i << "[Pa]";
         }
@@ -1682,11 +1702,15 @@ Problem<dim>::postprocess()
 
       crystal_probe_file << '\t' << limits_N_m.first << '\t'
                          << limits_N_m.second;
+      crystal_probe_file << '\t' << N_m[dof_id_axis] << '\t'
+                         << N_m[dof_id_triple];
       for (const auto &v : values_N_m)
         crystal_probe_file << '\t' << v;
 
       crystal_probe_file << '\t' << limits_tau.first << '\t'
                          << limits_tau.second;
+      crystal_probe_file << '\t' << tau[dof_id_axis] << '\t'
+                         << tau[dof_id_triple];
       for (const auto &v : values_tau)
         crystal_probe_file << '\t' << v;
     }
@@ -1724,6 +1748,14 @@ bool
 Problem<dim>::use_advection() const
 {
   return prm.get("Interpolation method") == "advection";
+}
+
+template <int dim>
+bool
+Problem<dim>::cmp_z(const std::pair<unsigned int, Point<dim>> &it1,
+                    const std::pair<unsigned int, Point<dim>> &it2)
+{
+  return it1.second[dim - 1] < it2.second[dim - 1];
 }
 
 int
