@@ -270,6 +270,11 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
     Patterns::Bool(),
     "Do not interpolate fields on the crystallization interface");
 
+  prm.declare_entry("Smooth interface fields",
+                    "true",
+                    Patterns::Bool(),
+                    "Smooth fields on the crystallization interface");
+
   prm.declare_entry(
     "Reset interface fields",
     "false",
@@ -915,7 +920,7 @@ Problem<dim>::update_fields()
 
   std::vector<Point<dim>> points;
   std::vector<bool>       interface_dofs;
-  if (prm.get_bool("Fix interface fields"))
+  if (!prm.get_bool("Smooth interface fields"))
     {
       temperature_solver.get_boundary_points(boundary_id_interface,
                                              points,

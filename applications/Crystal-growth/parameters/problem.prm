@@ -22,6 +22,7 @@ set Surface update tolerance  = 0.1e-3
 set Number of gradient quadrature points = 0
 set Interpolation method      = advection
 set Fix interface fields      = true
+set Smooth interface fields   = true
 set Reset interface fields    = false
 set Interpolation test function = 
 set Max relative shift        = 0
