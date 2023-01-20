@@ -154,7 +154,8 @@ private:
   // crystal axis
   constexpr static unsigned int boundary_id_axis = 2;
 
-  unsigned int point_id_axis_z_min, point_id_axis_z_max, point_id_triple;
+  unsigned int point_id_axis_z_min, point_id_axis_z_max, point_id_triple,
+    point_id_seed;
   unsigned int dof_id_axis, dof_id_triple;
 
   SurfaceInterpolator2D surface_projector;
@@ -535,9 +536,23 @@ Problem<dim>::make_grid()
     std::min_element(points_surface.begin(), points_surface.end(), cmp_z)
       ->first;
 
-  std::cout << "Axis lowest point = " << point_id_axis_z_min << '\n'
-            << "Axis highest point = " << point_id_axis_z_max << '\n'
-            << "Triple point = " << point_id_triple << '\n';
+  point_id_seed = point_id_axis_z_max;
+  for (const auto &it : points_surface)
+    {
+      const auto &p = it.second;
+      if (p[0] > points_surface.at(point_id_seed)[0] &&
+          p[dim - 1] >= points_surface.at(point_id_seed)[0] - 1e-6)
+        point_id_seed = it.first;
+    }
+
+  std::cout << "Axis lowest point: " << point_id_axis_z_min << " ("
+            << points_axis.at(point_id_axis_z_min) << ")\n"
+            << "Axis highest point: " << point_id_axis_z_max << " ("
+            << points_axis.at(point_id_axis_z_max) << ")\n"
+            << "Triple point: " << point_id_triple << " ("
+            << points_surface.at(point_id_triple) << ")\n"
+            << "Seed point: " << point_id_seed << " ("
+            << points_surface.at(point_id_seed) << ")\n";
 
   // save the crystal side surface
   std::vector<Point<dim>> points_sorted;
@@ -1267,12 +1282,17 @@ Problem<dim>::set_temperature_BC()
                                              points,
                                              boundary_dofs);
 
+      const auto &mesh_points = temperature_solver.get_mesh().get_vertices();
+
       // normalize the dimensions
       const double L = calc_actual_L();
-      const double R = calc_actual_R();
+      const double R = mesh_points.at(point_id_seed)[0];
 
       for (auto &p : points)
         {
+          // make the non-horizontal crystal surface flat
+          p[0] = std::min(p[0], R);
+
           p[0] /= R;
           p[dim - 1] /= L;
         }
