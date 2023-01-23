@@ -536,12 +536,17 @@ Problem<dim>::make_grid()
     std::min_element(points_surface.begin(), points_surface.end(), cmp_z)
       ->first;
 
+  // find the point at which the top crystal surface is still horizontal
   point_id_seed = point_id_axis_z_max;
+
   for (const auto &it : points_surface)
     {
+      const double r_old = points_surface.at(point_id_seed)[0];
+      const double z_old = points_surface.at(point_id_seed)[dim - 1];
+
       const auto &p = it.second;
-      if (p[0] > points_surface.at(point_id_seed)[0] &&
-          p[dim - 1] >= points_surface.at(point_id_seed)[0] - 1e-6)
+
+      if (p[0] > r_old && p[dim - 1] >= z_old - 1e-6)
         point_id_seed = it.first;
     }
 
@@ -1287,11 +1292,13 @@ Problem<dim>::set_temperature_BC()
       // normalize the dimensions
       const double L = calc_actual_L();
       const double R = mesh_points.at(point_id_seed)[0];
+      const double Z = mesh_points.at(point_id_seed)[dim - 1];
 
       for (auto &p : points)
         {
-          // make the non-horizontal crystal surface flat
-          p[0] = std::min(p[0], R);
+          // make the non-horizontal crystal surface straight
+          if (p[dim - 1] < Z - 1e-6)
+            p[0] = R;
 
           p[0] /= R;
           p[dim - 1] /= L;
