@@ -951,9 +951,16 @@ read_data(T &data, const std::string &file_name)
 {
   try
     {
-      std::cout << "Reading from '" << file_name << "'\n";
       std::ifstream f(file_name);
-      data.block_read(f);
+      if (f.is_open())
+        {
+          std::cout << "Reading from '" << file_name << "'\n";
+          data.block_read(f);
+        }
+      else
+        {
+          std::cout << "Skipping reading from '" << file_name << "'\n";
+        }
     }
   catch (std::exception &e)
     {

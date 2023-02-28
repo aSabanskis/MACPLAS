@@ -103,6 +103,8 @@ Problem<dim>::initialize()
     {
       temperature[i] = m_T.value(support_points[i]);
     }
+
+  solver.load_data();
 }
 
 int
