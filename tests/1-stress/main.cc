@@ -144,18 +144,35 @@ Problem<dim>::initialize()
 }
 
 int
-main()
+main(int argc, char *argv[])
 {
+  const std::vector<std::string> arguments(argv, argv + argc);
+
+  int order     = 2;
+  int dimension = 2;
+
+  for (unsigned int i = 1; i < arguments.size(); ++i)
+    {
+      if (arguments[i] == "order" && i + 1 < arguments.size())
+        order = std::stoi(arguments[i + 1]);
+      if (arguments[i] == "2d" || arguments[i] == "2D")
+        dimension = 2;
+      if (arguments[i] == "3d" || arguments[i] == "3D")
+        dimension = 3;
+    }
+
   deallog.attach(std::cout);
   deallog.depth_console(2);
 
-  for (unsigned int order = 1; order <= 3; ++order)
+  if (dimension == 2)
     {
-      Problem<2> p2d(order);
-      p2d.run();
-
-      Problem<3> p3d(order);
-      p3d.run();
+      Problem<2> p2(order);
+      p2.run();
+    }
+  else if (dimension == 3)
+    {
+      Problem<3> p3(order);
+      p3.run();
     }
 
   return 0;
