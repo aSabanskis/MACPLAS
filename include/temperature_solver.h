@@ -100,8 +100,8 @@ public:
    * \todo Automatically calculate temperature derivatives needed for the
    * Newton's method
    */
-  TemperatureSolver(const unsigned int order           = 2,
-                    const bool         use_default_prm = false);
+  explicit TemperatureSolver(const unsigned int order           = 2,
+                             const bool         use_default_prm = false);
 
   /** Solver name
    */

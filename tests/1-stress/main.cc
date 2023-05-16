@@ -9,7 +9,7 @@ template <int dim>
 class Problem
 {
 public:
-  Problem(const unsigned int order = 1);
+  explicit Problem(const unsigned int order = 1);
 
   void
   run();
@@ -25,8 +25,6 @@ private:
   double T_a, T_b;
 
   const SphericalManifold<dim> manifold;
-
-  Vector<double> temperature;
 
   StressSolver<dim> solver;
 };

@@ -49,8 +49,8 @@ public:
    * Default values are used and written to \c stress.prm if
    * \c use_default_prm parameter is specified.
    */
-  StressSolver(const unsigned int order           = 2,
-               const bool         use_default_prm = false);
+  explicit StressSolver(const unsigned int order           = 2,
+                        const bool         use_default_prm = false);
 
   /** Solver name
    */

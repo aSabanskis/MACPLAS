@@ -36,8 +36,8 @@ public:
    * Default values are used and written to \c dislocation.prm if
    * \c use_default_prm parameter is specified.
    */
-  DislocationSolver(const unsigned int order           = 2,
-                    const bool         use_default_prm = false);
+  explicit DislocationSolver(const unsigned int order           = 2,
+                             const bool         use_default_prm = false);
 
   /** Solver name
    */

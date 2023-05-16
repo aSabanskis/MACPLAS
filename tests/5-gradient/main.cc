@@ -9,7 +9,7 @@ template <int dim>
 class Problem
 {
 public:
-  Problem(const unsigned int order = 2);
+  explicit Problem(const unsigned int order = 2);
 
   void
   run();

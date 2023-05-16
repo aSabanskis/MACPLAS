@@ -2173,7 +2173,7 @@ DoFGradientEvaluation<dim>::calculate(const unsigned int n_quadrature_points)
   std::vector<types::global_dof_index> local_dof_indices(dofs_per_cell);
 
   // check data sizes and initialize gradients with zeros
-  for (auto &it : fields)
+  for (const auto &it : fields)
     {
       const auto &s = it.first;
       const auto  n = fields[s].size();
@@ -2317,7 +2317,7 @@ DoFFieldSmoother<dim>::smooth_cell(const double relax,
       for (unsigned int i = 0; i < dofs_per_cell; ++i)
         count[local_dof_indices[i]] += 1;
 
-      for (auto &it : fields)
+      for (const auto &it : fields)
         {
           const Vector<double> &f = it.second;
 

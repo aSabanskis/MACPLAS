@@ -18,7 +18,8 @@ template <int dim>
 class Problem
 {
 public:
-  Problem(const unsigned int order = 2, const bool use_default_prm = false);
+  explicit Problem(const unsigned int order           = 2,
+                   const bool         use_default_prm = false);
 
   void
   run(const bool dry_run);
@@ -938,10 +939,10 @@ Problem<dim>::update_fields()
       advection_solver.solve(true);
     }
 
-  std::vector<Point<dim>> points;
-  std::vector<bool>       interface_dofs;
+  std::vector<bool> interface_dofs;
   if (!prm.get_bool("Smooth interface fields"))
     {
+      std::vector<Point<dim>> points;
       temperature_solver.get_boundary_points(boundary_id_interface,
                                              points,
                                              interface_dofs);

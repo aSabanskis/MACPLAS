@@ -8,7 +8,7 @@ template <int dim>
 class Problem
 {
 public:
-  Problem(const std::vector<std::string> &arguments);
+  explicit Problem(const std::vector<std::string> &arguments);
 
   void
   run();
