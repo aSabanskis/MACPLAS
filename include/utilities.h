@@ -406,6 +406,9 @@ public:
   inline void
   set_points(const std::vector<Point<dim>> &new_points);
 
+  inline void
+  set_points(const std::vector<Point<dim + 1>> &new_points);
+
   /** Get mesh
    */
   inline const std::vector<Point<dim>> &
@@ -1968,6 +1971,12 @@ SurfaceInterpolator2D::set_points(const std::vector<Point<dim>> &new_points)
 #ifdef DEBUG
   info();
 #endif
+}
+
+void
+SurfaceInterpolator2D::set_points(const std::vector<Point<dim + 1>> &new_points)
+{
+  // do nothing
 }
 
 const std::vector<Point<SurfaceInterpolator2D::dim>> &

@@ -516,9 +516,11 @@ Problem<dim>::make_grid()
     }
 
 
-  const auto points_axis = get_boundary_points(triangulation, boundary_id_axis),
-             points_surface =
-               get_boundary_points(triangulation, boundary_id_surface);
+  const auto points_surface =
+    get_boundary_points(triangulation, boundary_id_surface);
+  const auto points_axis =
+    dim == 2 ? get_boundary_points(triangulation, boundary_id_axis) :
+               points_surface;
   AssertThrow(!points_axis.empty(),
               ExcMessage("No points on boundary No. " +
                          std::to_string(boundary_id_axis) + " (axis) found"));
@@ -584,7 +586,7 @@ Problem<dim>::make_grid()
 
   std::cout << "Initial R = " << R << " m, L = " << L << " m\n";
 
-  AssertThrow(std::fabs(R - R_new) < 1e-4,
+  AssertThrow(std::fabs(R - R_new) < 1e-4 || dim == 3,
               ExcMessage("The actual radius R = " + std::to_string(R) +
                          " m differs from the expected R_new = " +
                          std::to_string(R_new) + " m"));
@@ -794,6 +796,13 @@ Problem<dim>::deform_grid()
     }
 
   std::cout << "Deforming grid - done " << format_time(timer) << "\n";
+}
+
+template <>
+void
+Problem<3>::deform_grid()
+{
+  throw ExcNotImplemented();
 }
 
 template <int dim>
@@ -1119,8 +1128,8 @@ Problem<dim>::initialize_temperature()
   const std::string expr = prm.get("Interpolation test function");
   if (!expr.empty())
     {
-      FunctionParser<2> calc_f;
-      calc_f.initialize("r,z", expr, typename FunctionParser<2>::ConstMap());
+      FunctionParser<dim> calc_f;
+      calc_f.initialize("r,z", expr, typename FunctionParser<dim>::ConstMap());
 
       temperature_solver.get_support_points(support_points);
       f_test.reinit(temperature.size());
@@ -1766,7 +1775,7 @@ template <int dim>
 bool
 Problem<dim>::T_BC1_applied() const
 {
-  return dim == 2 && !T2d.empty();
+  return !T2d.empty();
 }
 
 template <int dim>
@@ -1809,6 +1818,10 @@ main(int argc, char *argv[])
         dry_run = true;
       if (arguments[i] == "order" && i + 1 < arguments.size())
         order = std::stoi(arguments[i + 1]);
+      if (arguments[i] == "2d" || arguments[i] == "2D")
+        dimension = 2;
+      if (arguments[i] == "3d" || arguments[i] == "3D")
+        dimension = 3;
     }
 
   deallog.attach(std::cout);
@@ -1819,6 +1832,12 @@ main(int argc, char *argv[])
       Problem<2> p2d(order, init);
       if (!init)
         p2d.run(dry_run);
+    }
+  else if (dimension == 3)
+    {
+      Problem<3> p3d(order, init);
+      if (!init)
+        p3d.run(dry_run);
     }
   else
     {
