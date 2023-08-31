@@ -591,10 +591,9 @@ private:
  * typically, each of the vertices at the boundary of the triangulation is
  * mapped to the corresponding points in the @p new_points map.
  *
- * The unknown displacement field $u_d(\mathbf x)$ in direction $d$ is obtained
- * from the minimization problem \f[ \min\, \int \frac{1}{2} c(\mathbf x)
- *   \mathbf \nabla u_d(\mathbf x) \cdot
- *   \mathbf \nabla u_d(\mathbf x)
+ * The unknown displacement field \f$u_d(\mathbf x)\f$ in direction \f$d\f$ is
+ * obtained from the minimization problem \f[ \min\, \int \frac{1}{2} c(\mathbf
+ * x) \mathbf \nabla u_d(\mathbf x) \cdot \mathbf \nabla u_d(\mathbf x)
  *   \,\rm d x
  * \f]
  * subject to prescribed constraints. The minimizer is obtained by solving the
@@ -638,6 +637,8 @@ private:
  * result in very different mesh motion otherwise. Since in most cases one will
  * be using a non-constant coefficient in displacement formulation, the default
  * value of this parameter is <code>false</code>.
+ *
+ * @param[in] tol Tolerance for solving the system of linear equations.
  *
  * @note This function is not currently implemented for the 1d case.
  * @note The code is taken from deal.II sources and user-specified solver tolerance added.
