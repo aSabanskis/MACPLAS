@@ -310,6 +310,11 @@ private:
   double
   calc_C_44(const double T) const;
 
+  /** Calculate the anisotropic factor \f$H = 2 C_{44} + C_{12} − C_{11}\f$, Pa
+   */
+  double
+  calc_H(const double T) const;
+
   /** Recover strain at DOFs via extrapolation from quadrature points.
    * Called by StressSolver::calculate_stress.
    */
@@ -1052,6 +1057,11 @@ StressSolver<dim>::output_vtk() const
     C_44[i] = calc_C_44(temperature[i]);
   data_out.add_data_vector(C_44, "C_44");
 
+  Vector<double> H(temperature.size());
+  for (unsigned int i = 0; i < temperature.size(); ++i)
+    H[i] = calc_H(temperature[i]);
+  data_out.add_data_vector(H, "H");
+
   Vector<double> alpha(temperature.size());
   for (unsigned int i = 0; i < temperature.size(); ++i)
     alpha[i] = calc_alpha(temperature[i]);
@@ -1140,6 +1150,7 @@ StressSolver<dim>::output_parameter_table(const double       T1,
          << "C_11[Pa]\t"
          << "C_12[Pa]\t"
          << "C_44[Pa]\t"
+         << "H[Pa]\t"
          << "alpha[K^-1]\n";
 
   for (unsigned int i = 0; i < n; ++i)
@@ -1147,8 +1158,8 @@ StressSolver<dim>::output_parameter_table(const double       T1,
       const double T = T1 + (T2 - T1) * i / (n - 1);
 
       output << T << '\t' << calc_E(T) << '\t' << calc_C_11(T) << '\t'
-             << calc_C_12(T) << '\t' << calc_C_44(T) << '\t' << calc_alpha(T)
-             << '\n';
+             << calc_C_12(T) << '\t' << calc_C_44(T) << '\t' << calc_H(T)
+             << '\t' << calc_alpha(T) << '\n';
     }
 }
 
@@ -1479,6 +1490,16 @@ StressSolver<dim>::calc_C_44(const double T) const
     return m_C_44.value(Point<1>(T));
 
   return calc_E(T) / (2 * (1 + m_nu));
+}
+
+template <int dim>
+double
+StressSolver<dim>::calc_H(const double T) const
+{
+  if (use_elastic_constants)
+    return 2 * calc_C_44(T) + calc_C_12(T) - calc_C_11(T);
+
+  return 0;
 }
 
 template <int dim>
