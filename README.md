@@ -47,6 +47,19 @@ To generate documentation in HTML and LaTeX formats, execute the command ```doxy
   title = {Application of the {A}lexander{\textendash}{H}aasen Model for Thermally Stimulated Dislocation Generation in {FZ} Silicon Crystals},
   journal = {Crystals}
 }
+
+@article{Sabanskis2023,
+  doi = {10.1016/j.jcrysgro.2023.127384},
+  url = {https://doi.org/10.1016/j.jcrysgro.2023.127384},
+  year = {2023},
+  month = nov,
+  publisher = {Elsevier {BV}},
+  volume = {622},
+  pages = {127384},
+  author = {Andrejs Sabanskis and Kaspars Dadzis and Kevin-Peter Gradwohl and Arved Wintzer and Wolfram Miller and Uta Juda and R. Radhakrishnan Sumathi and J{\={a}}nis Virbulis},
+  title = {Parametric numerical study of dislocation density distribution in {C}zochralski-grown germanium crystals},
+  journal = {Journal of Crystal Growth}
+}
 ```
 Please cite the MACPLAS library if you use it in your research.
 
