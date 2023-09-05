@@ -1,6 +1,7 @@
 set Melting point             = 1210
 set Emissivity                = 0.55
 set Ambient temperature       = 300
+set Ambient temperature interface = -1
 set Ambient temperature top   = -1
 set Pull rate                 = 1e-3/60
 set Crystal radius            = 0.002
