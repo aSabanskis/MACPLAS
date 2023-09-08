@@ -222,7 +222,22 @@ public:
   stress_component_names() const;
 
 private:
-  /** Initialize parameters. Called by the constructor
+  /** Method of calculation of the elastic matrix
+   */
+  enum ElasticMatrixType
+  {
+    Enu, ///< Isotropic (from Young's modulus and Poisson's ratio)
+    Cij, ///< C_11, C_12 and C_44
+    Full ///< Full matrix
+  };
+
+  /** Initialize elastic parameters and \c Cij_type. Called by
+   * StressSolver::initialize_parameters
+   */
+  void
+  initialize_elastic_parameters();
+
+  /** Initialize all parameters. Called by the constructor
    */
   void
   initialize_parameters();
@@ -460,9 +475,9 @@ private:
    */
   ParameterHandler prm;
 
-  /** Use elastic constants instead of Young's modulus and Poisson's ratio
+  /** Method of calculation of the elastic constants
    */
-  bool use_elastic_constants;
+  ElasticMatrixType Cij_type;
 
   /** Elastic constant (temperature function) \f$C_{11}\f$, Pa
    */
@@ -475,6 +490,10 @@ private:
   /** Elastic constant (temperature function) \f$C_{44}\f$, Pa
    */
   FunctionParser<1> m_C_44;
+
+  /** Full elastic constant matrix (temperature functions) \f$C_{ij}\f$, Pa
+   */
+  std::array<FunctionParser<1>, n_components * n_components> m_C_full;
 
   /** Young's modulus (temperature function) \f$E\f$, Pa
    */
@@ -505,6 +524,7 @@ StressSolver<dim>::StressSolver(const unsigned int order,
   , fe(FE_Q<dim>(order), dim)
   , dh(triangulation)
   , converged(false)
+  , Cij_type(ElasticMatrixType::Enu)
 {
   std::cout << "Creating stress solver, order=" << order << ", dim=" << dim
             << " ("
@@ -538,6 +558,13 @@ StressSolver<dim>::StressSolver(const unsigned int order,
                     "",
                     Patterns::Anything(),
                     "Optional elastic constant C_44 in Pa" + info_T);
+
+  prm.declare_entry(
+    "Elastic constant matrix",
+    "",
+    Patterns::Anything(),
+    "Optional comma-separated full elastic constant matrix C_ij in Pa" +
+      info_T);
 
   // Physical parameters from https://doi.org/10.1016/S0022-0248(01)01322-7
   prm.declare_entry("Young's modulus",
@@ -691,22 +718,23 @@ StressSolver<dim>::StressSolver(const unsigned int order,
 
 template <int dim>
 void
-StressSolver<dim>::initialize_parameters()
+StressSolver<dim>::initialize_elastic_parameters()
 {
-  std::cout << solver_name() << "  Initializing parameters";
+  const std::string m_E_expression = prm.get("Young's modulus");
+  m_E.initialize("T", m_E_expression, typename FunctionParser<1>::ConstMap());
+  m_nu = prm.get_double("Poisson's ratio");
 
   const std::string m_C_11_expression = prm.get("Elastic constant C_11");
   const std::string m_C_12_expression = prm.get("Elastic constant C_12");
   const std::string m_C_44_expression = prm.get("Elastic constant C_44");
 
-  use_elastic_constants =
+  const bool use_elastic_constants =
     !(m_C_11_expression.empty() || m_C_12_expression.empty() ||
       m_C_44_expression.empty());
 
   if (use_elastic_constants)
     {
-      prm.set("Young's modulus", "0");
-      prm.set("Poisson's ratio", "0");
+      Cij_type = ElasticMatrixType::Cij;
 
       m_C_11.initialize("T",
                         m_C_11_expression,
@@ -717,10 +745,90 @@ StressSolver<dim>::initialize_parameters()
       m_C_44.initialize("T",
                         m_C_44_expression,
                         typename FunctionParser<1>::ConstMap());
+
+      std::cout << "C_11=" << m_C_11_expression << "\n"
+                << "C_12=" << m_C_12_expression << "\n"
+                << "C_44=" << m_C_44_expression << "\n";
+
+      return;
     }
 
-  const std::string m_E_expression = prm.get("Young's modulus");
-  m_E.initialize("T", m_E_expression, typename FunctionParser<1>::ConstMap());
+  const std::string        Cij_s     = prm.get("Elastic constant matrix");
+  std::vector<std::string> Cij_split = Utilities::split_string_list(Cij_s, ',');
+
+  std::cout << Cij_split.size() << ' ' << m_C_full.size() << '\n';
+
+  const bool use_full_matix = Cij_split.size() == m_C_full.size();
+
+  if (use_full_matix)
+    {
+      Cij_type = ElasticMatrixType::Full;
+
+      std::array<int, n_components> colum_widths;
+
+      for (int i = 0; i < n_components; ++i)
+        {
+          colum_widths[i] = 0;
+          for (int j = 0; j < n_components; ++j)
+            {
+              std::string &Cij = Cij_split[i + j * n_components];
+              colum_widths[i]  = std::max(colum_widths[i], (int)Cij.size());
+            }
+          std::cout << i << ' ' << colum_widths[i] << '\n';
+        }
+
+      std::cout << "C_ij=\n";
+      for (int j = 0; j < n_components; ++j)
+        {
+          for (int i = 0; i < n_components; ++i)
+            {
+              std::string &Cij = Cij_split[i + j * n_components];
+
+              if (Cij.empty())
+                Cij = "0";
+
+              std::cout << std::setw(colum_widths[i]) << Cij;
+
+              if (i + 1 < n_components)
+                std::cout << ", ";
+              else
+                std::cout << '\n';
+            }
+        }
+
+      for (int j = 0; j < n_components; ++j)
+        {
+          for (int i = 0; i <= j; ++i)
+            {
+              const std::string &Cij = Cij_split[i + j * n_components];
+              const std::string &Cji = Cij_split[j + i * n_components];
+
+              AssertThrow(Cij == Cji,
+                          ExcMessage("C_" + std::to_string(i) +
+                                     std::to_string(j) + " = '" + Cij +
+                                     "' not equal to C_" + std::to_string(j) +
+                                     std::to_string(i) + " = '" + Cji + "'"));
+
+              // lower triangle will be uninitialized
+              m_C_full[i + j * n_components].initialize(
+                "T", Cij, typename FunctionParser<1>::ConstMap());
+            }
+        }
+
+      return;
+    }
+
+  std::cout << "E=" << m_E_expression << "\n"
+            << "nu=" << m_nu << "\n";
+}
+
+template <int dim>
+void
+StressSolver<dim>::initialize_parameters()
+{
+  std::cout << solver_name() << "  Initializing parameters\n";
+
+  initialize_elastic_parameters();
 
   const std::string m_alpha_expression =
     prm.get("Thermal expansion coefficient");
@@ -728,7 +836,6 @@ StressSolver<dim>::initialize_parameters()
                      m_alpha_expression,
                      typename FunctionParser<1>::ConstMap());
 
-  m_nu    = prm.get_double("Poisson's ratio");
   m_T_ref = prm.get_double("Reference temperature");
 
   const auto n_threads = prm.get_integer("Number of threads");
@@ -749,16 +856,6 @@ StressSolver<dim>::initialize_parameters()
 
   if (prm.get_integer("Output subdivisions") == 0)
     prm.set("Output subdivisions", n_vtk_default);
-
-  std::cout << "  done\n";
-
-  if (use_elastic_constants)
-    std::cout << "C_11=" << m_C_11_expression << "\n"
-              << "C_12=" << m_C_12_expression << "\n"
-              << "C_44=" << m_C_44_expression << "\n";
-  else
-    std::cout << "E=" << m_E_expression << "\n"
-              << "nu=" << m_nu << "\n";
 
   std::cout << "alpha=" << m_alpha_expression << "\n"
             << "T_ref=" << m_T_ref << "\n";
@@ -1466,7 +1563,7 @@ template <int dim>
 double
 StressSolver<dim>::calc_C_11(const double T) const
 {
-  if (use_elastic_constants)
+  if (Cij_type == ElasticMatrixType::Cij)
     return m_C_11.value(Point<1>(T));
 
   return calc_E(T) * (1 - m_nu) / ((1 + m_nu) * (1 - 2 * m_nu));
@@ -1476,7 +1573,7 @@ template <int dim>
 double
 StressSolver<dim>::calc_C_12(const double T) const
 {
-  if (use_elastic_constants)
+  if (Cij_type == ElasticMatrixType::Cij)
     return m_C_12.value(Point<1>(T));
 
   return calc_E(T) * m_nu / ((1 + m_nu) * (1 - 2 * m_nu));
@@ -1486,7 +1583,7 @@ template <int dim>
 double
 StressSolver<dim>::calc_C_44(const double T) const
 {
-  if (use_elastic_constants)
+  if (Cij_type == ElasticMatrixType::Cij)
     return m_C_44.value(Point<1>(T));
 
   return calc_E(T) / (2 * (1 + m_nu));
@@ -1496,7 +1593,7 @@ template <int dim>
 double
 StressSolver<dim>::calc_H(const double T) const
 {
-  if (use_elastic_constants)
+  if (Cij_type == ElasticMatrixType::Cij)
     return 2 * calc_C_44(T) + calc_C_12(T) - calc_C_11(T);
 
   return 0;
@@ -1865,6 +1962,23 @@ SymmetricTensor<2, StressSolver<dim>::n_components>
 StressSolver<dim>::get_stiffness_tensor(const double &T) const
 {
   SymmetricTensor<2, n_components> tmp;
+
+  if (Cij_type == ElasticMatrixType::Full)
+    {
+      const auto x = Point<1>(T);
+
+      for (int j = 0; j < n_components; ++j)
+        {
+          for (int i = 0; i <= j; ++i)
+            {
+              tmp[i][j] = m_C_full[i + j * n_components].value(x);
+            }
+        }
+
+      return tmp;
+    }
+
+
   tmp[0][0] = tmp[1][1] = tmp[2][2] = calc_C_11(T);
   tmp[2][1] = tmp[2][0] = tmp[1][0] = calc_C_12(T);
 
