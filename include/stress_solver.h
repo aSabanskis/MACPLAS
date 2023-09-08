@@ -756,7 +756,9 @@ StressSolver<dim>::initialize_elastic_parameters()
   const std::string        Cij_s     = prm.get("Elastic constant matrix");
   std::vector<std::string> Cij_split = Utilities::split_string_list(Cij_s, ',');
 
+#ifdef DEBUG
   std::cout << Cij_split.size() << ' ' << m_C_full.size() << '\n';
+#endif
 
   const bool use_full_matix = Cij_split.size() == m_C_full.size();
 
@@ -774,7 +776,9 @@ StressSolver<dim>::initialize_elastic_parameters()
               std::string &Cij = Cij_split[i + j * n_components];
               colum_widths[i]  = std::max(colum_widths[i], (int)Cij.size());
             }
+#ifdef DEBUG
           std::cout << i << ' ' << colum_widths[i] << '\n';
+#endif
         }
 
       std::cout << "C_ij=\n";
