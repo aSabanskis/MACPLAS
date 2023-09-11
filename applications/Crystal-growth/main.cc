@@ -220,10 +220,10 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
     "Ambient temperature for uppermost crystal points in K (negative - disabled)");
 
   prm.declare_entry(
-    "Ambient temperature interface",
+    "Ambient temperature detached",
     "-1",
     Patterns::Double(),
-    "Ambient temperature for crystallization interface after detachment in K (negative - disabled)");
+    "Ambient temperature for all surfaces after detachment in K (negative - disabled)");
 
   prm.declare_entry("Temperature only",
                     "false",
@@ -1359,8 +1359,9 @@ Problem<dim>::set_temperature_BC()
                                          points,
                                          boundary_dofs);
 
-  const double z_top = surface_projector.get_points()[0][dim - 1];
-  const double T_top = prm.get_double("Ambient temperature top");
+  const double z_top      = surface_projector.get_points()[0][dim - 1];
+  const double T_top      = prm.get_double("Ambient temperature top");
+  const double T_detached = prm.get_double("Ambient temperature detached");
 
   for (unsigned int i = 0; i < n; ++i)
     {
@@ -1370,7 +1371,9 @@ Problem<dim>::set_temperature_BC()
       const double z      = points[i][dim - 1];
       const bool   top_bc = T_top >= 0 && std::abs(z - z_top) < 1e-8;
 
-      const double T = top_bc ? T_top : ambient_temperature->value(Point<1>(z));
+      const double T = (is_detached(t) && T_detached >= 0) ? T_detached :
+                       top_bc                              ? T_top :
+                                ambient_temperature->value(Point<1>(z));
 
       q_in[i] = sigma_SB * e * std::pow(T, 4);
     }
@@ -1382,9 +1385,6 @@ Problem<dim>::set_temperature_BC()
 
   if (is_detached(t))
     {
-      const double T_interface =
-        prm.get_double("Ambient temperature interface");
-
       std::vector<bool> boundary_dofs2;
       temperature_solver.get_boundary_points(boundary_id_interface,
                                              points,
@@ -1396,8 +1396,8 @@ Problem<dim>::set_temperature_BC()
             continue;
 
           const double z = points[i][dim - 1];
-          const double T = T_interface >= 0 ?
-                             T_interface :
+          const double T = T_detached >= 0 ?
+                             T_detached :
                              ambient_temperature->value(Point<1>(z));
 
           q_in[i] = sigma_SB * e * std::pow(T, 4);
