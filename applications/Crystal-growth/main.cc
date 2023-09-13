@@ -95,10 +95,7 @@ private:
   solve_temperature_dislocation();
 
   void
-  output_results(const bool data     = false,
-                 const bool vtk      = true,
-                 const bool boundary = dim == 2,
-                 const bool mesh     = false) const;
+  output_results() const;
 
   void
   postprocess();
@@ -229,6 +226,16 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     "false",
                     Patterns::Bool(),
                     "Calculate just the temperature field");
+
+  prm.declare_entry("Export data",
+                    "false",
+                    Patterns::Bool(),
+                    "Export the raw results");
+
+  prm.declare_entry("Export vtk",
+                    "true",
+                    Patterns::Bool(),
+                    "Export results in vtk format");
 
   prm.declare_entry(
     "Pull rate",
@@ -1613,11 +1620,13 @@ Problem<dim>::solve_temperature_dislocation()
 
 template <int dim>
 void
-Problem<dim>::output_results(const bool data,
-                             const bool vtk,
-                             const bool boundary,
-                             const bool mesh) const
+Problem<dim>::output_results() const
 {
+  const bool data     = prm.get_bool("Export data");
+  const bool vtk      = prm.get_bool("Export vtk");
+  const bool boundary = dim == 2;
+  const bool mesh     = data;
+
   const bool has_dislocation =
     with_dislocation() &&
     dislocation_solver.get_dof_handler().has_active_dofs();

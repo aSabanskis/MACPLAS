@@ -29,3 +29,5 @@ set Interpolation test function =
 set Max relative shift        = 0
 set Laplace tolerance         = 1e-12
 set Temperature only          = false
+set Export data               = false
+set Export vtk                = true
