@@ -1977,7 +1977,13 @@ SurfaceInterpolator2D::set_points(const std::vector<Point<dim>> &new_points)
 void
 SurfaceInterpolator2D::set_points(const std::vector<Point<dim + 1>> &new_points)
 {
-  // do nothing
+  points.resize(new_points.size());
+
+  for (unsigned int i = 0; i < points.size(); ++i)
+    {
+      points[i][0] = std::hypot(new_points[i][0], new_points[i][1]);
+      points[i][1] = new_points[i][2];
+    }
 }
 
 const std::vector<Point<SurfaceInterpolator2D::dim>> &

@@ -1366,7 +1366,7 @@ Problem<dim>::set_temperature_BC()
                                          points,
                                          boundary_dofs);
 
-  const double z_top      = surface_projector.get_points()[0][dim - 1];
+  const double z_top      = surface_projector.get_points()[0][1];
   const double T_top      = prm.get_double("Ambient temperature top");
   const double T_detached = prm.get_double("Ambient temperature detached");
 
