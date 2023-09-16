@@ -163,6 +163,8 @@ private:
 
   std::unique_ptr<Function<1>> ambient_temperature;
 
+  std::unique_ptr<Function<2>> ambient_temperature_detached;
+
   std::unique_ptr<Function<1>> pull_rate;
 
   std::unique_ptr<Function<1>> crystal_radius;
@@ -219,8 +221,8 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
   prm.declare_entry(
     "Ambient temperature detached",
     "-1",
-    Patterns::Double(),
-    "Ambient temperature for all surfaces after detachment in K (negative - disabled)");
+    Patterns::Anything(),
+    "Ambient temperature for all surfaces after detachment in K (vertical coordinate z and time t function)");
 
   prm.declare_entry("Temperature only",
                     "false",
@@ -425,6 +427,10 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
     }
 
   initialize_function(ambient_temperature, prm.get("Ambient temperature"), "z");
+
+  initialize_function(ambient_temperature_detached,
+                      prm.get("Ambient temperature detached"),
+                      "z,t");
 
   initialize_function(pull_rate, prm.get("Pull rate"));
 
@@ -1366,9 +1372,8 @@ Problem<dim>::set_temperature_BC()
                                          points,
                                          boundary_dofs);
 
-  const double z_top      = surface_projector.get_points()[0][1];
-  const double T_top      = prm.get_double("Ambient temperature top");
-  const double T_detached = prm.get_double("Ambient temperature detached");
+  const double z_top = surface_projector.get_points()[0][1];
+  const double T_top = prm.get_double("Ambient temperature top");
 
   for (unsigned int i = 0; i < n; ++i)
     {
@@ -1377,6 +1382,8 @@ Problem<dim>::set_temperature_BC()
 
       const double z      = points[i][dim - 1];
       const bool   top_bc = T_top >= 0 && std::abs(z - z_top) < 1e-8;
+      const double T_detached =
+        ambient_temperature_detached->value(Point<2>(z, t));
 
       const double T = (is_detached(t) && T_detached >= 0) ? T_detached :
                        top_bc                              ? T_top :
@@ -1403,6 +1410,9 @@ Problem<dim>::set_temperature_BC()
             continue;
 
           const double z = points[i][dim - 1];
+          const double T_detached =
+            ambient_temperature_detached->value(Point<2>(z, t));
+
           const double T = T_detached >= 0 ?
                              T_detached :
                              ambient_temperature->value(Point<1>(z));
