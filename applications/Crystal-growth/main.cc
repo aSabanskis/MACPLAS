@@ -224,6 +224,11 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
     Patterns::Anything(),
     "Ambient temperature for all surfaces after detachment in K (vertical coordinate z and time t function)");
 
+  prm.declare_entry("Load saved results",
+                    "false",
+                    Patterns::Bool(),
+                    "Skip calculation of temperature and stress fields");
+
   prm.declare_entry("Temperature only",
                     "false",
                     Patterns::Bool(),
@@ -1158,6 +1163,12 @@ Problem<dim>::initialize_temperature()
 
       temperature_solver.add_field("f_test", f_test);
     }
+
+  if (prm.get_bool("Load saved results"))
+    {
+      temperature_solver.load_data();
+      return;
+    }
 }
 
 template <int dim>
@@ -1175,6 +1186,11 @@ Problem<dim>::initialize_dislocation(const bool dry_run)
   dislocation_solver.add_output("shift_relative");
 
   dislocation_solver.output_parameter_table();
+
+  if (prm.get_bool("Load saved results"))
+    {
+      dislocation_solver.load_data();
+    }
 
   if (dry_run)
     return;
@@ -1519,6 +1535,12 @@ template <int dim>
 void
 Problem<dim>::solve_steady_temperature()
 {
+  if (prm.get_bool("Load saved results"))
+    {
+      temperature_solver.load_data();
+      return;
+    }
+
   std::cout << "Calculating steady-state temperature field\n";
 
   const double dt0 = temperature_solver.get_time_step();

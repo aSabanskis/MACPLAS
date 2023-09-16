@@ -28,6 +28,7 @@ set Reset interface fields    = false
 set Interpolation test function = 
 set Max relative shift        = 0
 set Laplace tolerance         = 1e-12
+set Load saved results        = false
 set Temperature only          = false
 set Export data               = false
 set Export vtk                = true
