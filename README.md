@@ -60,6 +60,20 @@ To generate documentation in HTML and LaTeX formats, execute the command ```doxy
   title = {Parametric numerical study of dislocation density distribution in {C}zochralski-grown germanium crystals},
   journal = {Journal of Crystal Growth}
 }
+
+@article{Miller2023,
+  doi = {10.3390/cryst13101440},
+  url = {https://doi.org/10.3390/cryst13101440},
+  year = {2023},
+  month = sep,
+  publisher = {{MDPI} {AG}},
+  volume = {13},
+  number = {10},
+  pages = {1440},
+  author = {Wolfram Miller and Andrejs Sabanskis and Alexander Gybin and Kevin-P. Gradwohl and Arved Wintzer and Kaspars Dadzis and J{\={a}}nis Virbulis and Radhakrishnan Sumathi},
+  title = {A Coupled Approach to Compute the Dislocation Density Development during Czochralski Growth and Its Application to the Growth of High-Purity Germanium ({HPGe})},
+  journal = {Crystals}
+}
 ```
 Please cite the MACPLAS library if you use it in your research.
 
