@@ -44,7 +44,7 @@ To generate documentation in HTML and LaTeX formats, execute the command ```doxy
   number = {2},
   pages = {174},
   author = {Andrejs Sabanskis and Kaspars Dadzis and Robert Menzel and J{\={a}}nis Virbulis},
-  title = {Application of the {A}lexander{\textendash}{H}aasen Model for Thermally Stimulated Dislocation Generation in {FZ} Silicon Crystals},
+  title = {Application of the {A}lexander{\textendash}{H}aasen model for thermally stimulated dislocation generation in {FZ} silicon crystals},
   journal = {Crystals}
 }
 
@@ -71,7 +71,7 @@ To generate documentation in HTML and LaTeX formats, execute the command ```doxy
   number = {10},
   pages = {1440},
   author = {Wolfram Miller and Andrejs Sabanskis and Alexander Gybin and Kevin-P. Gradwohl and Arved Wintzer and Kaspars Dadzis and J{\={a}}nis Virbulis and Radhakrishnan Sumathi},
-  title = {A Coupled Approach to Compute the Dislocation Density Development during Czochralski Growth and Its Application to the Growth of High-Purity Germanium ({HPGe})},
+  title = {A coupled approach to compute the dislocation density development during {C}zochralski growth and its application to the growth of high-purity germanium ({HPGe})},
   journal = {Crystals}
 }
 ```

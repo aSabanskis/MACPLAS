@@ -38,6 +38,7 @@ results-*
 html
 latex
 *.pdf
+*.bib
 *.gnu
 
 # Data files
