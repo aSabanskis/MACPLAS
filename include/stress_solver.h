@@ -281,9 +281,9 @@ private:
 
   /** Iterator tuple
    */
-  typedef std_cxx11::tuple<typename DoFHandler<dim>::active_cell_iterator,
-                           typename DoFHandler<dim>::active_cell_iterator>
-    IteratorTuple;
+  using IteratorTuple =
+    std::tuple<typename DoFHandler<dim>::active_cell_iterator,
+               typename DoFHandler<dim>::active_cell_iterator>;
 
   /** Iterator pair
    */
@@ -1415,9 +1415,9 @@ StressSolver<dim>::local_assemble_system(const IteratorPair & cell_pair,
   Tensor<1, n_components> epsilon_T_q;
 
   const typename DoFHandler<dim>::active_cell_iterator &cell_temp =
-    std_cxx11::get<0>(*cell_pair);
+    std::get<0>(*cell_pair);
   const typename DoFHandler<dim>::active_cell_iterator &cell =
-    std_cxx11::get<1>(*cell_pair);
+    std::get<1>(*cell_pair);
 
   fe_values_temp.reinit(cell_temp);
   fe_values.reinit(cell);
