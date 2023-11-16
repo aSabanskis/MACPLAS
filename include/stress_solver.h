@@ -768,10 +768,10 @@ StressSolver<dim>::initialize_elastic_parameters()
 
       std::array<int, n_components> colum_widths;
 
-      for (int i = 0; i < n_components; ++i)
+      for (unsigned int i = 0; i < n_components; ++i)
         {
           colum_widths[i] = 0;
-          for (int j = 0; j < n_components; ++j)
+          for (unsigned int j = 0; j < n_components; ++j)
             {
               std::string &Cij = Cij_split[i + j * n_components];
               colum_widths[i]  = std::max(colum_widths[i], (int)Cij.size());
@@ -782,9 +782,9 @@ StressSolver<dim>::initialize_elastic_parameters()
         }
 
       std::cout << "C_ij=\n";
-      for (int j = 0; j < n_components; ++j)
+      for (unsigned int j = 0; j < n_components; ++j)
         {
-          for (int i = 0; i < n_components; ++i)
+          for (unsigned int i = 0; i < n_components; ++i)
             {
               std::string &Cij = Cij_split[i + j * n_components];
 
@@ -800,9 +800,9 @@ StressSolver<dim>::initialize_elastic_parameters()
             }
         }
 
-      for (int j = 0; j < n_components; ++j)
+      for (unsigned int j = 0; j < n_components; ++j)
         {
-          for (int i = 0; i <= j; ++i)
+          for (unsigned int i = 0; i <= j; ++i)
             {
               const std::string &Cij = Cij_split[i + j * n_components];
               const std::string &Cji = Cij_split[j + i * n_components];
@@ -1971,9 +1971,9 @@ StressSolver<dim>::get_stiffness_tensor(const double &T) const
     {
       const auto x = Point<1>(T);
 
-      for (int j = 0; j < n_components; ++j)
+      for (unsigned int j = 0; j < n_components; ++j)
         {
-          for (int i = 0; i <= j; ++i)
+          for (unsigned int i = 0; i <= j; ++i)
             {
               tmp[i][j] = m_C_full[i + j * n_components].value(x);
             }
