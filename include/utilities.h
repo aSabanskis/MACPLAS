@@ -15,7 +15,11 @@
 #include <deal.II/fe/mapping_q1.h>
 
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
-#include <deal.II/lac/filtered_matrix.h>
+#if !DEAL_II_VERSION_GTE(9, 1, 0)
+#  include <deal.II/lac/filtered_matrix.h>
+#else
+#  include <deal.II/lac/constrained_linear_operator.h>
+#endif
 #include <deal.II/lac/vector.h>
 
 #include <deal.II/numerics/matrix_tools.h>
@@ -2408,10 +2412,15 @@ namespace
    * in order to allow parallel execution.
    */
   void
-  laplace_solve(const SparseMatrix<double> &                     S,
+  laplace_solve(const SparseMatrix<double> &S,
+#if !DEAL_II_VERSION_GTE(9, 1, 0)
                 const std::map<types::global_dof_index, double> &fixed_dofs,
-                Vector<double> &                                 u,
-                const double                                     tol)
+#else
+                const AffineConstraints<double> &constraints,
+#endif
+                Vector<double> &u,
+                const double    tol)
+#if !DEAL_II_VERSION_GTE(9, 1, 0)
   {
     const unsigned int                       n_dofs = S.n();
     FilteredMatrix<Vector<double>>           SF(S);
@@ -2429,6 +2438,27 @@ namespace
     SF.apply_constraints(f, true);
     solver.solve(SF, u, f, PF);
   }
+#else
+  {
+    const unsigned int n_dofs = S.n();
+    const auto op = linear_operator(S);
+    const auto SF = constrained_linear_operator(constraints, op);
+    PreconditionJacobi<SparseMatrix<double>> prec;
+    prec.initialize(S, 1.2);
+
+    SolverControl control(n_dofs, tol, false, false);
+    GrowingVectorMemory<Vector<double>> mem;
+    SolverCG<Vector<double>> solver(control, mem);
+
+    Vector<double> f(n_dofs);
+
+    const auto constrained_rhs =
+      constrained_right_hand_side(constraints, op, f);
+    solver.solve(SF, u, constrained_rhs, prec);
+
+    constraints.distribute(u);
+  }
+#endif
 } // namespace
 
 
@@ -2454,6 +2484,7 @@ laplace_transform(const std::map<unsigned int, Point<dim>> &new_points,
                   const Function<dim> *                     coefficient,
                   const bool   solve_for_absolute_positions,
                   const double tol)
+#if !DEAL_II_VERSION_GTE(9, 1, 0)
 {
   // first provide everything that is needed for solving a Laplace
   // equation.
@@ -2542,5 +2573,102 @@ laplace_transform(const std::map<unsigned int, Point<dim>> &new_points,
           vertex_touched[cell->vertex_index(vertex_no)] = true;
         }
 }
+#else
+{
+  if (dim == 1)
+    Assert(false, ExcNotImplemented());
+
+  // first provide everything that is needed for solving a Laplace
+  // equation.
+  FE_Q<dim> q1(1);
+
+  DoFHandler<dim> dof_handler(triangulation);
+  dof_handler.distribute_dofs(q1);
+
+  DynamicSparsityPattern dsp(dof_handler.n_dofs(), dof_handler.n_dofs());
+  DoFTools::make_sparsity_pattern(dof_handler, dsp);
+  dsp.compress();
+
+  SparsityPattern sparsity_pattern;
+  sparsity_pattern.copy_from(dsp);
+  sparsity_pattern.compress();
+
+  SparseMatrix<double> S(sparsity_pattern);
+
+  QGauss<dim> quadrature(4);
+
+  MatrixCreator::create_laplace_matrix(
+    StaticMappingQ1<dim>::mapping, dof_handler, quadrature, S, coefficient);
+
+  // set up the boundary values for the laplace problem
+  std::array<AffineConstraints<double>, dim> constraints;
+  typename std::map<unsigned int, Point<dim>>::const_iterator map_end =
+    new_points.end();
+
+  // fill these maps using the data given by new_points
+  for (const auto &cell : dof_handler.active_cell_iterators())
+    {
+      // loop over all vertices of the cell and see if it is listed in the map
+      // given as first argument of the function
+      for (unsigned int vertex_no = 0;
+           vertex_no < GeometryInfo<dim>::vertices_per_cell;
+           ++vertex_no)
+        {
+          const unsigned int vertex_index = cell->vertex_index(vertex_no);
+          const Point<dim> &vertex_point = cell->vertex(vertex_no);
+
+          const typename std::map<unsigned int, Point<dim>>::const_iterator
+            map_iter = new_points.find(vertex_index);
+
+          if (map_iter != map_end)
+            for (unsigned int i = 0; i < dim; ++i)
+              {
+                constraints[i].add_line(cell->vertex_dof_index(vertex_no, 0));
+                constraints[i].set_inhomogeneity(
+                  cell->vertex_dof_index(vertex_no, 0),
+                  (solve_for_absolute_positions ?
+                     map_iter->second(i) :
+                     map_iter->second(i) - vertex_point[i]));
+              }
+        }
+    }
+
+  for (unsigned int i = 0; i < dim; ++i)
+    constraints[i].close();
+
+  // solve the dim problems with different right hand sides.
+  Vector<double> us[dim];
+  for (unsigned int i = 0; i < dim; ++i)
+    us[i].reinit(dof_handler.n_dofs());
+
+  // solve linear systems in parallel
+  Threads::TaskGroup<> tasks;
+  for (unsigned int i = 0; i < dim; ++i)
+    tasks += Threads::new_task(&laplace_solve, S, constraints[i], us[i], tol);
+  tasks.join_all();
+
+  // change the coordinates of the points of the triangulation
+  // according to the computed values
+  std::vector<bool> vertex_touched(triangulation.n_vertices(), false);
+  for (const auto &cell : dof_handler.active_cell_iterators())
+    for (unsigned int vertex_no = 0;
+         vertex_no < GeometryInfo<dim>::vertices_per_cell;
+         ++vertex_no)
+      if (vertex_touched[cell->vertex_index(vertex_no)] == false)
+        {
+          Point<dim> &v = cell->vertex(vertex_no);
+
+          const types::global_dof_index dof_index =
+            cell->vertex_dof_index(vertex_no, 0);
+          for (unsigned int i = 0; i < dim; ++i)
+            if (solve_for_absolute_positions)
+              v(i) = us[i](dof_index);
+            else
+              v(i) += us[i](dof_index);
+
+          vertex_touched[cell->vertex_index(vertex_no)] = true;
+        }
+}
+#endif
 
 #endif
