@@ -735,10 +735,10 @@ initialize_function(std::unique_ptr<Function<1>> &f,
       const unsigned int n = points.size();
 
 #ifdef DEAL_II_WITH_CXX14
-      f = std::make_unique<F>(std::array<std::vector<double>, 1>{points},
+      f = std::make_unique<F>(std::array<std::vector<double>, 1>{{points}},
                               Table<1, double>{n, data.begin()});
 #else
-      f = std::unique_ptr<F>(new F(std::array<std::vector<double>, 1>{points},
+      f = std::unique_ptr<F>(new F(std::array<std::vector<double>, 1>{{points}},
                                    Table<1, double>{n, data.begin()}));
 #endif
     }
@@ -876,18 +876,18 @@ get_interpolation_weights(const std::vector<double> &times, const double t)
 
   // early return 1
   if (times.size() == 1)
-    return {{times[0], 1}};
+    return {{{times[0], 1}}};
 
   std::vector<double> T = times;
   std::sort(T.begin(), T.end());
 
   // early return 2
   if (t <= T.front())
-    return {{T.front(), 1}};
+    return {{{T.front(), 1}}};
 
   // early return 2
   if (t >= T.back())
-    return {{T.back(), 1}};
+    return {{{T.back(), 1}}};
 
   // find t1 and t2
   for (unsigned int i = 0; i < T.size() - 1; ++i)
@@ -896,7 +896,7 @@ get_interpolation_weights(const std::vector<double> &times, const double t)
       const double t2 = T[i + 1];
 
       if (t == t1 || t == t2)
-        return {{t, 1}};
+        return {{{t, 1}}};
 
       if (t1 <= t && t <= t2)
         {
@@ -904,7 +904,7 @@ get_interpolation_weights(const std::vector<double> &times, const double t)
           const double w1 = (t2 - t) / dt;
           const double w2 = 1 - w1;
 
-          return {{t1, w1}, {t2, w2}};
+          return {{{t1, w1}}, {{t2, w2}}};
         }
     }
 
@@ -1123,7 +1123,7 @@ barycentric_coordinates(const Point<dim> &p,
   const double t = d * (p - segment_p0) / d.norm_square();
 
   // t=0 corresponds to the first point segment_p0
-  return std::array<double, 2>({1.0 - t, t});
+  return {{1.0 - t, t}};
 }
 
 // Triangle
@@ -1247,10 +1247,9 @@ template <int dim>
 std::array<double, 3>
 Triangle<dim>::barycentric_coordinates(const Point<dim> &p) const
 {
-  return std::array<double, 3>(
-    {signed_area(p, m_points[1], m_points[2]) / m_area,
-     signed_area(m_points[0], p, m_points[2]) / m_area,
-     signed_area(m_points[0], m_points[1], p) / m_area});
+  return {{signed_area(p, m_points[1], m_points[2]) / m_area,
+           signed_area(m_points[0], p, m_points[2]) / m_area,
+           signed_area(m_points[0], m_points[1], p) / m_area}};
 }
 
 // SurfaceInterpolator3D
@@ -1473,9 +1472,9 @@ SurfaceInterpolator3D::read_vtu(const std::string &file_name)
                         {
                           unsigned int k = 3 * i;
 
-                          triangles[i] = {std::stoul(data[k]),
-                                          std::stoul(data[k + 1]),
-                                          std::stoul(data[k + 2])};
+                          triangles[i] = {{std::stoul(data[k]),
+                                           std::stoul(data[k + 1]),
+                                           std::stoul(data[k + 2])}};
                         }
                     }
 
