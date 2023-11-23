@@ -34,6 +34,14 @@
 
 using namespace dealii;
 
+#if DEAL_II_VERSION_GTE(9, 5, 0)
+template <int dim, typename RangeNumberType = double>
+using ConstantFunction = Functions::ConstantFunction<dim, RangeNumberType>;
+
+template <int dim, typename RangeNumberType = double>
+using ZeroFunction = Functions::ZeroFunction<dim, RangeNumberType>;
+#endif
+
 /** Class for calculation of the thermal stresses for a given temperature field.
  * Implemented for \c dim=2 (axisymmetric) and 3 (three-dimensional simulation).
  * The creep strain is also taken into account (updated by DislocationSolver).

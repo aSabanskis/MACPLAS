@@ -5,6 +5,7 @@
 #include <deal.II/base/function_parser.h>
 #include <deal.II/base/point.h>
 #include <deal.II/base/tensor.h>
+#include <deal.II/base/thread_management.h>
 #include <deal.II/base/timer.h>
 #include <deal.II/base/utilities.h>
 

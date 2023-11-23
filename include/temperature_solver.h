@@ -36,6 +36,14 @@
 
 using namespace dealii;
 
+#if DEAL_II_VERSION_GTE(9, 5, 0)
+template <int dim, typename RangeNumberType = double>
+using ConstantFunction = Functions::ConstantFunction<dim, RangeNumberType>;
+
+template <int dim, typename RangeNumberType = double>
+using ZeroFunction = Functions::ZeroFunction<dim, RangeNumberType>;
+#endif
+
 /** Stefan–Boltzmann constant \f$\sigma_\mathrm{SB}\f$,
  * W m<sup>-2</sup> K<sup>-4</sup>
  */
