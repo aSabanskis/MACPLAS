@@ -196,9 +196,7 @@ public:
   /** Apply boundary force
    */
   void
-  set_bc_force(const unsigned int id,
-               const unsigned int component,
-               const double       val);
+  set_bc_force(const unsigned int id, const Tensor<1, dim> val);
 
   /** Read raw results from disk
    */
@@ -484,14 +482,15 @@ private:
   bool converged;
 
   /** Data for first-type BC.
-   * Map key: boundary id, value contains component and displacement.
+   * Map key: boundary id and component, value contains displacement.
+   * This allows to apply BC to multiple components at the same boundary.
    */
-  std::map<unsigned int, std::pair<unsigned int, double>> bc1_data;
+  std::map<std::pair<unsigned int, unsigned int>, double> bc1_data;
 
   /** Data for force BC.
-   * Map key: boundary id, value contains component and applied force.
+   * Map key: boundary id, value contains applied force.
    */
-  std::map<unsigned int, std::pair<unsigned int, double>> bc_force_data;
+  std::map<unsigned int, Tensor<1, dim>> bc_force_data;
 
   /** Parameter handler
    */
@@ -1103,19 +1102,14 @@ StressSolver<dim>::set_bc1(const unsigned int id,
   AssertThrow(component < dim,
               ExcMessage("Invalid component=" + std::to_string(component)));
 
-  bc1_data[id] = std::make_pair(component, val);
+  bc1_data[std::make_pair(id, component)] = val;
 }
 
 template <int dim>
 void
-StressSolver<dim>::set_bc_force(const unsigned int id,
-                                const unsigned int component,
-                                const double       val)
+StressSolver<dim>::set_bc_force(const unsigned int id, const Tensor<1, dim> val)
 {
-  AssertThrow(component < dim,
-              ExcMessage("Invalid component=" + std::to_string(component)));
-
-  bc_force_data[id] = std::make_pair(component, val);
+  bc_force_data[id] = val;
 }
 
 template <int dim>
@@ -1402,13 +1396,13 @@ StressSolver<dim>::assemble_system()
   for (auto const &it : bc1_data)
     {
       std::vector<bool> mask(dim, false);
-      mask[it.second.first]        = true;
-      bc1_applied[it.second.first] = true;
+      mask[it.first.second]        = true;
+      bc1_applied[it.first.second] = true;
 
       VectorTools::interpolate_boundary_values( // break line
         dh,
-        it.first,
-        ConstantFunction<dim>(it.second.second, dim),
+        it.first.first,
+        ConstantFunction<dim>(it.second, dim),
         boundary_values,
         mask);
     }
@@ -1531,8 +1525,7 @@ StressSolver<dim>::local_assemble_system(const IteratorPair & cell_pair,
       if (it == bc_force_data.end())
         continue;
 
-      Tensor<1, dim> F;
-      F[it->second.first] = it->second.second;
+      const Tensor<1, dim> F = it->second;
 
       fe_face_values.reinit(cell, face_number);
 
