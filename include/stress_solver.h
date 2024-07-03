@@ -193,6 +193,13 @@ public:
           const unsigned int component,
           const double       val);
 
+  /** Apply boundary force
+   */
+  void
+  set_bc_force(const unsigned int id,
+               const unsigned int component,
+               const double       val);
+
   /** Read raw results from disk
    */
   void
@@ -267,12 +274,14 @@ private:
   struct AssemblyScratchData
   {
     AssemblyScratchData(const Quadrature<dim> &   quadrature,
+                        const Quadrature<dim - 1> face_quadrature,
                         const FiniteElement<dim> &fe_temp,
                         const FiniteElement<dim> &fe);
     AssemblyScratchData(const AssemblyScratchData &scratch_data);
 
-    FEValues<dim> fe_values_temp;
-    FEValues<dim> fe_values;
+    FEValues<dim>     fe_values_temp;
+    FEValues<dim>     fe_values;
+    FEFaceValues<dim> fe_face_values;
 
     std::vector<double>              T_q;
     std::vector<std::vector<double>> epsilon_c_q;
@@ -478,6 +487,11 @@ private:
    * Map key: boundary id, value contains component and displacement.
    */
   std::map<unsigned int, std::pair<unsigned int, double>> bc1_data;
+
+  /** Data for force BC.
+   * Map key: boundary id, value contains component and applied force.
+   */
+  std::map<unsigned int, std::pair<unsigned int, double>> bc_force_data;
 
   /** Parameter handler
    */
@@ -688,6 +702,11 @@ StressSolver<dim>::StressSolver(const unsigned int order,
                     Patterns::Integer(0),
                     "Number of QGauss<dim> quadrature points (0: order+1)");
 
+  prm.declare_entry("Number of face quadrature points",
+                    "0",
+                    Patterns::Integer(0),
+                    "Number of QGauss<dim-1> quadrature points (0: order+1)");
+
   prm.declare_entry("Number of threads",
                     "0",
                     Patterns::Integer(0),
@@ -859,6 +878,9 @@ StressSolver<dim>::initialize_parameters()
   if (prm.get_integer("Number of cell quadrature points") == 0)
     prm.set("Number of cell quadrature points", n_q_default);
 
+  if (prm.get_integer("Number of face quadrature points") == 0)
+    prm.set("Number of face quadrature points", n_q_default);
+
   prm.enter_subsection("Stress recovery");
   if (prm.get_integer("Number of cell quadrature points") == 0)
     prm.set("Number of cell quadrature points", n_q_default);
@@ -873,6 +895,8 @@ StressSolver<dim>::initialize_parameters()
             << "T_ref=" << m_T_ref << "\n";
 
   std::cout << "n_q_cell=" << prm.get("Number of cell quadrature points")
+            << "\n"
+            << "n_q_face=" << prm.get("Number of face quadrature points")
             << "\n";
 
   std::cout << "n_cores=" << MultithreadInfo::n_cores() << "\n"
@@ -1080,6 +1104,18 @@ StressSolver<dim>::set_bc1(const unsigned int id,
               ExcMessage("Invalid component=" + std::to_string(component)));
 
   bc1_data[id] = std::make_pair(component, val);
+}
+
+template <int dim>
+void
+StressSolver<dim>::set_bc_force(const unsigned int id,
+                                const unsigned int component,
+                                const double       val)
+{
+  AssertThrow(component < dim,
+              ExcMessage("Invalid component=" + std::to_string(component)));
+
+  bc_force_data[id] = std::make_pair(component, val);
 }
 
 template <int dim>
@@ -1304,6 +1340,7 @@ StressSolver<dim>::prepare_for_solve()
 template <int dim>
 StressSolver<dim>::AssemblyScratchData::AssemblyScratchData(
   const Quadrature<dim> &   quadrature,
+  const Quadrature<dim - 1> face_quadrature,
   const FiniteElement<dim> &fe_temp,
   const FiniteElement<dim> &fe)
   : fe_values_temp(fe_temp, quadrature, update_values)
@@ -1311,6 +1348,7 @@ StressSolver<dim>::AssemblyScratchData::AssemblyScratchData(
               quadrature,
               update_quadrature_points | update_values | update_gradients |
                 update_JxW_values)
+  , fe_face_values(fe, face_quadrature, update_values | update_JxW_values)
   , T_q(quadrature.size())
   , epsilon_c_q(n_components, std::vector<double>(quadrature.size()))
 {}
@@ -1324,6 +1362,9 @@ StressSolver<dim>::AssemblyScratchData::AssemblyScratchData(
   , fe_values(scratch_data.fe_values.get_fe(),
               scratch_data.fe_values.get_quadrature(),
               scratch_data.fe_values.get_update_flags())
+  , fe_face_values(scratch_data.fe_face_values.get_fe(),
+                   scratch_data.fe_face_values.get_quadrature(),
+                   scratch_data.fe_face_values.get_update_flags())
   , T_q(scratch_data.T_q)
   , epsilon_c_q(scratch_data.epsilon_c_q)
 {}
@@ -1338,6 +1379,8 @@ StressSolver<dim>::assemble_system()
 
   const QGauss<dim> quadrature(
     prm.get_integer("Number of cell quadrature points"));
+  const QGauss<dim - 1> face_quadrature(
+    prm.get_integer("Number of face quadrature points"));
 
   system_matrix = 0;
   system_rhs    = 0;
@@ -1348,7 +1391,7 @@ StressSolver<dim>::assemble_system()
                   *this,
                   &StressSolver::local_assemble_system,
                   &StressSolver::copy_local_to_global,
-                  AssemblyScratchData(quadrature, fe_temp, fe),
+                  AssemblyScratchData(quadrature, face_quadrature, fe_temp, fe),
                   AssemblyCopyData());
 
   // Apply boundary conditions for displacement. Also check if BC was applied
@@ -1396,12 +1439,15 @@ StressSolver<dim>::local_assemble_system(const IteratorPair & cell_pair,
                                          AssemblyScratchData &scratch_data,
                                          AssemblyCopyData &   copy_data)
 {
-  FEValues<dim> &        fe_values_temp = scratch_data.fe_values_temp;
-  FEValues<dim> &        fe_values      = scratch_data.fe_values;
-  const Quadrature<dim> &quadrature     = fe_values.get_quadrature();
+  FEValues<dim> &            fe_values_temp  = scratch_data.fe_values_temp;
+  FEValues<dim> &            fe_values       = scratch_data.fe_values;
+  FEFaceValues<dim> &        fe_face_values  = scratch_data.fe_face_values;
+  const Quadrature<dim> &    quadrature      = fe_values.get_quadrature();
+  const Quadrature<dim - 1> &face_quadrature = fe_face_values.get_quadrature();
 
-  const unsigned int dofs_per_cell = fe.dofs_per_cell;
-  const unsigned int n_q_points    = quadrature.size();
+  const unsigned int dofs_per_cell   = fe.dofs_per_cell;
+  const unsigned int n_q_points      = quadrature.size();
+  const unsigned int n_face_q_points = face_quadrature.size();
 
   FullMatrix<double> &cell_matrix = copy_data.cell_matrix;
   Vector<double> &    cell_rhs    = copy_data.cell_rhs;
@@ -1470,6 +1516,40 @@ StressSolver<dim>::local_assemble_system(const IteratorPair & cell_pair,
                 (strain_i_stiffness * strains_ij[j]) * weight;
             }
           cell_rhs(i) += (strain_i_stiffness * epsilon_T_c_q) * weight;
+        }
+    }
+
+  for (unsigned int face_number = 0;
+       face_number < GeometryInfo<dim>::faces_per_cell;
+       ++face_number)
+    {
+      if (!cell->face(face_number)->at_boundary())
+        continue;
+
+      const auto it =
+        bc_force_data.find(cell->face(face_number)->boundary_id());
+      if (it == bc_force_data.end())
+        continue;
+
+      Tensor<1, dim> F;
+      F[it->second.first] = it->second.second;
+
+      fe_face_values.reinit(cell, face_number);
+
+      for (unsigned int q = 0; q < n_face_q_points; ++q)
+        {
+          const double weight =
+            dim == 2 ?
+              fe_face_values.JxW(q) * fe_face_values.quadrature_point(q)[0] :
+              fe_face_values.JxW(q);
+
+          for (unsigned int i = 0; i < dofs_per_cell; ++i)
+            {
+              const unsigned int component_i =
+                fe.system_to_component_index(i).first;
+              cell_rhs(i) +=
+                F[component_i] * fe_face_values.shape_value(i, q) * weight;
+            }
         }
     }
 
