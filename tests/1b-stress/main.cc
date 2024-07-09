@@ -32,14 +32,14 @@ private:
   unsigned int   boundary;
   unsigned int   component;
   double         displacement;
-  Tensor<1, dim> force;
+  Tensor<1, dim> load;
 };
 
 template <int dim>
 Problem<dim>::Problem(const std::vector<std::string> &arguments)
   : solver(get_degree(arguments))
-  , refine_global(2)
-  , refine_x(2)
+  , refine_global(1)
+  , refine_x(5)
   , boundary(1)
   , component(0)
   , displacement(0)
@@ -65,9 +65,9 @@ Problem<dim>::Problem(const std::vector<std::string> &arguments)
       if (arguments[i] == "displacement" && i + 1 < arguments.size())
         displacement = std::stod(arguments[i + 1]);
 
-      if (arguments[i] == "force" && i + dim < arguments.size())
+      if (arguments[i] == "load" && i + dim < arguments.size())
         for (unsigned int k = 0; k < dim; ++k)
-          force[k] = std::stod(arguments[i + 1 + k]);
+          load[k] = std::stod(arguments[i + 1 + k]);
     }
 
   AssertThrow(!BC.empty(), ExcMessage("No boundary conditions provided"));
@@ -78,7 +78,7 @@ Problem<dim>::Problem(const std::vector<std::string> &arguments)
   std::cout << "boundary = " << boundary << '\n';
   std::cout << "component = " << component << '\n';
   std::cout << "displacement = " << displacement << '\n';
-  std::cout << "force = " << force << '\n';
+  std::cout << "load = " << load << '\n';
 }
 
 template <int dim>
@@ -94,7 +94,17 @@ Problem<dim>::run()
   // write results on x axis
   std::stringstream ss;
   ss << "result-" << dim << "d-order"
-     << solver.get_dof_handler().get_fe().degree << "-x.dat";
+     << solver.get_dof_handler().get_fe().degree << "-BC" << BC << boundary
+     << "-";
+  if (BC == "d")
+    ss << displacement;
+  else if (BC == "f")
+    {
+      ss << load[0];
+      for (unsigned int i = 1; i < dim; ++i)
+        ss << "_" << load[i];
+    }
+  ss << "-x.dat";
   const std::string file_name = ss.str();
   std::cout << "Saving postprocessed results to '" << file_name << "'\n";
 
@@ -165,9 +175,9 @@ Problem<dim>::initialize()
     solver.set_bc1(0, i, 0);
 
   if (BC == "d")
-    solver.set_bc1(1, component, displacement);
+    solver.set_bc1(boundary, component, displacement);
   else if (BC == "f")
-    solver.set_bc_force(1, force);
+    solver.set_bc_load(boundary, load);
   else
     AssertThrow(false,
                 ExcMessage("initialize: BC '" + BC + "' not supported."));
@@ -192,7 +202,7 @@ main(int argc, char *argv[])
 {
   const std::vector<std::string> arguments(argv, argv + argc);
 
-  int dimension = 1;
+  int dimension = 3;
 
   for (unsigned int i = 1; i < arguments.size(); ++i)
     {
