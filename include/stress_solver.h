@@ -193,10 +193,10 @@ public:
           const unsigned int component,
           const double       val);
 
-  /** Apply boundary force
+  /** Apply boundary load
    */
   void
-  set_bc_force(const unsigned int id, const Tensor<1, dim> val);
+  set_bc_load(const unsigned int id, const Tensor<1, dim> val);
 
   /** Read raw results from disk
    */
@@ -487,10 +487,10 @@ private:
    */
   std::map<std::pair<unsigned int, unsigned int>, double> bc1_data;
 
-  /** Data for force BC.
-   * Map key: boundary id, value contains applied force.
+  /** Data for load BC.
+   * Map key: boundary id, value contains applied load.
    */
-  std::map<unsigned int, Tensor<1, dim>> bc_force_data;
+  std::map<unsigned int, Tensor<1, dim>> bc_load_data;
 
   /** Parameter handler
    */
@@ -1107,9 +1107,9 @@ StressSolver<dim>::set_bc1(const unsigned int id,
 
 template <int dim>
 void
-StressSolver<dim>::set_bc_force(const unsigned int id, const Tensor<1, dim> val)
+StressSolver<dim>::set_bc_load(const unsigned int id, const Tensor<1, dim> val)
 {
-  bc_force_data[id] = val;
+  bc_load_data[id] = val;
 }
 
 template <int dim>
@@ -1520,9 +1520,8 @@ StressSolver<dim>::local_assemble_system(const IteratorPair & cell_pair,
       if (!cell->face(face_number)->at_boundary())
         continue;
 
-      const auto it =
-        bc_force_data.find(cell->face(face_number)->boundary_id());
-      if (it == bc_force_data.end())
+      const auto it = bc_load_data.find(cell->face(face_number)->boundary_id());
+      if (it == bc_load_data.end())
         continue;
 
       const Tensor<1, dim> F = it->second;
