@@ -1,0 +1,5 @@
+set Linear solver type               = UMFPACK
+set Poisson's ratio                  = 0.25
+set Reference temperature            = 0
+set Thermal expansion coefficient    = 0
+set Young's modulus                  = 1.56e11
