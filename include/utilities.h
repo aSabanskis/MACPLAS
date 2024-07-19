@@ -121,6 +121,12 @@ template <typename T>
 inline void
 read_data(T &data, const std::string &file_name);
 
+/** Count boundary faces
+ */
+template <int dim>
+inline std::map<unsigned int, unsigned int>
+get_boundary_summary(const Triangulation<dim> &mesh);
+
 /** Extract mesh points with a specified boundary id
  */
 template <int dim>
@@ -975,6 +981,31 @@ read_data(T &data, const std::string &file_name)
     {
       std::cout << e.what() << "\n";
     }
+}
+
+template <int dim>
+inline std::map<unsigned int, unsigned int>
+get_boundary_summary(const Triangulation<dim> &mesh)
+{
+  std::map<unsigned int, unsigned int> info;
+
+  typename Triangulation<dim>::active_cell_iterator cell = mesh.begin_active(),
+                                                    endc = mesh.end();
+
+  for (; cell != endc; ++cell)
+    {
+      for (unsigned int i = 0; i < GeometryInfo<dim>::faces_per_cell; ++i)
+        {
+          const auto &face = cell->face(i);
+
+          if (face->at_boundary())
+            {
+              info[face->boundary_id()]++;
+            }
+        }
+    }
+
+  return info;
 }
 
 template <int dim>
