@@ -27,6 +27,8 @@ private:
 
   std::string BC;
 
+  double Lx, Ly, Lz;
+
   int refine_global, refine_x;
 
   unsigned int   boundary;
@@ -38,6 +40,9 @@ private:
 template <int dim>
 Problem<dim>::Problem(const std::vector<std::string> &arguments)
   : solver(get_degree(arguments))
+  , Lx(0.1)
+  , Ly(0.015)
+  , Lz(0.003)
   , refine_global(1)
   , refine_x(5)
   , boundary(1)
@@ -49,6 +54,15 @@ Problem<dim>::Problem(const std::vector<std::string> &arguments)
       if (Utilities::match_at_string_start(arguments[i], "bc") ||
           Utilities::match_at_string_start(arguments[i], "BC"))
         BC = arguments[i].substr(2);
+
+      if (arguments[i] == "Lx" && i + 1 < arguments.size())
+        Lx = std::stod(arguments[i + 1]);
+
+      if (arguments[i] == "Ly" && i + 1 < arguments.size())
+        Ly = std::stod(arguments[i + 1]);
+
+      if (arguments[i] == "Lz" && i + 1 < arguments.size())
+        Lz = std::stod(arguments[i + 1]);
 
       if (arguments[i] == "refine_global" && i + 1 < arguments.size())
         refine_global = std::stoi(arguments[i + 1]);
@@ -142,7 +156,7 @@ Problem<dim>::make_grid()
   Point<dim> p1; // 0 0 0
   Point<dim> p2;
 
-  Point<3> pMax(0.92, 0.025, 0.002);
+  Point<3> pMax(Lx, Ly, Lz);
 
   for (unsigned int i = 0; i < dim; ++i)
     p2[i] = pMax[i];
