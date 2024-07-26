@@ -1261,6 +1261,14 @@ DislocationSolver<dim>::output_vtk() const
     tau_crit[i] = calc_tau_crit(T[i]);
   data_out.add_data_vector(tau_crit, "tau_crit");
 
+  const BlockVector<double> &displacement = get_displacement();
+  for (unsigned int i = 0; i < displacement.n_blocks(); ++i)
+    {
+      const std::string name = "displacement_" + std::to_string(i);
+      if (isfinite(displacement.block(i)))
+        data_out.add_data_vector(displacement.block(i), name);
+    }
+
   const BlockVector<double> &stress = get_stress();
   for (unsigned int i = 0; i < stress.n_blocks(); ++i)
     {
@@ -1787,6 +1795,7 @@ DislocationSolver<dim>::output_probes() const
   const double t  = get_time();
   const double dt = get_time_step();
 
+  const BlockVector<double> &d   = get_displacement();
   const BlockVector<double> &s   = get_stress();
   const BlockVector<double> &S   = get_stress_deviator();
   const BlockVector<double> &e_c = get_strain_c();
@@ -1813,6 +1822,8 @@ DislocationSolver<dim>::output_probes() const
              << "\tdot_N_m_max[m^-2s^-1]"
              << "\tv_min[ms^-1]"
              << "\tv_max[ms^-1]"
+             << "\tdisplacement_min[m]"
+             << "\tdisplacement_max[m]"
              << "\tstress_min[Pa]"
              << "\tstress_max[Pa]"
              << "\tstrain_c_min[-]"
@@ -1830,6 +1841,9 @@ DislocationSolver<dim>::output_probes() const
                  << "\tN_m_" << i << "[m^-2]"
                  << "\tdot_N_m_" << i << "[m^-2s^-1]"
                  << "\tv_" << i << "[ms^-1]";
+
+          for (unsigned int j = 0; j < d.n_blocks(); ++j)
+            output << "\tdisplacement_" << j << "_" << i << "[m]";
 
           for (unsigned int j = 0; j < s.n_blocks(); ++j)
             output << "\tstress_" << j << "_" << i << "[Pa]";
@@ -1857,6 +1871,10 @@ DislocationSolver<dim>::output_probes() const
   const std::vector<double> values_T   = get_field_at_probes(T);
   const std::vector<double> values_N_m = get_field_at_probes(N_m);
   const std::vector<double> values_J_2 = get_field_at_probes(J_2);
+
+  std::vector<std::vector<double>> values_d(d.n_blocks());
+  for (unsigned int i = 0; i < d.n_blocks(); ++i)
+    values_d[i] = get_field_at_probes(d.block(i));
 
   std::vector<std::vector<double>> values_s(s.n_blocks());
   for (unsigned int i = 0; i < s.n_blocks(); ++i)
@@ -1899,6 +1917,7 @@ DislocationSolver<dim>::output_probes() const
   const auto limits_N_m     = minmax(N_m);
   const auto limits_dot_N_m = minmax(derivative_N_m(N_m, J_2, T));
   const auto limits_v       = minmax(dislocation_velocity(N_m, J_2, T));
+  const auto limits_d       = minmax(d);
   const auto limits_s       = minmax(s);
   const auto limits_e_c     = minmax(e_c);
   const auto limits_dot_e_c = minmax(dot_e_c);
@@ -1914,6 +1933,7 @@ DislocationSolver<dim>::output_probes() const
   output << '\t' << limits_N_m.first << '\t' << limits_N_m.second;
   output << '\t' << limits_dot_N_m.first << '\t' << limits_dot_N_m.second;
   output << '\t' << limits_v.first << '\t' << limits_v.second;
+  output << '\t' << limits_d.first << '\t' << limits_d.second;
   output << '\t' << limits_s.first << '\t' << limits_s.second;
   output << '\t' << limits_e_c.first << '\t' << limits_e_c.second;
   output << '\t' << limits_dot_e_c.first << '\t' << limits_dot_e_c.second;
@@ -1924,6 +1944,9 @@ DislocationSolver<dim>::output_probes() const
     {
       output << '\t' << values_T[i] << '\t' << values_N_m[i] << '\t'
              << values_dot_N_m[i] << '\t' << values_v[i];
+
+      for (unsigned int j = 0; j < d.n_blocks(); ++j)
+        output << '\t' << values_d[j][i];
 
       for (unsigned int j = 0; j < s.n_blocks(); ++j)
         output << '\t' << values_s[j][i];
