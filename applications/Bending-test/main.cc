@@ -171,10 +171,10 @@ Problem<dim>::handle_boundaries()
                 const bool is_bot = face_center[dim - 1] <= z_min;
                 const bool is_top = face_center[dim - 1] >= z_max;
 
-                if (is_top && std::abs(face_center[0]) <= 0.002)
+                if (is_top && std::abs(face_center[0]) <= 0.001)
                   cell->face(f)->set_boundary_id(boundary_id_load);
-                else if (is_bot && (std::abs(face_center[0] - 0.033) <= 0.001 ||
-                                    std::abs(face_center[0] + 0.033) <= 0.001))
+                else if (is_bot && (std::abs(face_center[0] - 0.03) <= 0.001 ||
+                                    std::abs(face_center[0] + 0.03) <= 0.001))
                   cell->face(f)->set_boundary_id(boundary_id_support);
                 else
                   cell->face(f)->set_boundary_id(boundary_id_free);
