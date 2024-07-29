@@ -1,0 +1,3 @@
+set Initial temperature = 500
+set Pressure            = 1e7
+set Pressure ramp       = 10
