@@ -41,6 +41,8 @@ private:
   constexpr static unsigned int boundary_id_free    = 0;
   constexpr static unsigned int boundary_id_support = 1;
   constexpr static unsigned int boundary_id_load    = 2;
+
+  constexpr static double x_support = 0.0305;
 };
 
 template <int dim>
@@ -173,8 +175,9 @@ Problem<dim>::handle_boundaries()
 
                 if (is_top && std::abs(face_center[0]) <= 0.001)
                   cell->face(f)->set_boundary_id(boundary_id_load);
-                else if (is_bot && (std::abs(face_center[0] - 0.03) <= 0.001 ||
-                                    std::abs(face_center[0] + 0.03) <= 0.001))
+                else if (is_bot &&
+                         (std::abs(face_center[0] - x_support) <= 0.0005 ||
+                          std::abs(face_center[0] + x_support) <= 0.0005))
                   cell->face(f)->set_boundary_id(boundary_id_support);
                 else
                   cell->face(f)->set_boundary_id(boundary_id_free);
