@@ -8,7 +8,7 @@ Nx = 100;
 Ny = 4;
 Nz = 3;
 
-z0 = -Lz/2;
+z0 = 0;
 
 Point(1) = {-Lx/2, -Ly/2, z0};
 Point(2) = { Lx/2, -Ly/2, z0};
