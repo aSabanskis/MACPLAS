@@ -65,6 +65,11 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
     Patterns::Double(0),
     "Time over which pressure reaches max value in s (0 - instantaneous)");
 
+  prm.declare_entry("Max dz",
+                    "0",
+                    Patterns::Double(0),
+                    "Maximum vertical displacement in m (0 - disabled)");
+
   if (use_default_prm)
     {
       std::ofstream of("problem.prm");
@@ -95,6 +100,8 @@ Problem<dim>::run()
   const double p0   = prm.get_double("Pressure");
   const double ramp = prm.get_double("Pressure ramp");
 
+  const double dz_max = prm.get_double("Max dz");
+
   while (true)
     {
       const double t       = solver.get_time() + solver.get_time_step();
@@ -107,7 +114,15 @@ Problem<dim>::run()
       solver.get_stress_solver().set_bc_load(boundary_id_load, load);
       solver.add_output("pressure[Pa]", p);
 
-      const bool keep_going = solver.solve();
+      const auto &dz = solver.get_displacement().block(dim - 1);
+
+      const auto limits_dz = minmax(dz);
+
+      const bool dz_reached =
+        dz_max > 0 && (std::abs(limits_dz.first) >= dz_max ||
+                       std::abs(limits_dz.second) >= dz_max);
+
+      const bool keep_going = solver.solve() && !dz_reached;
 
       if (!keep_going)
         break;
