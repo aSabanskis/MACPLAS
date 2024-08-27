@@ -1197,69 +1197,70 @@ StressSolver<dim>::output_vtk() const
   DataOut<dim> data_out;
 
   data_out.attach_dof_handler(dh_temp);
-  data_out.add_data_vector(temperature, "T");
+
+  output_data_vector(temperature, "T", data_out);
 
   Vector<double> E(temperature.size());
   for (unsigned int i = 0; i < temperature.size(); ++i)
     E[i] = calc_E(temperature[i]);
-  data_out.add_data_vector(E, "E");
+  output_data_vector(E, "E", data_out);
 
   Vector<double> C_11(temperature.size());
   for (unsigned int i = 0; i < temperature.size(); ++i)
     C_11[i] = calc_C_11(temperature[i]);
-  data_out.add_data_vector(C_11, "C_11");
+  output_data_vector(C_11, "C_11", data_out);
 
   Vector<double> C_12(temperature.size());
   for (unsigned int i = 0; i < temperature.size(); ++i)
     C_12[i] = calc_C_12(temperature[i]);
-  data_out.add_data_vector(C_12, "C_12");
+  output_data_vector(C_12, "C_12", data_out);
 
   Vector<double> C_44(temperature.size());
   for (unsigned int i = 0; i < temperature.size(); ++i)
     C_44[i] = calc_C_44(temperature[i]);
-  data_out.add_data_vector(C_44, "C_44");
+  output_data_vector(C_44, "C_44", data_out);
 
   Vector<double> H(temperature.size());
   for (unsigned int i = 0; i < temperature.size(); ++i)
     H[i] = calc_H(temperature[i]);
-  data_out.add_data_vector(H, "H");
+  output_data_vector(H, "H", data_out);
 
   Vector<double> alpha(temperature.size());
   for (unsigned int i = 0; i < temperature.size(); ++i)
     alpha[i] = calc_alpha(temperature[i]);
-  data_out.add_data_vector(alpha, "alpha");
+  output_data_vector(alpha, "alpha", data_out);
 
   for (unsigned int i = 0; i < displacement.n_blocks(); ++i)
     {
       const std::string name = "displacement_" + std::to_string(i);
-      data_out.add_data_vector(displacement.block(i), name);
+      output_data_vector(displacement.block(i), name, data_out);
     }
 
   for (unsigned int i = 0; i < stress.n_blocks(); ++i)
     {
       const std::string name = "stress_" + std::to_string(i);
-      data_out.add_data_vector(stress.block(i), name);
+      output_data_vector(stress.block(i), name, data_out);
     }
   for (unsigned int i = 0; i < stress_deviator.n_blocks(); ++i)
     {
       const std::string name = "stress_deviator_" + std::to_string(i);
-      data_out.add_data_vector(stress_deviator.block(i), name);
+      output_data_vector(stress_deviator.block(i), name, data_out);
     }
 
   for (unsigned int i = 0; i < strain_e.n_blocks(); ++i)
     {
       const std::string name = "epsilon_e_" + std::to_string(i);
-      data_out.add_data_vector(strain_e.block(i), name);
+      output_data_vector(strain_e.block(i), name, data_out);
     }
   for (unsigned int i = 0; i < strain_c.n_blocks(); ++i)
     {
       const std::string name = "epsilon_c_" + std::to_string(i);
-      data_out.add_data_vector(strain_c.block(i), name);
+      output_data_vector(strain_c.block(i), name, data_out);
     }
 
-  data_out.add_data_vector(stress_hydrostatic, "stress_hydrostatic");
-  data_out.add_data_vector(stress_von_Mises, "stress_von_Mises");
-  data_out.add_data_vector(stress_J_2, "stress_J_2");
+  output_data_vector(stress_hydrostatic, "stress_hydrostatic", data_out);
+  output_data_vector(stress_von_Mises, "stress_von_Mises", data_out);
+  output_data_vector(stress_J_2, "stress_J_2", data_out);
 
   data_out.build_patches(prm.get_integer("Output subdivisions"));
 

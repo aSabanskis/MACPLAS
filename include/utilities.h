@@ -46,6 +46,14 @@ sqr(const double x);
 inline bool
 isfinite(const Vector<double> &data);
 
+/** Add data vector to DataOut unless \c Inf or \c Nan values are present
+ */
+template <int dim>
+inline void
+output_data_vector(const Vector<double> &data,
+                   const std::string &   name,
+                   DataOut<dim> &        data_out);
+
 /** Convert string to a vector of double
  */
 inline std::vector<double>
@@ -680,6 +688,19 @@ isfinite(const Vector<double> &data)
         return false;
     }
   return true;
+}
+
+template <int dim>
+void
+output_data_vector(const Vector<double> &data,
+                   const std::string &   name,
+                   DataOut<dim> &        data_out)
+{
+  if (isfinite(data))
+    data_out.add_data_vector(data, name);
+  else
+    std::cout << name << " contains invalid data, skipping\n";
+  ;
 }
 
 std::vector<double>
