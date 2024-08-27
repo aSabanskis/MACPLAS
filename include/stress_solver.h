@@ -186,12 +186,19 @@ public:
   const DoFHandler<dim> &
   get_dof_handler() const;
 
-  /** Set first-type boundary condition
+  /** Set first-type boundary condition at a boundary
    */
   void
-  set_bc1(const unsigned int id,
+  set_bc1(const unsigned int boundary_id,
           const unsigned int component,
           const double       val);
+
+  /** Set first-type boundary condition at a DOF
+   */
+  void
+  set_bc1_dof(const unsigned int dof_id,
+              const unsigned int component,
+              const double       val);
 
   /** Apply boundary load
    */
@@ -486,6 +493,10 @@ private:
    * This allows to apply BC to multiple components at the same boundary.
    */
   std::map<std::pair<unsigned int, unsigned int>, double> bc1_data;
+
+  /** Same as above, for constraints at DOFs
+   */
+  std::map<std::pair<unsigned int, unsigned int>, double> bc1_dof_data;
 
   /** Data for load BC.
    * Map key: boundary id, value contains applied load.
@@ -1095,14 +1106,26 @@ StressSolver<dim>::get_support_points(std::vector<Point<dim>> &points) const
 
 template <int dim>
 void
-StressSolver<dim>::set_bc1(const unsigned int id,
+StressSolver<dim>::set_bc1(const unsigned int boundary_id,
                            const unsigned int component,
                            const double       val)
 {
   AssertThrow(component < dim,
               ExcMessage("Invalid component=" + std::to_string(component)));
 
-  bc1_data[std::make_pair(id, component)] = val;
+  bc1_data[std::make_pair(boundary_id, component)] = val;
+}
+
+template <int dim>
+void
+StressSolver<dim>::set_bc1_dof(const unsigned int dof_id,
+                               const unsigned int component,
+                               const double       val)
+{
+  AssertThrow(component < dim,
+              ExcMessage("Invalid component=" + std::to_string(component)));
+
+  bc1_dof_data[std::make_pair(dof_id, component)] = val;
 }
 
 template <int dim>
@@ -1395,9 +1418,11 @@ StressSolver<dim>::assemble_system()
   std::map<types::global_dof_index, double> boundary_values;
   for (auto const &it : bc1_data)
     {
+      const auto component = it.first.second;
+
       std::vector<bool> mask(dim, false);
-      mask[it.first.second]        = true;
-      bc1_applied[it.first.second] = true;
+      mask[component]        = true;
+      bc1_applied[component] = true;
 
       VectorTools::interpolate_boundary_values( // break line
         dh,
@@ -1406,6 +1431,17 @@ StressSolver<dim>::assemble_system()
         boundary_values,
         mask);
     }
+
+  for (auto const &it : bc1_dof_data)
+    {
+      const auto component = it.first.second;
+
+      bc1_applied[component] = true;
+
+      boundary_values[it.first.first + component * temperature.size()] =
+        it.second;
+    }
+
   for (unsigned int i = 0; i < bc1_applied.size(); ++i)
     {
       if (!bc1_applied[i])
