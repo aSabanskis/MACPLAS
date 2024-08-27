@@ -30,10 +30,14 @@ private:
   void
   handle_boundaries();
 
-  // helper function
+  // helper functions
   static bool
-  cmp_z(const std::pair<unsigned int, Point<dim>> &it1,
-        const std::pair<unsigned int, Point<dim>> &it2);
+  cmp_z_pair(const std::pair<unsigned int, Point<dim>> &it1,
+             const std::pair<unsigned int, Point<dim>> &it2);
+
+  static bool
+  cmp_z(const Point<dim> &p1, const Point<dim> &p2);
+
 
   void
   initialize();
@@ -168,10 +172,10 @@ Problem<dim>::handle_boundaries()
         get_boundary_points(triangulation, boundary_info.begin()->first);
 
       const double z_min =
-        std::min_element(points0.begin(), points0.end(), cmp_z)
+        std::min_element(points0.begin(), points0.end(), cmp_z_pair)
           ->second[dim - 1];
       const double z_max =
-        std::max_element(points0.begin(), points0.end(), cmp_z)
+        std::max_element(points0.begin(), points0.end(), cmp_z_pair)
           ->second[dim - 1];
 
       typename Triangulation<dim>::active_cell_iterator
@@ -217,10 +221,18 @@ Problem<dim>::handle_boundaries()
 
 template <int dim>
 bool
-Problem<dim>::cmp_z(const std::pair<unsigned int, Point<dim>> &it1,
-                    const std::pair<unsigned int, Point<dim>> &it2)
+Problem<dim>::cmp_z_pair(const std::pair<unsigned int, Point<dim>> &it1,
+                         const std::pair<unsigned int, Point<dim>> &it2)
 {
   return it1.second[dim - 1] < it2.second[dim - 1];
+}
+
+
+template <int dim>
+bool
+Problem<dim>::cmp_z(const Point<dim> &p1, const Point<dim> &p2)
+{
+  return p1[dim - 1] < p2[dim - 1];
 }
 
 template <int dim>
@@ -234,7 +246,24 @@ Problem<dim>::initialize()
   temperature = 0;
   temperature.add(prm.get_double("Initial temperature"));
 
-  solver.get_stress_solver().set_bc1(boundary_id_support, dim - 1, 0.0);
+  // solver.get_stress_solver().set_bc1(boundary_id_support, dim - 1, 0.0);
+
+  std::vector<Point<dim>> points0;
+  solver.get_support_points(points0);
+
+  const double z_min =
+    (*std::min_element(points0.begin(), points0.end(), cmp_z))[dim - 1];
+
+  for (size_t i = 0; i < points0.size(); ++i)
+    {
+      const auto &p = points0[i];
+
+      const bool is_bot = p[dim - 1] <= z_min;
+
+      if (is_bot && (std::abs(p[0] - x_support) <= 1e-8 ||
+                     std::abs(p[0] + x_support) <= 1e-8))
+        solver.get_stress_solver().set_bc1_dof(i, dim - 1, 0.0);
+    }
 
   // initialize stresses and output probes at zero time
   solver.solve(true);
