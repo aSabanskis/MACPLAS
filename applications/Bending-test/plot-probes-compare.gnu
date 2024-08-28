@@ -5,12 +5,15 @@ set term pdfcairo rounded size 15cm,25cm font ',10'
 set grid
 set key top left Left reverse width -2
 
-array T = [500, 600, 700]
+array T = [400, 500, 600, 700, 800, 900]
 
 set datafile separator '\t'
 
 set output 'probes-compare.pdf'
 set multiplot layout 4,2
+
+set logscale y
+set format y "10^{%L}"
 
 col='N_m_0[m^-2]'
 set title col noenh

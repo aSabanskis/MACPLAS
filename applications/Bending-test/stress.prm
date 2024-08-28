@@ -1,14 +1,14 @@
 set Linear solver iterations         = 10000
 set Linear solver tolerance          = 1e-8
 set Linear solver type               = minres # UMFPACK # minres
-set Number of cell quadrature points =  0
-set Number of threads                =  0
+set Number of cell quadrature points = 5
+set Number of threads                = 0
 set Output precision                 = 8
 set Output subdivisions              = 0
 set Poisson's ratio                  = 0.256
 set Preconditioner relaxation        = 1.0
 set Preconditioner type              = jacobi
-set Reference temperature            = 700
+set Reference temperature            = 900
 set Thermal expansion coefficient    = 0
 set Young's modulus                  = 17.76e9
 set Elastic constant C_11            =

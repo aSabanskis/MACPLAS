@@ -6,7 +6,7 @@ source ./helper.sh
 initialize # 2 0
 
 # Temperature
-arr_T=(500 600 700)
+arr_T=(400 500 600 700 800 900)
 
 clean_results
 setup_parameters
