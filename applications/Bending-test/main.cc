@@ -48,8 +48,6 @@ private:
   constexpr static unsigned int boundary_id_free    = 0;
   constexpr static unsigned int boundary_id_support = 1;
   constexpr static unsigned int boundary_id_load    = 2;
-
-  constexpr static double x_support = 0.03;
 };
 
 template <int dim>
@@ -76,6 +74,11 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     "0",
                     Patterns::Double(0),
                     "Maximum vertical displacement in m (0 - disabled)");
+
+  prm.declare_entry("Support x",
+                    "0.03",
+                    Patterns::Double(0),
+                    "Position of the support (located at +x and -x)");
 
   if (use_default_prm)
     {
@@ -165,9 +168,6 @@ Problem<dim>::handle_boundaries()
       const std::map<unsigned int, Point<dim>> points0 =
         get_boundary_points(triangulation, boundary_info.begin()->first);
 
-      const double z_min =
-        std::min_element(points0.begin(), points0.end(), cmp_z_pair)
-          ->second[dim - 1];
       const double z_max =
         std::max_element(points0.begin(), points0.end(), cmp_z_pair)
           ->second[dim - 1];
@@ -183,15 +183,10 @@ Problem<dim>::handle_boundaries()
               {
                 const Point<dim> face_center = cell->face(f)->center();
 
-                const bool is_bot = face_center[dim - 1] <= z_min;
                 const bool is_top = face_center[dim - 1] >= z_max;
 
                 if (is_top && std::abs(face_center[0]) <= 0.001)
                   cell->face(f)->set_boundary_id(boundary_id_load);
-                else if (is_bot &&
-                         (std::abs(face_center[0] - x_support) <= 0.001 ||
-                          std::abs(face_center[0] + x_support) <= 0.001))
-                  cell->face(f)->set_boundary_id(boundary_id_support);
                 else
                   cell->face(f)->set_boundary_id(boundary_id_free);
               }
@@ -247,6 +242,8 @@ Problem<dim>::initialize()
 
   const double z_min =
     (*std::min_element(points0.begin(), points0.end(), cmp_z))[dim - 1];
+
+  const double x_support = prm.get_double("Support x");
 
   for (size_t i = 0; i < points0.size(); ++i)
     {

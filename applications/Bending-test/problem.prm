@@ -1,4 +1,5 @@
 set Initial temperature = 900
 set Pressure            = 2e5
 set Pressure ramp       = 10
+set Support x           = 0.03
 set Max dz              = 5e-4
