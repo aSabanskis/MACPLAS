@@ -42,6 +42,9 @@ private:
   void
   initialize();
 
+  void
+  apply_load(const double time);
+
   constexpr static unsigned int boundary_id_free    = 0;
   constexpr static unsigned int boundary_id_support = 1;
   constexpr static unsigned int boundary_id_load    = 2;
@@ -101,22 +104,13 @@ Problem<dim>::run()
   make_grid();
   initialize();
 
-  const double p0   = prm.get_double("Pressure");
-  const double ramp = prm.get_double("Pressure ramp");
-
   const double dz_max = prm.get_double("Max dz");
 
   while (true)
     {
-      const double t       = solver.get_time() + solver.get_time_step();
-      const double p_scale = ramp <= 0 ? 1 : t >= ramp ? 1 : t / ramp;
-      const double p       = p0 * p_scale;
+      const double t = solver.get_time() + solver.get_time_step();
 
-      Tensor<1, dim> load;
-      load[dim - 1] = -p;
-
-      solver.get_stress_solver().set_bc_load(boundary_id_load, load);
-      solver.add_output("pressure[Pa]", p);
+      apply_load(t);
 
       const auto &dz = solver.get_displacement().block(dim - 1);
 
@@ -266,8 +260,26 @@ Problem<dim>::initialize()
     }
 
   // initialize stresses and output probes at zero time
+  apply_load(0);
   solver.solve(true);
   solver.output_vtk();
+}
+
+template <int dim>
+void
+Problem<dim>::apply_load(const double time)
+{
+  const double p0   = prm.get_double("Pressure");
+  const double ramp = prm.get_double("Pressure ramp");
+
+  const double p_scale = ramp <= 0 ? 1 : time >= ramp ? 1 : time / ramp;
+  const double p       = p0 * p_scale;
+
+  Tensor<1, dim> load;
+  load[dim - 1] = -p;
+
+  solver.get_stress_solver().set_bc_load(boundary_id_load, load);
+  solver.add_output("pressure[Pa]", p);
 }
 
 int
