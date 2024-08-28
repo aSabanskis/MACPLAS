@@ -5,11 +5,12 @@ set term pdfcairo rounded size 15cm,25cm font ',10'
 set grid
 set key top left Left reverse width -2
 
+p = '2e5'
 array T = [400, 500, 600, 700, 800, 900]
 
 set datafile separator '\t'
 
-set output 'probes-compare.pdf'
+set output sprintf('probes-compare-p%s.pdf', p)
 set multiplot layout 4,2
 
 set logscale y
@@ -18,7 +19,7 @@ set format y "10^{%L}"
 col='N_m_0[m^-2]'
 set title col noenh
 p \
-for[k=1:|T|] sprintf('results-T%g/probes-dislocation-3d.txt', T[k]) \
+for[k=1:|T|] sprintf('results-p%s-T%g/probes-dislocation-3d.txt', p, T[k]) \
 u 1:(abs(column(col))) w l ti sprintf('T = %g K', T[k])
 
 unset key

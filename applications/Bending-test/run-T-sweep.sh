@@ -41,4 +41,5 @@ for i in "${!arr_T[@]}"; do
     mv probes-dislocation-3d.txt probes-minmax.pdf result-dislocation-3d-order$order-*.vtk "$r/"
 done
 
+sed -Ei "s|(p *= *).*|\1'$p'|" plot-probes-compare.gnu
 ./plot-probes-compare.gnu
