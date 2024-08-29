@@ -85,6 +85,11 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     Patterns::Double(0),
                     "Maximum vertical displacement in m (0 - disabled)");
 
+  prm.declare_entry("Load x",
+                    "0.002",
+                    Patterns::Double(0),
+                    "Position of the support (between -x and +x)");
+
   prm.declare_entry("Support x",
                     "0.03",
                     Patterns::Double(0),
@@ -198,6 +203,8 @@ Problem<dim>::handle_boundaries()
         std::max_element(points0.begin(), points0.end(), cmp_z_pair)
           ->second[dim - 1];
 
+      const double x_load = prm.get_double("Load x");
+
       typename Triangulation<dim>::active_cell_iterator
         cell = triangulation.begin_active(),
         endc = triangulation.end();
@@ -211,7 +218,7 @@ Problem<dim>::handle_boundaries()
 
                 const bool is_top = face_center[dim - 1] >= z_max;
 
-                if (is_top && std::abs(face_center[0]) <= 0.001)
+                if (is_top && std::abs(face_center[0]) <= x_load)
                   cell->face(f)->set_boundary_id(boundary_id_load);
                 else
                   cell->face(f)->set_boundary_id(boundary_id_free);
