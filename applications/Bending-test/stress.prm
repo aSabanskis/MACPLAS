@@ -1,7 +1,7 @@
 set Linear solver iterations         = 10000
 set Linear solver tolerance          = 1e-8
-set Linear solver type               = minres # UMFPACK # minres
-set Number of cell quadrature points = 5
+set Linear solver type               = minres # UMFPACK
+set Number of cell quadrature points = 0
 set Number of threads                = 0
 set Output precision                 = 8
 set Output subdivisions              = 0
@@ -17,7 +17,7 @@ set Elastic constant C_44            =
 set Log convergence full             = false
 set Log convergence final            = true
 subsection Stress recovery
-  set Method                    =  global
+  set Method                    = extrapolation # global
   set Number of cell quadrature points = 0
   set Linear solver iterations  = 1000
   set Linear solver tolerance   = 1e-12
