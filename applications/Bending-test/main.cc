@@ -56,6 +56,8 @@ private:
   constexpr static unsigned int boundary_id_free = 0;
   constexpr static unsigned int boundary_id_load = 1;
 
+  double load_area;
+
   double previous_time_step;
   double next_output_time;
 };
@@ -63,22 +65,23 @@ private:
 template <int dim>
 Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
   : solver(order, use_default_prm)
+  , load_area(0)
 {
   prm.declare_entry("Initial temperature",
                     "1000",
                     Patterns::Double(0),
                     "Initial temperature T_0 in K");
 
-  prm.declare_entry("Pressure",
+  prm.declare_entry("Max force",
                     "0",
                     Patterns::Double(0),
-                    "Maximum applied pressure in Pa");
+                    "Maximum applied force in N");
 
   prm.declare_entry(
-    "Pressure ramp",
+    "Force ramp",
     "0",
     Patterns::Double(0),
-    "Time over which pressure reaches max value in s (0 - instantaneous)");
+    "Time over which force reaches max value in s (0 - instantaneous)");
 
   prm.declare_entry("Max dz",
                     "0",
@@ -179,7 +182,7 @@ Problem<dim>::make_grid()
   // a single probe point at the origin
   solver.add_probe(Point<dim>());
 
-  solver.add_output("pressure[Pa]");
+  solver.add_output("force[N]");
 }
 
 template <int dim>
@@ -219,7 +222,10 @@ Problem<dim>::handle_boundaries()
                 const bool is_top = face_center[dim - 1] >= z_max;
 
                 if (is_top && std::abs(face_center[0]) <= x_load)
-                  cell->face(f)->set_boundary_id(boundary_id_load);
+                  {
+                    cell->face(f)->set_boundary_id(boundary_id_load);
+                    load_area += cell->face(f)->measure();
+                  }
                 else
                   cell->face(f)->set_boundary_id(boundary_id_free);
               }
@@ -289,6 +295,10 @@ Problem<dim>::initialize()
         solver.get_stress_solver().set_bc1_dof(i, dim - 1, 0.0);
     }
 
+  std::cout << "Load area: " << load_area << " m2\n";
+  std::cout << "Max pressure: " << prm.get_double("Max force") / load_area
+            << " Pa\n";
+
   // initialize stresses and output probes at zero time
   apply_load(0);
   solver.solve(true);
@@ -299,17 +309,17 @@ template <int dim>
 void
 Problem<dim>::apply_load(const double time)
 {
-  const double p0   = prm.get_double("Pressure");
-  const double ramp = prm.get_double("Pressure ramp");
+  const double F0   = prm.get_double("Max force");
+  const double ramp = prm.get_double("Force ramp");
 
-  const double p_scale = ramp <= 0 ? 1 : time >= ramp ? 1 : time / ramp;
-  const double p       = p0 * p_scale;
+  const double F_scale = ramp <= 0 ? 1 : time >= ramp ? 1 : time / ramp;
+  const double F       = F0 * F_scale;
 
   Tensor<1, dim> load;
-  load[dim - 1] = -p;
+  load[dim - 1] = -F / load_area;
 
   solver.get_stress_solver().set_bc_load(boundary_id_load, load);
-  solver.add_output("pressure[Pa]", p);
+  solver.add_output("force[N]", F);
 }
 
 template <int dim>

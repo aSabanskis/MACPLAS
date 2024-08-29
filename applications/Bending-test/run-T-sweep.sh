@@ -8,8 +8,8 @@ initialize # 2 0
 # Temperature
 arr_T=(400 500 600 700 800 900)
 
-# Pressure
-p=2e5
+# Force
+F=5
 
 clean_results
 setup_parameters
@@ -18,7 +18,7 @@ setup_parameters
 
 for i in "${!arr_T[@]}"; do
     T=${arr_T[$i]}
-    id="p$p-T$T"
+    id="F$F-T$T"
     r="results-$id"
     echo "$id"
 
@@ -30,7 +30,7 @@ for i in "${!arr_T[@]}"; do
     sed -Ei "s|(set Initial temperature *= *).*|\1$T|"   problem.prm
     sed -Ei "s|(set Reference temperature *= *).*|\1$T|" stress.prm
 
-    sed -Ei "s|(set Pressure *= *).*|\1$p|" problem.prm
+    sed -Ei "s|(set Max force *= *).*|\1$F|" problem.prm
 
     mkdir -p $r
 
@@ -41,5 +41,5 @@ for i in "${!arr_T[@]}"; do
     mv probes-dislocation-3d.txt probes-minmax.pdf result-dislocation-3d-order$order-*.vtk "$r/"
 done
 
-sed -Ei "s|(p *= *).*|\1'$p'|" plot-probes-compare.gnu
+sed -Ei "s|(F *= *).*|\1'$F'|" plot-probes-compare.gnu
 ./plot-probes-compare.gnu
