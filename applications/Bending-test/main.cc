@@ -45,9 +45,19 @@ private:
   void
   apply_load(const double time);
 
-  constexpr static unsigned int boundary_id_free    = 0;
-  constexpr static unsigned int boundary_id_support = 1;
-  constexpr static unsigned int boundary_id_load    = 2;
+  /** Checks whether the results need to be outputted at the end of the current
+   * time step, and adjusts it if necessary */
+  bool
+  update_output_time_step();
+
+  void
+  set_time_step(const double dt);
+
+  constexpr static unsigned int boundary_id_free = 0;
+  constexpr static unsigned int boundary_id_load = 1;
+
+  double previous_time_step;
+  double next_output_time;
 };
 
 template <int dim>
@@ -80,6 +90,12 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     Patterns::Double(0),
                     "Position of the support (located at +x and -x)");
 
+  prm.declare_entry("Output time step",
+                    "60",
+                    Patterns::Double(0),
+                    "Time interval in s between result output (0 - disabled). "
+                    "The time step is adjusted to match the required time.");
+
   if (use_default_prm)
     {
       std::ofstream of("problem.prm");
@@ -111,6 +127,8 @@ Problem<dim>::run()
 
   while (true)
     {
+      const bool output_enabled = update_output_time_step();
+
       const double t = solver.get_time() + solver.get_time_step();
 
       apply_load(t);
@@ -127,6 +145,14 @@ Problem<dim>::run()
 
       if (!keep_going)
         break;
+
+      if (output_enabled)
+        {
+          solver.output_vtk();
+
+          std::cout << "Restoring previous dt=" << previous_time_step << "s\n";
+          set_time_step(previous_time_step);
+        }
     };
 
   solver.output_vtk();
@@ -235,7 +261,7 @@ Problem<dim>::initialize()
   temperature = 0;
   temperature.add(prm.get_double("Initial temperature"));
 
-  // solver.get_stress_solver().set_bc1(boundary_id_support, dim - 1, 0.0);
+  next_output_time = prm.get_double("Output time step");
 
   std::vector<Point<dim>> points0;
   solver.get_support_points(points0);
@@ -277,6 +303,43 @@ Problem<dim>::apply_load(const double time)
 
   solver.get_stress_solver().set_bc_load(boundary_id_load, load);
   solver.add_output("pressure[Pa]", p);
+}
+
+template <int dim>
+bool
+Problem<dim>::update_output_time_step()
+{
+  const double t  = solver.get_time();
+  const double dt = solver.get_time_step();
+
+  const double dt_output = prm.get_double("Output time step");
+
+  previous_time_step = dt;
+
+  // output time step is not specified
+  if (dt_output <= 0)
+    return false;
+
+  // output time too far away, nothing to do
+  if (dt_output > 0 && t + (1 + 1e-4) * dt < next_output_time)
+    return false;
+
+  // output time is specified and the time step has to be adjusted
+  set_time_step(next_output_time - t);
+
+  std::cout << "dt changed from " << dt << " to " << solver.get_time_step()
+            << " s for result output at t=" << next_output_time << " s\n";
+
+  next_output_time += dt_output;
+
+  return true;
+}
+
+template <int dim>
+void
+Problem<dim>::set_time_step(const double dt)
+{
+  solver.get_time_step() = dt;
 }
 
 int
