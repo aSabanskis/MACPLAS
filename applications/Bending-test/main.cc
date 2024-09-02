@@ -39,6 +39,8 @@ private:
   cmp_z(const Point<dim> &p1, const Point<dim> &p2);
 
 
+  Timer timer;
+
   void
   initialize();
 
@@ -164,6 +166,8 @@ Problem<dim>::run()
     };
 
   solver.output_vtk();
+
+  std::cout << "Finished in " << timer.wall_time() << " s\n";
 }
 
 template <int dim>

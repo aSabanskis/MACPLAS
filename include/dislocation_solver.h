@@ -548,6 +548,10 @@ private:
    */
   double previous_time_step;
 
+  /** Wall clock for timing
+   */
+  Timer solver_timer;
+
   /** Peierls potential \f$Q\f$ (temperature function), eV
    */
   FunctionParser<1> m_Q;
@@ -827,6 +831,7 @@ DislocationSolver<dim>::solve(const bool stress_only)
       stress_solver.solve();
       update_time_step();
 
+      add_output("wall_time[s]", solver_timer.wall_time());
       output_probes();
       // set here to keep const-ness of output_probes
       probes_header_written = true;
@@ -871,6 +876,7 @@ DislocationSolver<dim>::solve(const bool stress_only)
   else
     AssertThrow(false, ExcNotImplemented());
 
+  add_output("wall_time[s]", solver_timer.wall_time());
   output_probes();
   probes_header_written = true;
 
@@ -1556,6 +1562,7 @@ template <int dim>
 void
 DislocationSolver<dim>::initialize_dt_output()
 {
+  add_output("wall_time[s]");
   add_output("substeps", 1);
   add_output("max_dt_v[s]");
   for (unsigned int i = 0; i < StressSolver<dim>::n_components; ++i)
