@@ -1,7 +1,7 @@
 set Initial temperature = 900
 set Max force           = 5
-set Force ramp          = 10
-set Load x              = 0.002
-set Support x           = 0.03
+set Force ramp          = 0
+set Load x              = 0.001
+set Support x           = 0.0135
 set Max dz              = 5.5e-4
-set Output time step    = 60
+set Output time step    = 300

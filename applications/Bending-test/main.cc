@@ -13,7 +13,7 @@ template <int dim>
 class Problem
 {
 public:
-  explicit Problem(const unsigned int order           = 1,
+  explicit Problem(const unsigned int order,
                    const bool         use_default_prm = false);
 
   void
@@ -68,6 +68,8 @@ template <int dim>
 Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
   : solver(order, use_default_prm)
   , load_area(0)
+  , previous_time_step()
+  , next_output_time()
 {
   prm.declare_entry("Initial temperature",
                     "1000",
