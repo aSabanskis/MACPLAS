@@ -60,6 +60,8 @@ private:
 
   double load_area;
 
+  int load_component;
+
   double previous_time_step;
   double next_output_time;
 };
@@ -68,6 +70,7 @@ template <int dim>
 Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
   : solver(order, use_default_prm)
   , load_area(0)
+  , load_component(0)
   , previous_time_step()
   , next_output_time()
 {
@@ -96,6 +99,11 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     "0.002",
                     Patterns::Double(0),
                     "Position of the support (between -x and +x)");
+
+  prm.declare_entry("Load component",
+                    std::to_string(dim - 1),
+                    Patterns::Integer(0),
+                    "Direction of the load (0 - x)");
 
   prm.declare_entry("Support x",
                     "0.03",
@@ -301,6 +309,8 @@ Problem<dim>::initialize()
         solver.get_stress_solver().set_bc1_dof(i, dim - 1, 0.0);
     }
 
+  load_component = prm.get_double("Load component");
+
   std::cout << "Load area: " << load_area << " m2\n";
   std::cout << "Max pressure: " << prm.get_double("Max force") / load_area
             << " Pa\n";
@@ -322,7 +332,7 @@ Problem<dim>::apply_load(const double time)
   const double F       = F0 * F_scale;
 
   Tensor<1, dim> load;
-  load[dim - 1] = -F / load_area;
+  load[load_component] = -F / load_area;
 
   solver.get_stress_solver().set_bc_load(boundary_id_load, load);
   solver.add_output("force[N]", F);
