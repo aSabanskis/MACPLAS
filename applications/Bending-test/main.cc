@@ -9,6 +9,12 @@
 
 using namespace dealii;
 
+enum class BCType
+{
+  three_point_load,
+  uniaxial_compression_force
+};
+
 template <int dim>
 class Problem
 {
@@ -31,6 +37,10 @@ private:
   handle_boundaries();
 
   // helper functions
+  static bool
+  cmp_x_pair(const std::pair<unsigned int, Point<dim>> &it1,
+             const std::pair<unsigned int, Point<dim>> &it2);
+
   static bool
   cmp_z_pair(const std::pair<unsigned int, Point<dim>> &it1,
              const std::pair<unsigned int, Point<dim>> &it2);
@@ -57,6 +67,9 @@ private:
 
   constexpr static unsigned int boundary_id_free = 0;
   constexpr static unsigned int boundary_id_load = 1;
+  constexpr static unsigned int boundary_id_wall = 2;
+
+  BCType bc_type;
 
   double load_area;
 
@@ -69,6 +82,7 @@ private:
 template <int dim>
 Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
   : solver(order, use_default_prm)
+  , bc_type(BCType::three_point_load)
   , load_area(0)
   , load_component(0)
   , previous_time_step()
@@ -95,15 +109,16 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     Patterns::Double(0),
                     "Maximum vertical displacement in m (0 - disabled)");
 
+  prm.declare_entry("Load type",
+                    "Three point load",
+                    Patterns::Selection(
+                      "Three point load|Uniaxial compression force"),
+                    "Type of the boundary conditions");
+
   prm.declare_entry("Load x",
                     "0.002",
                     Patterns::Double(0),
                     "Position of the support (between -x and +x)");
-
-  prm.declare_entry("Load component",
-                    std::to_string(dim - 1),
-                    Patterns::Integer(0),
-                    "Direction of the load (0 - x)");
 
   prm.declare_entry("Support x",
                     "0.03",
@@ -208,17 +223,35 @@ Problem<dim>::handle_boundaries()
   std::map<unsigned int, unsigned int> boundary_info =
     get_boundary_summary(triangulation);
 
-  if (boundary_info.size() < 3)
+  const std::string lt = prm.get("Load type");
+
+  if (lt == "Three point load")
+    bc_type = BCType::three_point_load;
+  else if (lt == "Uniaxial compression force")
+    bc_type = BCType::uniaxial_compression_force;
+
+  const unsigned int n_expected = bc_type == BCType::three_point_load ? 2 : 3;
+
+  if (boundary_info.size() < n_expected)
     {
-      std::cout << boundary_info.size()
-                << " boundary/ies detected, setting custom boundary IDs\n";
+      std::cout << boundary_info.size() << " boundary/ies detected instead of "
+                << n_expected << ", setting custom boundary IDs\n";
 
       const std::map<unsigned int, Point<dim>> points0 =
         get_boundary_points(triangulation, boundary_info.begin()->first);
 
+      const double x_min =
+        std::min_element(points0.begin(), points0.end(), cmp_x_pair)->second[0];
+
+      const double x_max =
+        std::max_element(points0.begin(), points0.end(), cmp_x_pair)->second[0];
+
       const double z_max =
         std::max_element(points0.begin(), points0.end(), cmp_z_pair)
           ->second[dim - 1];
+
+      std::cout << "x_min: " << x_min << " x_max: " << x_max
+                << " z_max: " << z_max << '\n';
 
       const double x_load = prm.get_double("Load x");
 
@@ -231,17 +264,35 @@ Problem<dim>::handle_boundaries()
           {
             if (cell->face(f)->at_boundary())
               {
+                // to avoid repeating it afterwards
+                cell->face(f)->set_boundary_id(boundary_id_free);
+
                 const Point<dim> face_center = cell->face(f)->center();
 
-                const bool is_top = face_center[dim - 1] >= z_max;
+                const bool is_left  = face_center[0] <= x_min;
+                const bool is_right = face_center[0] >= x_max;
+                const bool is_top   = face_center[dim - 1] >= z_max;
 
-                if (is_top && std::abs(face_center[0]) <= x_load)
+                if (bc_type == BCType::three_point_load)
                   {
-                    cell->face(f)->set_boundary_id(boundary_id_load);
-                    load_area += cell->face(f)->measure();
+                    if (is_top && std::abs(face_center[0]) <= x_load)
+                      {
+                        cell->face(f)->set_boundary_id(boundary_id_load);
+                        load_area += cell->face(f)->measure();
+                      }
                   }
-                else
-                  cell->face(f)->set_boundary_id(boundary_id_free);
+                else if (bc_type == BCType::uniaxial_compression_force)
+                  {
+                    if (is_right)
+                      {
+                        cell->face(f)->set_boundary_id(boundary_id_load);
+                        load_area += cell->face(f)->measure();
+                      }
+                    else if (is_left)
+                      {
+                        cell->face(f)->set_boundary_id(boundary_id_wall);
+                      }
+                  }
               }
           }
 
@@ -259,6 +310,14 @@ Problem<dim>::handle_boundaries()
 
   for (const auto &it : boundary_info)
     std::cout << "boundary " << it.first << " size: " << it.second << '\n';
+}
+
+template <int dim>
+bool
+Problem<dim>::cmp_x_pair(const std::pair<unsigned int, Point<dim>> &it1,
+                         const std::pair<unsigned int, Point<dim>> &it2)
+{
+  return it1.second[0] < it2.second[0];
 }
 
 template <int dim>
@@ -290,26 +349,37 @@ Problem<dim>::initialize()
 
   next_output_time = prm.get_double("Output time step");
 
-  std::vector<Point<dim>> points0;
-  solver.get_support_points(points0);
-
-  const double z_min =
-    (*std::min_element(points0.begin(), points0.end(), cmp_z))[dim - 1];
-
-  const double x_support = prm.get_double("Support x");
-
-  for (size_t i = 0; i < points0.size(); ++i)
+  const std::string lt = prm.get("Load type");
+  if (lt == "Three point load")
     {
-      const auto &p = points0[i];
+      bc_type        = BCType::three_point_load;
+      load_component = dim - 1;
 
-      const bool is_bot = p[dim - 1] <= z_min;
+      std::vector<Point<dim>> points0;
+      solver.get_support_points(points0);
 
-      if (is_bot && (std::abs(p[0] - x_support) <= 1e-8 ||
-                     std::abs(p[0] + x_support) <= 1e-8))
-        solver.get_stress_solver().set_bc1_dof(i, dim - 1, 0.0);
+      const double z_min =
+        (*std::min_element(points0.begin(), points0.end(), cmp_z))[dim - 1];
+
+      const double x_support = prm.get_double("Support x");
+
+      for (size_t i = 0; i < points0.size(); ++i)
+        {
+          const auto &p = points0[i];
+
+          const bool is_bot = p[dim - 1] <= z_min;
+
+          if (is_bot && (std::abs(p[0] - x_support) <= 1e-8 ||
+                         std::abs(p[0] + x_support) <= 1e-8))
+            solver.get_stress_solver().set_bc1_dof(i, dim - 1, 0.0);
+        }
     }
-
-  load_component = prm.get_double("Load component");
+  else if (lt == "Uniaxial compression force")
+    {
+      bc_type        = BCType::uniaxial_compression_force;
+      load_component = 0;
+      solver.get_stress_solver().set_bc1(boundary_id_wall, 0, 0.0);
+    }
 
   std::cout << "Load area: " << load_area << " m2\n";
   std::cout << "Max pressure: " << prm.get_double("Max force") / load_area
