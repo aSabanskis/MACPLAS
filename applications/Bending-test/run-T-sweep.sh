@@ -38,6 +38,7 @@ for i in "${!arr_T[@]}"; do
 
     ./plot-probes-minmax.gnu
 
+    cp *prm "$r/"
     mv probes-dislocation-3d.txt probes-minmax.pdf result-dislocation-3d-order$order-*.vtk "$r/"
 done
 

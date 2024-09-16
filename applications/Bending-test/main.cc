@@ -118,6 +118,11 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     Patterns::Anything(),
                     "Horizontal displacement in m (time function)");
 
+  prm.declare_entry("Max dx",
+                    "0",
+                    Patterns::Double(0),
+                    "Maximum horizontal displacement in m (0 - disabled)");
+
   prm.declare_entry("Max dz",
                     "0",
                     Patterns::Double(0),
@@ -173,6 +178,7 @@ Problem<dim>::run()
   make_grid();
   initialize();
 
+  const double dx_max = prm.get_double("Max dx");
   const double dz_max = prm.get_double("Max dz");
 
   while (true)
@@ -183,15 +189,21 @@ Problem<dim>::run()
 
       update_BCs(t);
 
+      const auto &dx = solver.get_displacement().block(0);
       const auto &dz = solver.get_displacement().block(dim - 1);
 
+      const auto limits_dx = minmax(dx);
       const auto limits_dz = minmax(dz);
+
+      const bool dx_reached =
+        dx_max > 0 && (std::abs(limits_dx.first) >= dx_max ||
+                       std::abs(limits_dx.second) >= dx_max);
 
       const bool dz_reached =
         dz_max > 0 && (std::abs(limits_dz.first) >= dz_max ||
                        std::abs(limits_dz.second) >= dz_max);
 
-      const bool keep_going = solver.solve() && !dz_reached;
+      const bool keep_going = solver.solve() && !dx_reached && !dz_reached;
 
       if (!keep_going)
         break;
