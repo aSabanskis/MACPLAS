@@ -12,7 +12,8 @@ using namespace dealii;
 enum class BCType
 {
   three_point_load,
-  uniaxial_compression_force
+  uniaxial_compression_force,
+  uniaxial_compression_displacement
 };
 
 template <int dim>
@@ -55,7 +56,13 @@ private:
   initialize();
 
   void
-  apply_load(const double time);
+  update_BCs(const double time);
+
+  void
+  apply_force(const double time);
+
+  void
+  apply_displacement(const double time);
 
   /** Checks whether the results need to be outputted at the end of the current
    * time step, and adjusts it if necessary */
@@ -74,6 +81,8 @@ private:
   double load_area;
 
   int load_component;
+
+  FunctionParser<1> displacement;
 
   double previous_time_step;
   double next_output_time;
@@ -104,16 +113,22 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
     Patterns::Double(0),
     "Time over which force reaches max value in s (0 - instantaneous)");
 
+  prm.declare_entry("Displacement x",
+                    "1e-6 * t",
+                    Patterns::Anything(),
+                    "Horizontal displacement in m (time function)");
+
   prm.declare_entry("Max dz",
                     "0",
                     Patterns::Double(0),
                     "Maximum vertical displacement in m (0 - disabled)");
 
-  prm.declare_entry("Load type",
-                    "Three point load",
-                    Patterns::Selection(
-                      "Three point load|Uniaxial compression force"),
-                    "Type of the boundary conditions");
+  prm.declare_entry(
+    "Load type",
+    "Three point load",
+    Patterns::Selection(
+      "Three point load|Uniaxial compression force|Uniaxial compression displacement"),
+    "Type of the boundary conditions");
 
   prm.declare_entry("Load x",
                     "0.002",
@@ -166,7 +181,7 @@ Problem<dim>::run()
 
       const double t = solver.get_time() + solver.get_time_step();
 
-      apply_load(t);
+      update_BCs(t);
 
       const auto &dz = solver.get_displacement().block(dim - 1);
 
@@ -210,8 +225,6 @@ Problem<dim>::make_grid()
 
   // a single probe point at the origin
   solver.add_probe(Point<dim>());
-
-  solver.add_output("force[N]");
 }
 
 template <int dim>
@@ -229,6 +242,8 @@ Problem<dim>::handle_boundaries()
     bc_type = BCType::three_point_load;
   else if (lt == "Uniaxial compression force")
     bc_type = BCType::uniaxial_compression_force;
+  else if (lt == "Uniaxial compression displacement")
+    bc_type = BCType::uniaxial_compression_displacement;
 
   const unsigned int n_expected = bc_type == BCType::three_point_load ? 2 : 3;
 
@@ -281,7 +296,7 @@ Problem<dim>::handle_boundaries()
                         load_area += cell->face(f)->measure();
                       }
                   }
-                else if (bc_type == BCType::uniaxial_compression_force)
+                else
                   {
                     if (is_right)
                       {
@@ -349,10 +364,8 @@ Problem<dim>::initialize()
 
   next_output_time = prm.get_double("Output time step");
 
-  const std::string lt = prm.get("Load type");
-  if (lt == "Three point load")
+  if (bc_type == BCType::three_point_load)
     {
-      bc_type        = BCType::three_point_load;
       load_component = dim - 1;
 
       std::vector<Point<dim>> points0;
@@ -374,26 +387,41 @@ Problem<dim>::initialize()
             solver.get_stress_solver().set_bc1_dof(i, dim - 1, 0.0);
         }
     }
-  else if (lt == "Uniaxial compression force")
+  else
     {
-      bc_type        = BCType::uniaxial_compression_force;
       load_component = 0;
       solver.get_stress_solver().set_bc1(boundary_id_wall, 0, 0.0);
     }
+
+  if (bc_type == BCType::uniaxial_compression_displacement)
+    displacement.initialize("t",
+                            prm.get("Displacement x"),
+                            typename FunctionParser<1>::ConstMap());
+
 
   std::cout << "Load area: " << load_area << " m2\n";
   std::cout << "Max pressure: " << prm.get_double("Max force") / load_area
             << " Pa\n";
 
   // initialize stresses and output probes at zero time
-  apply_load(0);
+  update_BCs(0);
   solver.solve(true);
   solver.output_vtk();
 }
 
 template <int dim>
 void
-Problem<dim>::apply_load(const double time)
+Problem<dim>::update_BCs(const double time)
+{
+  if (bc_type == BCType::uniaxial_compression_displacement)
+    apply_displacement(time);
+  else
+    apply_force(time);
+}
+
+template <int dim>
+void
+Problem<dim>::apply_force(const double time)
 {
   const double F0   = prm.get_double("Max force");
   const double ramp = prm.get_double("Force ramp");
@@ -406,6 +434,15 @@ Problem<dim>::apply_load(const double time)
 
   solver.get_stress_solver().set_bc_load(boundary_id_load, load);
   solver.add_output("force[N]", F);
+}
+
+template <int dim>
+void
+Problem<dim>::apply_displacement(const double time)
+{
+  const double dx = displacement.value(Point<1>(time));
+  solver.get_stress_solver().set_bc1(boundary_id_load, load_component, -dx);
+  solver.add_output("dx[m]", dx);
 }
 
 template <int dim>
