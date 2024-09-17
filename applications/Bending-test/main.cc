@@ -9,11 +9,16 @@
 
 using namespace dealii;
 
-enum class BCType
+enum class GeomType
 {
   three_point_load,
-  uniaxial_compression_force,
-  uniaxial_compression_displacement
+  uniaxial_compression
+};
+
+enum class BCType
+{
+  force,
+  displacement
 };
 
 template <int dim>
@@ -76,7 +81,8 @@ private:
   constexpr static unsigned int boundary_id_load = 1;
   constexpr static unsigned int boundary_id_wall = 2;
 
-  BCType bc_type;
+  GeomType configuration;
+  BCType   bc_type;
 
   double load_area;
 
@@ -91,7 +97,8 @@ private:
 template <int dim>
 Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
   : solver(order, use_default_prm)
-  , bc_type(BCType::three_point_load)
+  , configuration(GeomType::three_point_load)
+  , bc_type(BCType::force)
   , load_area(0)
   , load_component(0)
   , previous_time_step()
@@ -113,7 +120,7 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
     Patterns::Double(0),
     "Time over which force reaches max value in s (0 - instantaneous)");
 
-  prm.declare_entry("Displacement x",
+  prm.declare_entry("Displacement",
                     "1e-6 * t",
                     Patterns::Anything(),
                     "Horizontal displacement in m (time function)");
@@ -128,12 +135,16 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     Patterns::Double(0),
                     "Maximum vertical displacement in m (0 - disabled)");
 
-  prm.declare_entry(
-    "Load type",
-    "Three point load",
-    Patterns::Selection(
-      "Three point load|Uniaxial compression force|Uniaxial compression displacement"),
-    "Type of the boundary conditions");
+  prm.declare_entry("Configuration",
+                    "Three point load",
+                    Patterns::Selection(
+                      "Three point load|Uniaxial compression"),
+                    "Configuration of the system");
+
+  prm.declare_entry("Boundary condition",
+                    "Force",
+                    Patterns::Selection("Force|Displacement"),
+                    "Load boundary condition");
 
   prm.declare_entry("Load x",
                     "0.002",
@@ -248,16 +259,24 @@ Problem<dim>::handle_boundaries()
   std::map<unsigned int, unsigned int> boundary_info =
     get_boundary_summary(triangulation);
 
-  const std::string lt = prm.get("Load type");
+  const std::string cfg = prm.get("Configuration");
 
-  if (lt == "Three point load")
-    bc_type = BCType::three_point_load;
-  else if (lt == "Uniaxial compression force")
-    bc_type = BCType::uniaxial_compression_force;
-  else if (lt == "Uniaxial compression displacement")
-    bc_type = BCType::uniaxial_compression_displacement;
+  if (cfg == "Three point load")
+    configuration = GeomType::three_point_load;
+  else if (cfg == "Uniaxial compression")
+    configuration = GeomType::uniaxial_compression;
 
-  const unsigned int n_expected = bc_type == BCType::three_point_load ? 2 : 3;
+
+  const std::string bc = prm.get("Boundary condition");
+
+  if (bc == "Force")
+    bc_type = BCType::force;
+  else if (bc == "Displacement")
+    bc_type = BCType::displacement;
+
+
+  const unsigned int n_expected =
+    configuration == GeomType::three_point_load ? 2 : 3;
 
   if (boundary_info.size() < n_expected)
     {
@@ -300,7 +319,7 @@ Problem<dim>::handle_boundaries()
                 const bool is_right = face_center[0] >= x_max;
                 const bool is_top   = face_center[dim - 1] >= z_max;
 
-                if (bc_type == BCType::three_point_load)
+                if (configuration == GeomType::three_point_load)
                   {
                     if (is_top && std::abs(face_center[0]) <= x_load)
                       {
@@ -376,7 +395,7 @@ Problem<dim>::initialize()
 
   next_output_time = prm.get_double("Output time step");
 
-  if (bc_type == BCType::three_point_load)
+  if (configuration == GeomType::three_point_load)
     {
       load_component = dim - 1;
 
@@ -405,15 +424,23 @@ Problem<dim>::initialize()
       solver.get_stress_solver().set_bc1(boundary_id_wall, 0, 0.0);
     }
 
-  if (bc_type == BCType::uniaxial_compression_displacement)
-    displacement.initialize("t",
-                            prm.get("Displacement x"),
-                            typename FunctionParser<1>::ConstMap());
-
-
   std::cout << "Load area: " << load_area << " m2\n";
-  std::cout << "Max pressure: " << prm.get_double("Max force") / load_area
-            << " Pa\n";
+  std::cout << "Load component: " << load_component << " ("
+            << coordinate_names(dim)[load_component] << ")\n";
+
+  if (bc_type == BCType::displacement)
+    {
+      std::cout << "Using displacement BC\n";
+      displacement.initialize("t",
+                              prm.get("Displacement"),
+                              typename FunctionParser<1>::ConstMap());
+    }
+  else
+    {
+      std::cout << "Using force BC\n";
+      std::cout << "Max pressure: " << prm.get_double("Max force") / load_area
+                << " Pa\n";
+    }
 
   // initialize stresses and output probes at zero time
   update_BCs(0);
@@ -425,7 +452,7 @@ template <int dim>
 void
 Problem<dim>::update_BCs(const double time)
 {
-  if (bc_type == BCType::uniaxial_compression_displacement)
+  if (bc_type == BCType::displacement)
     apply_displacement(time);
   else
     apply_force(time);
