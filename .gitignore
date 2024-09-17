@@ -35,6 +35,8 @@ log*
 *.log*
 results
 results-*
+template-*
+CsI-*
 html
 latex
 *.pdf
