@@ -61,6 +61,9 @@ private:
   initialize();
 
   void
+  update_temperature(const double time);
+
+  void
   update_BCs(const double time);
 
   void
@@ -88,6 +91,8 @@ private:
 
   int load_component;
 
+  FunctionParser<1> temperature;
+
   FunctionParser<1> displacement;
 
   double previous_time_step;
@@ -104,10 +109,10 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
   , previous_time_step()
   , next_output_time()
 {
-  prm.declare_entry("Initial temperature",
-                    "1000",
-                    Patterns::Double(0),
-                    "Initial temperature T_0 in K");
+  prm.declare_entry("Temperature",
+                    "900",
+                    Patterns::Anything(),
+                    "Temperature T in K (time function)");
 
   prm.declare_entry("Max force",
                     "0",
@@ -198,6 +203,7 @@ Problem<dim>::run()
 
       const double t = solver.get_time() + solver.get_time_step();
 
+      update_temperature(t);
       update_BCs(t);
 
       const auto &dx = solver.get_displacement().block(0);
@@ -388,11 +394,6 @@ Problem<dim>::initialize()
 {
   solver.initialize();
 
-  Vector<double> &temperature = solver.get_temperature();
-
-  temperature = 0;
-  temperature.add(prm.get_double("Initial temperature"));
-
   next_output_time = prm.get_double("Output time step");
 
   if (configuration == GeomType::three_point_load)
@@ -442,10 +443,25 @@ Problem<dim>::initialize()
                 << " Pa\n";
     }
 
-  // initialize stresses and output probes at zero time
+  temperature.initialize("t",
+                         prm.get("Temperature"),
+                         typename FunctionParser<1>::ConstMap());
+
+  // initialize temperature and stresses and output probes at zero time
+  update_temperature(0);
   update_BCs(0);
   solver.solve(true);
   solver.output_vtk();
+}
+
+template <int dim>
+void
+Problem<dim>::update_temperature(const double time)
+{
+  Vector<double> &T = solver.get_temperature();
+
+  T = 0;
+  T.add(temperature.value(Point<1>(time)));
 }
 
 template <int dim>

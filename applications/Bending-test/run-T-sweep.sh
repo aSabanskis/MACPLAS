@@ -27,7 +27,7 @@ for i in "${!arr_T[@]}"; do
         continue
     fi
 
-    sed -Ei "s|(set Initial temperature *= *).*|\1$T|"   problem.prm
+    sed -Ei "s|(set Temperature *= *).*|\1$T|" problem.prm
     sed -Ei "s|(set Reference temperature *= *).*|\1$T|" stress.prm
 
     sed -Ei "s|(set Max force *= *).*|\1$F|" problem.prm

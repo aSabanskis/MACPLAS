@@ -1,4 +1,4 @@
-set Initial temperature = 900
+set Temperature         = 900
 set Max force           = 5
 set Force ramp          = 0
 set Load x              = 0.001
