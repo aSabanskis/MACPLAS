@@ -149,7 +149,7 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
   prm.declare_entry("Load x",
                     "0.002",
                     Patterns::Double(0),
-                    "Position of the support (between -x and +x)");
+                    "Position of the load (between -x and +x)");
 
   prm.declare_entry("Support x",
                     "0.03",
