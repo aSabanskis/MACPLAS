@@ -92,7 +92,7 @@ private:
   int load_component;
 
   FunctionParser<1> temperature;
-
+  FunctionParser<1> force;
   FunctionParser<1> displacement;
 
   double previous_time_step;
@@ -114,16 +114,10 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
                     Patterns::Anything(),
                     "Temperature T in K (time function)");
 
-  prm.declare_entry("Max force",
-                    "0",
-                    Patterns::Double(0),
-                    "Maximum applied force in N");
-
-  prm.declare_entry(
-    "Force ramp",
-    "0",
-    Patterns::Double(0),
-    "Time over which force reaches max value in s (0 - instantaneous)");
+  prm.declare_entry("Force",
+                    "1",
+                    Patterns::Anything(),
+                    "Applied force in N (time function)");
 
   prm.declare_entry("Displacement",
                     "1e-6 * t",
@@ -439,8 +433,9 @@ Problem<dim>::initialize()
   else
     {
       std::cout << "Using force BC\n";
-      std::cout << "Max pressure: " << prm.get_double("Max force") / load_area
-                << " Pa\n";
+      force.initialize("t",
+                       prm.get("Force"),
+                       typename FunctionParser<1>::ConstMap());
     }
 
   temperature.initialize("t",
@@ -478,11 +473,7 @@ template <int dim>
 void
 Problem<dim>::apply_force(const double time)
 {
-  const double F0   = prm.get_double("Max force");
-  const double ramp = prm.get_double("Force ramp");
-
-  const double F_scale = ramp <= 0 ? 1 : time >= ramp ? 1 : time / ramp;
-  const double F       = F0 * F_scale;
+  const double F = force.value(Point<1>(time));
 
   Tensor<1, dim> load;
   load[load_component] = -F / load_area;

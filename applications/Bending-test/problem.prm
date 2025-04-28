@@ -1,6 +1,5 @@
 set Temperature         = 900
-set Max force           = 5
-set Force ramp          = 0
+set Force               = 1
 set Load x              = 0.001
 set Configuration       = Three point load # Uniaxial compression
 set Boundary condition  = Force # Displacement
