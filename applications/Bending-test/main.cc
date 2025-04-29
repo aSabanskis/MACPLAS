@@ -516,6 +516,10 @@ Problem<dim>::update_output_time_step()
   std::cout << "dt changed from " << dt << " to " << solver.get_time_step()
             << " s for result output at t=" << next_output_time << " s\n";
 
+  const double t_max = solver.get_max_time();
+  if (next_output_time + previous_time_step > t_max)
+    previous_time_step = t_max - next_output_time;
+
   next_output_time += dt_output;
 
   return true;
