@@ -1007,6 +1007,9 @@ Problem<dim>::update_fields()
 
   if (with_dislocation())
     {
+      if (f_test.size() > 0)
+        dislocation_solver.add_field("f_test", f_test);
+
       Vector<double> &N_m = dislocation_solver.get_dislocation_density();
 
       update_one_field(N_m, "N_m", interface_dofs);
@@ -1186,6 +1189,9 @@ Problem<dim>::initialize_dislocation(const bool dry_run)
   dislocation_solver.add_output("shift_relative");
 
   dislocation_solver.output_parameter_table();
+
+  if (f_test.size() > 0)
+    dislocation_solver.add_field("f_test", f_test);
 
   if (prm.get_bool("Load saved results"))
     {
@@ -1672,9 +1678,10 @@ Problem<dim>::output_results() const
 
   if (vtk)
     {
-      temperature_solver.output_vtk();
       if (has_dislocation)
         dislocation_solver.output_vtk();
+      else
+        temperature_solver.output_vtk();
 #ifdef DEBUG
       if (use_advection())
         advection_solver.output_vtk();
@@ -1685,14 +1692,17 @@ Problem<dim>::output_results() const
   // Export is disabled by default in 3D.
   if (boundary)
     {
-      temperature_solver.output_boundary_values(boundary_id_interface);
-      temperature_solver.output_boundary_values(boundary_id_surface);
-      temperature_solver.output_boundary_values(boundary_id_axis);
       if (has_dislocation)
         {
           dislocation_solver.output_boundary_values(boundary_id_interface);
           dislocation_solver.output_boundary_values(boundary_id_surface);
           dislocation_solver.output_boundary_values(boundary_id_axis);
+        }
+      else
+        {
+          temperature_solver.output_boundary_values(boundary_id_interface);
+          temperature_solver.output_boundary_values(boundary_id_surface);
+          temperature_solver.output_boundary_values(boundary_id_axis);
         }
     }
 
