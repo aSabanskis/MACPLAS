@@ -91,7 +91,8 @@ private:
 
   int load_component;
 
-  FunctionParser<1> temperature;
+  std::unique_ptr<Function<1>> temperature;
+
   FunctionParser<1> force;
   FunctionParser<1> displacement;
 
@@ -438,9 +439,7 @@ Problem<dim>::initialize()
                        typename FunctionParser<1>::ConstMap());
     }
 
-  temperature.initialize("t",
-                         prm.get("Temperature"),
-                         typename FunctionParser<1>::ConstMap());
+  initialize_function(temperature, prm.get("Temperature"), "t");
 
   // initialize temperature and stresses and output probes at zero time
   update_temperature(0);
@@ -456,7 +455,7 @@ Problem<dim>::update_temperature(const double time)
   Vector<double> &T = solver.get_temperature();
 
   T = 0;
-  T.add(temperature.value(Point<1>(time)));
+  T.add(temperature->value(Point<1>(time)));
 }
 
 template <int dim>
