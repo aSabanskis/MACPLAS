@@ -107,7 +107,7 @@ public:
   void
   get_boundary_points(const unsigned int       id,
                       std::vector<Point<dim>> &points,
-                      std::vector<bool> &      boundary_dofs) const;
+                      IndexSet &               boundary_dofs) const;
 
   /** Get coordinates of DOFs
    */
@@ -525,17 +525,13 @@ AdvectionSolver<dim>::initialize()
 
 template <int dim>
 void
-AdvectionSolver<dim>::get_boundary_points(
-  const unsigned int       id,
-  std::vector<Point<dim>> &points,
-  std::vector<bool> &      boundary_dofs) const
+AdvectionSolver<dim>::get_boundary_points(const unsigned int       id,
+                                          std::vector<Point<dim>> &points,
+                                          IndexSet &boundary_dofs) const
 {
   get_support_points(points);
-  boundary_dofs.resize(dh.n_dofs());
-  DoFTools::extract_boundary_dofs(dh,
-                                  ComponentMask(),
-                                  boundary_dofs,
-                                  {static_cast<types::boundary_id>(id)});
+  boundary_dofs = extract_single_component_boundary_dofs(
+    dh, {static_cast<types::boundary_id>(id)});
 }
 
 template <int dim>
@@ -811,12 +807,8 @@ AdvectionSolver<dim>::assemble_system()
   // apply Dirichlet boundary conditions
   for (const auto &b : bc1)
     {
-      std::vector<bool> boundary_dofs(n_dofs, false);
-
-      DoFTools::extract_boundary_dofs(dh,
-                                      ComponentMask(),
-                                      boundary_dofs,
-                                      {static_cast<types::boundary_id>(b)});
+      const IndexSet boundary_dofs = extract_single_component_boundary_dofs(
+        dh, {static_cast<types::boundary_id>(b)});
 
       for (unsigned int k = 0; k < n_fields; ++k)
         {
@@ -826,7 +818,7 @@ AdvectionSolver<dim>::assemble_system()
 
           for (unsigned int i = 0; i < n_dofs; ++i)
             {
-              if (boundary_dofs[i])
+              if (boundary_dofs.is_element(i))
                 boundary_values[i] = f[i];
             }
 
@@ -1045,12 +1037,10 @@ AdvectionSolver<dim>::output_boundary_values(const unsigned int id) const
   Timer timer;
 
   std::vector<Point<dim>> points;
-  std::vector<bool>       boundary_dofs;
+  IndexSet                boundary_dofs;
   get_boundary_points(id, points, boundary_dofs);
 
-  if (std::none_of(boundary_dofs.cbegin(),
-                   boundary_dofs.cend(),
-                   [](const bool b) { return b; }))
+  if (boundary_dofs.is_empty())
     {
       std::cout << solver_name()
                 << "  output_boundary_values: skipping empty boundary " << id
@@ -1084,7 +1074,7 @@ AdvectionSolver<dim>::output_boundary_values(const unsigned int id) const
 
   for (unsigned int i = 0; i < points.size(); ++i)
     {
-      if (!boundary_dofs[i])
+      if (!boundary_dofs.is_element(i))
         continue;
 
       // a simple '<< points[i]' would put space between coordinates

@@ -167,7 +167,7 @@ Problem<dim>::initialize()
   if (BC == "2")
     {
       std::vector<Point<dim>> points;
-      std::vector<bool>       boundary_dofs;
+      IndexSet                boundary_dofs;
 
       const double q0 = 3e5;
 
@@ -175,7 +175,7 @@ Problem<dim>::initialize()
       Vector<double> q(points.size());
       for (unsigned int i = 0; i < q.size(); ++i)
         {
-          if (boundary_dofs[i])
+          if (boundary_dofs.is_element(i))
             q[i] = q0;
         }
 
@@ -221,14 +221,14 @@ Problem<dim>::initialize()
       solver.set_bc1(boundary_id, T0);
 
       std::vector<Point<dim>> points;
-      std::vector<bool>       boundary_dofs;
+      IndexSet                boundary_dofs;
       boundary_id = 1;
       solver.get_boundary_points(boundary_id, points, boundary_dofs);
       const double   q0 = 1e4;
       Vector<double> q(points.size());
       for (unsigned int i = 0; i < q.size(); ++i)
         {
-          if (boundary_dofs[i])
+          if (boundary_dofs.is_element(i))
             q[i] = q0;
         }
       const double                        emissivity0 = 0.46;

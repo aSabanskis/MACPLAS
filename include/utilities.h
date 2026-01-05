@@ -302,7 +302,7 @@ public:
   interpolate(const FieldType &              field_type,
               const std::string &            field_name,
               const std::vector<Point<dim>> &target_points,
-              const std::vector<bool> &      markers,
+              const IndexSet &               markers,
               Vector<double> &               target_values) const;
 
   /** Same as above, for target points in 2D
@@ -311,7 +311,7 @@ public:
   interpolate(const FieldType &                  field_type,
               const std::string &                field_name,
               const std::vector<Point<dim - 1>> &target_points,
-              const std::vector<bool> &          markers,
+              const IndexSet &                   markers,
               Vector<double> &                   target_values) const;
 
   /** Convert between cell and point fields.
@@ -443,7 +443,7 @@ public:
   inline void
   interpolate(const std::string &            field_name,
               const std::vector<Point<dim>> &target_points,
-              const std::vector<bool> &      markers,
+              const IndexSet &               markers,
               Vector<double> &               target_values) const;
 
   /** Same as above, for target points in 3D
@@ -451,7 +451,7 @@ public:
   inline void
   interpolate(const std::string &                field_name,
               const std::vector<Point<dim + 1>> &target_points,
-              const std::vector<bool> &          markers,
+              const IndexSet &                   markers,
               Vector<double> &                   target_values) const;
 
   /** Project a specific point onto the mesh
@@ -670,6 +670,14 @@ laplace_transform(const std::map<unsigned int, Point<dim>> &new_points,
                   const bool   solve_for_absolute_positions             = false,
                   const double tol = 1.e-10);
 
+/**
+ * Handling of deprecated functions DoFTools::extract_boundary_dofs
+ */
+template <int dim, int spacedim>
+IndexSet
+extract_single_component_boundary_dofs(
+  const DoFHandler<dim, spacedim> &   dof_handler,
+  const std::set<types::boundary_id> &boundary_ids = {});
 
 // IMPLEMENTATION
 
@@ -1643,7 +1651,7 @@ void
 SurfaceInterpolator3D::interpolate(const FieldType &              field_type,
                                    const std::string &            field_name,
                                    const std::vector<Point<dim>> &target_points,
-                                   const std::vector<bool> &      markers,
+                                   const IndexSet &               markers,
                                    Vector<double> &target_values) const
 {
   AssertThrow(field_type == CellField || field_type == PointField,
@@ -1661,7 +1669,7 @@ SurfaceInterpolator3D::interpolate(const FieldType &              field_type,
 
   for (unsigned int i = 0; i < n_values; ++i)
     {
-      if (!markers[i])
+      if (!markers.is_element(i))
         continue;
 
       Point<dim>   p_found;
@@ -1736,7 +1744,7 @@ SurfaceInterpolator3D::interpolate(
   const FieldType &                  field_type,
   const std::string &                field_name,
   const std::vector<Point<dim - 1>> &target_points,
-  const std::vector<bool> &          markers,
+  const IndexSet &                   markers,
   Vector<double> &                   target_values) const
 {
   const unsigned int n_values = target_points.size();
@@ -2062,7 +2070,7 @@ SurfaceInterpolator2D::get_field_names() const
 void
 SurfaceInterpolator2D::interpolate(const std::string &            field_name,
                                    const std::vector<Point<dim>> &target_points,
-                                   const std::vector<bool> &      markers,
+                                   const IndexSet &               markers,
                                    Vector<double> &target_values) const
 {
   Timer timer;
@@ -2077,7 +2085,7 @@ SurfaceInterpolator2D::interpolate(const std::string &            field_name,
 
   for (unsigned int i = 0; i < n_values; ++i)
     {
-      if (!markers[i])
+      if (!markers.is_element(i))
         continue;
 
       Point<dim>   p_found;
@@ -2112,7 +2120,7 @@ void
 SurfaceInterpolator2D::interpolate(
   const std::string &                field_name,
   const std::vector<Point<dim + 1>> &target_points,
-  const std::vector<bool> &          markers,
+  const IndexSet &                   markers,
   Vector<double> &                   target_values) const
 {
   const unsigned int n_values = target_points.size();
@@ -2377,8 +2385,8 @@ DoFFieldSmoother<dim>::smooth_cell(const double relax,
   for (const auto &it : fields)
     fields_new[it.first].reinit(n_dofs);
 
-  std::vector<bool> all_boundary_dofs(n_dofs, false);
-  DoFTools::extract_boundary_dofs(*dh, ComponentMask(), all_boundary_dofs);
+  const IndexSet all_boundary_dofs =
+    extract_single_component_boundary_dofs(*dh);
 
   typename DoFHandler<dim>::active_cell_iterator cell = dh->begin_active(),
                                                  endc = dh->end();
@@ -2404,7 +2412,8 @@ DoFFieldSmoother<dim>::smooth_cell(const double relax,
           for (unsigned int i = 0; i < dofs_per_cell; ++i)
             {
               const unsigned int j = local_dof_indices[i];
-              const double r = all_boundary_dofs[j] ? relax_boundary : relax;
+              const double       r =
+                all_boundary_dofs.is_element(j) ? relax_boundary : relax;
               f_new[j] += r * f_cell + (1 - r) * f[j];
             }
         }
@@ -2427,12 +2436,8 @@ DoFFieldSmoother<dim>::smooth_cell(const double relax,
   // apply Dirichlet boundary conditions
   for (const auto &b : bc1)
     {
-      std::vector<bool> boundary_dofs(n_dofs, false);
-
-      DoFTools::extract_boundary_dofs(*dh,
-                                      ComponentMask(),
-                                      boundary_dofs,
-                                      {static_cast<types::boundary_id>(b)});
+      const IndexSet boundary_dofs = extract_single_component_boundary_dofs(
+        *dh, {static_cast<types::boundary_id>(b)});
 
       for (const auto &it : fields)
         {
@@ -2440,7 +2445,7 @@ DoFFieldSmoother<dim>::smooth_cell(const double relax,
 
           for (unsigned int i = 0; i < n_dofs; ++i)
             {
-              if (boundary_dofs[i])
+              if (boundary_dofs.is_element(i))
                 f_new[i] = it.second[i];
             }
         }
@@ -2722,5 +2727,25 @@ laplace_transform(const std::map<unsigned int, Point<dim>> &new_points,
         }
 }
 #endif
+
+template <int dim, int spacedim>
+IndexSet
+extract_single_component_boundary_dofs(
+  const DoFHandler<dim, spacedim> &   dof_handler,
+  const std::set<types::boundary_id> &boundary_ids)
+{
+#if DEAL_II_VERSION_GTE(9, 3, 0)
+  const IndexSet boundary_dofs =
+    DoFTools::extract_boundary_dofs(dof_handler, ComponentMask(), boundary_ids);
+#else
+  IndexSet boundary_dofs;
+  DoFTools::extract_boundary_dofs(dof_handler,
+                                  ComponentMask(),
+                                  boundary_dofs,
+                                  boundary_ids);
+#endif
+  return boundary_dofs;
+}
+
 
 #endif

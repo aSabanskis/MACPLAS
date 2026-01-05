@@ -197,7 +197,7 @@ public:
   void
   get_boundary_points(const unsigned int       id,
                       std::vector<Point<dim>> &points,
-                      std::vector<bool> &      boundary_dofs) const;
+                      IndexSet &               boundary_dofs) const;
 
   /** Get coordinates of DOFs
    */
@@ -956,17 +956,13 @@ TemperatureSolver<dim>::initialize()
 
 template <int dim>
 void
-TemperatureSolver<dim>::get_boundary_points(
-  const unsigned int       id,
-  std::vector<Point<dim>> &points,
-  std::vector<bool> &      boundary_dofs) const
+TemperatureSolver<dim>::get_boundary_points(const unsigned int       id,
+                                            std::vector<Point<dim>> &points,
+                                            IndexSet &boundary_dofs) const
 {
   get_support_points(points);
-  boundary_dofs.resize(dh.n_dofs());
-  DoFTools::extract_boundary_dofs(dh,
-                                  ComponentMask(),
-                                  boundary_dofs,
-                                  {static_cast<types::boundary_id>(id)});
+  boundary_dofs = extract_single_component_boundary_dofs(
+    dh, {static_cast<types::boundary_id>(id)});
 }
 
 template <int dim>
@@ -983,14 +979,14 @@ std::map<unsigned int, Point<dim>>
 TemperatureSolver<dim>::get_boundary_dofs(const unsigned int boundary_id) const
 {
   std::vector<Point<dim>> all_points;
-  std::vector<bool>       boundary_dofs;
+  IndexSet                boundary_dofs;
 
   get_boundary_points(boundary_id, all_points, boundary_dofs);
 
   std::map<unsigned int, Point<dim>> boundary_points;
   for (unsigned int i = 0; i < all_points.size(); ++i)
     {
-      if (boundary_dofs[i])
+      if (boundary_dofs.is_element(i))
         boundary_points[i] = all_points[i];
     }
   return boundary_points;
@@ -1075,16 +1071,12 @@ TemperatureSolver<dim>::apply_bc1()
                                  " does not match BC1 size " +
                                  std::to_string(T1.size())));
 
-          std::vector<bool> boundary_dofs(N, false);
-          DoFTools::extract_boundary_dofs(dh,
-                                          ComponentMask(),
-                                          boundary_dofs,
-                                          {static_cast<types::boundary_id>(
-                                            bc.first)});
+          const IndexSet boundary_dofs = extract_single_component_boundary_dofs(
+            dh, {static_cast<types::boundary_id>(bc.first)});
 
           for (unsigned int i = 0; i < N; ++i)
             {
-              if (boundary_dofs[i])
+              if (boundary_dofs.is_element(i))
                 temperature[i] = T1[i];
             }
         }
@@ -1236,16 +1228,12 @@ TemperatureSolver<dim>::output_vtk() const
       q.reinit(temperature);
       e.reinit(temperature);
 
-      std::vector<bool> boundary_dofs(temperature.size(), false);
-      DoFTools::extract_boundary_dofs(dh,
-                                      ComponentMask(),
-                                      boundary_dofs,
-                                      {static_cast<types::boundary_id>(
-                                        data.first)});
+      const IndexSet boundary_dofs = extract_single_component_boundary_dofs(
+        dh, {static_cast<types::boundary_id>(data.first)});
 
       for (unsigned int i = 0; i < temperature.size(); ++i)
         {
-          if (!boundary_dofs[i])
+          if (!boundary_dofs.is_element(i))
             continue;
           e[i] = data.second.emissivity(temperature[i]);
           q[i] = sigma_SB * e[i] * std::pow(temperature[i], 4);
@@ -1264,16 +1252,12 @@ TemperatureSolver<dim>::output_vtk() const
 
       q.reinit(temperature);
 
-      std::vector<bool> boundary_dofs(temperature.size(), false);
-      DoFTools::extract_boundary_dofs(dh,
-                                      ComponentMask(),
-                                      boundary_dofs,
-                                      {static_cast<types::boundary_id>(
-                                        data.first)});
+      const IndexSet boundary_dofs = extract_single_component_boundary_dofs(
+        dh, {static_cast<types::boundary_id>(data.first)});
 
       for (unsigned int i = 0; i < temperature.size(); ++i)
         {
-          if (!boundary_dofs[i])
+          if (!boundary_dofs.is_element(i))
             continue;
           q[i] = data.second.h * (temperature[i] - data.second.T_ref);
         }
@@ -1300,12 +1284,10 @@ TemperatureSolver<dim>::output_boundary_values(const unsigned int id) const
   Timer timer;
 
   std::vector<Point<dim>> points;
-  std::vector<bool>       boundary_dofs;
+  IndexSet                boundary_dofs;
   get_boundary_points(id, points, boundary_dofs);
 
-  if (std::none_of(boundary_dofs.cbegin(),
-                   boundary_dofs.cend(),
-                   [](const bool b) { return b; }))
+  if (boundary_dofs.is_empty())
     {
       std::cout << solver_name()
                 << "  output_boundary_values: skipping empty boundary " << id
@@ -1349,7 +1331,7 @@ TemperatureSolver<dim>::output_boundary_values(const unsigned int id) const
 
   for (unsigned int i = 0; i < points.size(); ++i)
     {
-      if (!boundary_dofs[i])
+      if (!boundary_dofs.is_element(i))
         continue;
 
       // a simple '<< points[i]' would put space between coordinates

@@ -92,7 +92,7 @@ Problem<dim>::initialize()
   // no need to initialize the temperature field
 
   std::vector<Point<dim>> points;
-  std::vector<bool>       boundary_dofs;
+  IndexSet                boundary_dofs;
   unsigned int            boundary_id = 0;
   solver.get_boundary_points(boundary_id, points, boundary_dofs);
   Vector<double> q(points.size());
@@ -127,7 +127,7 @@ Problem<dim>::initialize()
   boundary_id = 0;
   solver2.get_boundary_points(boundary_id, points2, boundary_dofs);
   // test all DOFs, not just boundary
-  std::fill(boundary_dofs.begin(), boundary_dofs.end(), true);
+  boundary_dofs = complete_index_set(points2.size());
   q.reinit(points2.size());
   surf.interpolate(
     SurfaceInterpolator3D::PointField, "q", points2, boundary_dofs, q);

@@ -826,7 +826,7 @@ Problem<dim>::apply_T_BC()
   if (T_BC1_applied())
     {
       std::vector<Point<dim>> points;
-      std::vector<bool>       boundary_dofs;
+      IndexSet                boundary_dofs;
       temperature_solver.get_boundary_points(boundary_id_surf,
                                              points,
                                              boundary_dofs);
@@ -963,7 +963,7 @@ Problem<dim>::interpolate_q_em(const double z)
     }
 
   std::vector<Point<dim>> points;
-  std::vector<bool>       boundary_dofs;
+  IndexSet                boundary_dofs;
   temperature_solver.get_boundary_points(boundary_id_surf,
                                          points,
                                          boundary_dofs);
@@ -976,7 +976,7 @@ Problem<dim>::interpolate_q_em(const double z)
 
   if (prm.get_bool("Approximate skin effect") ||
       prm.get_bool("Use LF EM field"))
-    std::fill(boundary_dofs.begin(), boundary_dofs.end(), true);
+    boundary_dofs = complete_index_set(points.size());
 
   if (dim == 2)
     q2d.interpolate("QEM", points, boundary_dofs, q0);
@@ -1145,14 +1145,14 @@ Problem<dim>::approximate_LF_EM()
   const bool use_LF = prm.get_bool("Use LF EM field");
 
   std::vector<Point<dim>> points;
-  std::vector<bool>       markers;
+  IndexSet                markers;
   temperature_solver.get_boundary_points(boundary_id_surf, points, markers);
 
   // calculate the radius
   double R = 0;
   for (unsigned int i = 0; i < points.size(); ++i)
     {
-      if (markers[i])
+      if (markers.is_element(i))
         R = std::max(R, points[i][0]);
     }
   std::cout << "R=" << R << " m\n";

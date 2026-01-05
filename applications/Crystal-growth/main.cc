@@ -41,9 +41,9 @@ private:
   update_fields();
 
   void
-  update_one_field(Vector<double> &         field,
-                   const std::string &      name,
-                   const std::vector<bool> &do_not_change);
+  update_one_field(Vector<double> &   field,
+                   const std::string &name,
+                   const IndexSet &   do_not_change);
 
   void
   initialize_temperature();
@@ -972,7 +972,7 @@ Problem<dim>::update_fields()
       advection_solver.solve(true);
     }
 
-  std::vector<bool> interface_dofs;
+  IndexSet interface_dofs;
   if (!prm.get_bool("Smooth interface fields"))
     {
       std::vector<Point<dim>> points;
@@ -1029,15 +1029,12 @@ Problem<dim>::update_fields()
 
       if (prm.get_bool("Reset interface fields"))
         {
-          std::vector<bool> mask(N_m.size());
-          DoFTools::extract_boundary_dofs(temperature_solver.get_dof_handler(),
-                                          ComponentMask(),
-                                          mask,
-                                          {static_cast<types::boundary_id>(
-                                            boundary_id_interface)});
+          const IndexSet mask = extract_single_component_boundary_dofs(
+            temperature_solver.get_dof_handler(),
+            {static_cast<types::boundary_id>(boundary_id_interface)});
 
           for (unsigned int i = 0; i < n; ++i)
-            if (mask[i])
+            if (mask.is_element(i))
               {
                 N_m[i] = N0;
                 for (unsigned int j = 0; j < e_c.n_blocks(); ++j)
@@ -1049,9 +1046,9 @@ Problem<dim>::update_fields()
 
 template <int dim>
 void
-Problem<dim>::update_one_field(Vector<double> &         field,
-                               const std::string &      name,
-                               const std::vector<bool> &do_not_change)
+Problem<dim>::update_one_field(Vector<double> &   field,
+                               const std::string &name,
+                               const IndexSet &   do_not_change)
 {
   Vector<double> df(field.size());
 
@@ -1069,7 +1066,7 @@ Problem<dim>::update_one_field(Vector<double> &         field,
     }
 
   for (unsigned int i = 0; i < do_not_change.size(); ++i)
-    if (do_not_change[i])
+    if (do_not_change.is_element(i))
       df[i] = 0;
 
 
@@ -1081,7 +1078,7 @@ Problem<dim>::update_one_field(Vector<double> &         field,
   df = smoother.get_field("F");
 
   for (unsigned int i = 0; i < do_not_change.size(); ++i)
-    if (do_not_change[i])
+    if (do_not_change.is_element(i))
       df[i] = 0;
 
   // update field
@@ -1333,7 +1330,7 @@ Problem<dim>::set_temperature_BC()
       AssertThrow(!is_detached(t), ExcNotImplemented());
 
       std::vector<Point<dim>> points;
-      std::vector<bool>       boundary_dofs;
+      IndexSet                boundary_dofs;
       temperature_solver.get_boundary_points(boundary_id_surface,
                                              points,
                                              boundary_dofs);
@@ -1389,7 +1386,7 @@ Problem<dim>::set_temperature_BC()
   Vector<double>     q_in(n);
 
   std::vector<Point<dim>> points;
-  std::vector<bool>       boundary_dofs;
+  IndexSet                boundary_dofs;
   temperature_solver.get_boundary_points(boundary_id_surface,
                                          points,
                                          boundary_dofs);
@@ -1399,7 +1396,7 @@ Problem<dim>::set_temperature_BC()
 
   for (unsigned int i = 0; i < n; ++i)
     {
-      if (!boundary_dofs[i])
+      if (!boundary_dofs.is_element(i))
         continue;
 
       const double z      = points[i][dim - 1];
@@ -1421,14 +1418,14 @@ Problem<dim>::set_temperature_BC()
 
   if (is_detached(t))
     {
-      std::vector<bool> boundary_dofs2;
+      IndexSet boundary_dofs2;
       temperature_solver.get_boundary_points(boundary_id_interface,
                                              points,
                                              boundary_dofs2);
       q_in = 0;
       for (unsigned int i = 0; i < n; ++i)
         {
-          if (!boundary_dofs2[i])
+          if (!boundary_dofs2.is_element(i))
             continue;
 
           const double z = points[i][dim - 1];
