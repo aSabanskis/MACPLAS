@@ -2054,6 +2054,9 @@ DislocationSolver<dim>::derivative_N_m(const double N_m,
   const double tau_p = tau_eff(N_m, J_2, T);
   const double tau_l = tau_eff(N_m, J_2, T, dot_N_m_with_tau_crit_l);
 
+  if (tau_p == 0 || N_m == 0)
+    return 0;
+
   return m_K * m_k_0 * std::pow(tau_p, m_p) * std::pow(tau_l, m_l) *
          std::exp(-calc_Q(T, tau_p) / (m_k_B * T)) * N_m;
 }
@@ -2098,6 +2101,9 @@ DislocationSolver<dim>::derivative2_N_m_N_m(const double N_m,
 {
   const double tau_p = tau_eff(N_m, J_2, T);
   const double tau_l = tau_eff(N_m, J_2, T, dot_N_m_with_tau_crit_l);
+
+  if (tau_p == 0 || N_m == 0)
+    return 0;
 
   return m_K * m_k_0 * std::exp(-calc_Q(T, tau_p) / (m_k_B * T)) *
          (                                                           //
