@@ -142,16 +142,34 @@ main(int argc, char *argv[])
 
   bool init = false;
 
+  const int order     = 1;
+  int       dimension = 1;
+
   for (unsigned int i = 1; i < arguments.size(); ++i)
-    if (arguments[i] == "init" || arguments[i] == "use_default_prm")
-      init = true;
+    {
+      if (arguments[i] == "init" || arguments[i] == "use_default_prm")
+        init = true;
+      if (arguments[i] == "1d" || arguments[i] == "1D")
+        dimension = 1;
+      if (arguments[i] == "3d" || arguments[i] == "3D")
+        dimension = 3;
+    }
 
   deallog.attach(std::cout);
   deallog.depth_console(2);
 
-  Problem<3> p3d(1, init);
-  if (!init)
-    p3d.run();
+  if (dimension == 1)
+    {
+      Problem<1> p1d(order, init);
+      if (!init)
+        p1d.run();
+    }
+  else if (dimension == 3)
+    {
+      Problem<3> p3d(order, init);
+      if (!init)
+        p3d.run();
+    }
 
   return 0;
 }

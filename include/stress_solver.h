@@ -232,9 +232,9 @@ public:
                          const double       T2 = 1700,
                          const unsigned int n  = 30) const;
 
-  /** Number of distinct elements of the stress tensor (3D: 6, 2D: 4)
+  /** Number of distinct elements of the stress tensor (3D: 6, 2D: 4, 1D: 1)
    */
-  static const unsigned int n_components = 2 * dim;
+  static const unsigned int n_components = dim == 1 ? 1 : 2 * dim;
 
   /** Names of stress components in Voigt notation
    */
@@ -567,7 +567,7 @@ StressSolver<dim>::StressSolver(const unsigned int order,
 #endif
                ")\n";
 
-  AssertThrow(dim == 2 || dim == 3, ExcNotImplemented());
+  AssertThrow(dim > 0, ExcNotImplemented());
 
   std::cout << "Stress components in Voigt notation:\n";
   const auto names = stress_component_names();
@@ -2055,6 +2055,21 @@ StressSolver<dim>::calculate_stress_invariants()
   stress_von_Mises.reinit(n_dofs_temp, true);
   stress_J_2.reinit(n_dofs_temp, true);
 
+  if (dim == 1)
+    {
+      for (unsigned int i = 0; i < n_dofs_temp; ++i)
+        {
+          stress_von_Mises[i] = std::abs(stress.block(0)[i]);
+          stress_J_2[i]       = sqr(stress_von_Mises[i]) / 3;
+        }
+
+      stress_hydrostatic = stress.block(0);
+      stress_hydrostatic /= 3;
+      stress_deviator = stress;
+      stress_deviator.block(0) -= stress_hydrostatic;
+      return;
+    }
+
   for (unsigned int i = 0; i < n_dofs_temp; ++i)
     {
       stress_hydrostatic[i] =
@@ -2099,6 +2114,11 @@ StressSolver<dim>::get_stiffness_tensor(const double &T) const
       return tmp;
     }
 
+  if (dim == 1)
+    {
+      tmp[0][0] = calc_C_11(T);
+      return tmp;
+    }
 
   tmp[0][0] = tmp[1][1] = tmp[2][2] = calc_C_11(T);
   tmp[2][1] = tmp[2][0] = tmp[1][0] = calc_C_12(T);
@@ -2118,6 +2138,11 @@ StressSolver<dim>::get_strain(const FEValues<dim> &    fe_values,
                               const unsigned int &     q,
                               Tensor<1, n_components> &strain) const
 {
+  if (dim == 1)
+    {
+      strain[0] = fe_values.shape_grad_component(shape_func, q, 0)[0];
+      return;
+    }
   if (dim == 2)
     {
       const auto grad_0 = fe_values.shape_grad_component(shape_func, q, 0);
@@ -2154,6 +2179,12 @@ StressSolver<dim>::get_strain(const double &           T,
 {
   const double alpha_T = calc_alpha(T);
 
+  if (dim == 1)
+    {
+      strain[0] = alpha_T * (T - m_T_ref);
+      return;
+    }
+
   strain[0] = strain[1] = strain[2] = alpha_T * (T - m_T_ref);
 
   if (dim == 2)
@@ -2170,6 +2201,11 @@ StressSolver<dim>::get_strain(
   const std::vector<Tensor<1, dim>> &grad_displacement,
   Tensor<1, n_components> &          strain) const
 {
+  if (dim == 1)
+    {
+      strain[0] = grad_displacement[0][0];
+      return;
+    }
   if (dim == 2)
     {
       strain[0] = grad_displacement[0][0];
@@ -2204,6 +2240,8 @@ template <int dim>
 const std::vector<std::string>
 StressSolver<dim>::stress_component_names() const
 {
+  if (dim == 1)
+    return {"xx"};
   if (dim == 2)
     return {"rr", "zz", "ff", "rz"};
   if (dim == 3)

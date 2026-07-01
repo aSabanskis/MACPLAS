@@ -11,6 +11,8 @@ arr_E=(8.4e9 23e9 1.3e9)
 arr_Q=(2.08  2.21 2.3)
 arr_D=(38.8518 34.6948 29.8847)
 
+dim=1
+
 cp data-ref/*.prm .
 
 for i in "${!arr_T[@]}"; do
@@ -33,8 +35,8 @@ for i in "${!arr_T[@]}"; do
         continue
     fi
 
-    ./macplas-test-4 >"$r/log-$id"
-    mv probes-dislocation-3d.txt "$r/probes-$id.txt"
+    ./macplas-test-4 ${dim}d >"$r/log-$id"
+    mv probes-dislocation-${dim}d.txt "$r/probes-$id.txt"
 done
 
 ./plot-probes-calibration.gnu
