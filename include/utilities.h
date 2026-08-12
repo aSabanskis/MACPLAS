@@ -542,7 +542,11 @@ private:
 
   /** DoF handler
    */
+#if DEAL_II_VERSION_GTE(9, 7, 0)
+  ObserverPointer<const DoFHandler<dim>> dh;
+#else
   SmartPointer<const DoFHandler<dim>> dh;
+#endif
 };
 
 /** Class for smoothing fields
@@ -608,7 +612,11 @@ private:
 
   /** DoF handler
    */
+#if DEAL_II_VERSION_GTE(9, 7, 0)
+  ObserverPointer<const DoFHandler<dim>> dh;
+#else
   SmartPointer<const DoFHandler<dim>> dh;
+#endif
 };
 
 /**

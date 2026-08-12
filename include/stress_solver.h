@@ -1430,7 +1430,7 @@ StressSolver<dim>::assemble_system()
         it.first.first,
         ConstantFunction<dim>(it.second, dim),
         boundary_values,
-        mask);
+        ComponentMask(mask));
     }
 
   for (auto const &it : bc1_dof_data)
