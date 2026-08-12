@@ -1417,7 +1417,7 @@ StressSolver<dim>::assemble_system()
   std::vector<bool> bc1_applied(dim, false);
 
   std::map<types::global_dof_index, double> boundary_values;
-  for (auto const &it : bc1_data)
+  for (const auto &it : bc1_data)
     {
       const auto component = it.first.second;
 
@@ -1433,7 +1433,7 @@ StressSolver<dim>::assemble_system()
         ComponentMask(mask));
     }
 
-  for (auto const &it : bc1_dof_data)
+  for (const auto &it : bc1_dof_data)
     {
       const auto component = it.first.second;
 

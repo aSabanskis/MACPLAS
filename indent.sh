@@ -6,7 +6,7 @@
 
 # Provide full path to clang-format or add its directory to PATH.
 # Versions below 11 are not supported.
-formatter=clang-format-11
+formatter=clang-format-12
 
 find include tests applications \
 -regextype egrep -regex ".*\.(cc|h)" -print0 | \

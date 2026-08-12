@@ -2512,14 +2512,14 @@ namespace
 #else
   {
     const unsigned int n_dofs = S.n();
-    const auto op = linear_operator(S);
-    const auto SF = constrained_linear_operator(constraints, op);
+    const auto         op     = linear_operator(S);
+    const auto         SF     = constrained_linear_operator(constraints, op);
     PreconditionJacobi<SparseMatrix<double>> prec;
     prec.initialize(S, 1.2);
 
-    SolverControl control(n_dofs, tol, false, false);
+    SolverControl                       control(n_dofs, tol, false, false);
     GrowingVectorMemory<Vector<double>> mem;
-    SolverCG<Vector<double>> solver(control, mem);
+    SolverCG<Vector<double>>            solver(control, mem);
 
     Vector<double> f(n_dofs);
 
@@ -2672,7 +2672,7 @@ laplace_transform(const std::map<unsigned int, Point<dim>> &new_points,
     StaticMappingQ1<dim>::mapping, dof_handler, quadrature, S, coefficient);
 
   // set up the boundary values for the laplace problem
-  std::array<AffineConstraints<double>, dim> constraints;
+  std::array<AffineConstraints<double>, dim>                  constraints;
   typename std::map<unsigned int, Point<dim>>::const_iterator map_end =
     new_points.end();
 
@@ -2686,7 +2686,7 @@ laplace_transform(const std::map<unsigned int, Point<dim>> &new_points,
            ++vertex_no)
         {
           const unsigned int vertex_index = cell->vertex_index(vertex_no);
-          const Point<dim> &vertex_point = cell->vertex(vertex_no);
+          const Point<dim> & vertex_point = cell->vertex(vertex_no);
 
           const typename std::map<unsigned int, Point<dim>>::const_iterator
             map_iter = new_points.find(vertex_index);
