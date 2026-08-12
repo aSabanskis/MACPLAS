@@ -300,7 +300,7 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
   if (use_default_prm)
     {
       std::ofstream of("problem.prm");
-      prm.print_parameters(of, ParameterHandler::Text);
+      prm.print_parameters(of, prmOutputStyle);
     }
   else
     try
@@ -312,7 +312,7 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
         std::cout << e.what() << "\n";
 
         std::ofstream of("problem-default.prm");
-        prm.print_parameters(of, ParameterHandler::Text);
+        prm.print_parameters(of, prmOutputStyle);
       }
 
   const double t_max = prm.get_double("Max time");
@@ -325,25 +325,25 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
   // print all problem-specific and solver parameters
   std::cout << "# ---------------------\n"
             << "# Problem\n";
-  prm.print_parameters(std::cout, ParameterHandler::Text);
+  prm.print_parameters(std::cout, prmOutputStyle);
 
   std::cout << "# ---------------------\n"
             << "# " << temperature_solver.solver_name() << '\n';
   temperature_solver.get_parameters().print_parameters(std::cout,
-                                                       ParameterHandler::Text);
+                                                       prmOutputStyle);
 
   if (with_dislocation())
     {
       std::cout << "# ---------------------\n"
                 << "# " << dislocation_solver.solver_name() << '\n';
-      dislocation_solver.get_parameters().print_parameters(
-        std::cout, ParameterHandler::Text);
+      dislocation_solver.get_parameters().print_parameters(std::cout,
+                                                           prmOutputStyle);
 
       std::cout << "# ---------------------\n"
                 << "# " << dislocation_solver.get_stress_solver().solver_name()
                 << '\n';
       dislocation_solver.get_stress_solver().get_parameters().print_parameters(
-        std::cout, ParameterHandler::Text);
+        std::cout, prmOutputStyle);
     }
 
   initialize_function(inductor_position, prm.get("Inductor position"));

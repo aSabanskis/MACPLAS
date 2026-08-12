@@ -34,6 +34,12 @@
 
 using namespace dealii;
 
+#if DEAL_II_VERSION_GTE(9, 2, 0)
+const ParameterHandler::OutputStyle prmOutputStyle = ParameterHandler::PRM;
+#else
+const ParameterHandler::OutputStyle prmOutputStyle = ParameterHandler::Text;
+#endif
+
 // helper functions
 
 /** Calculate the square \f$x^2\f$

@@ -735,7 +735,7 @@ StressSolver<dim>::StressSolver(const unsigned int order,
   if (use_default_prm)
     {
       std::ofstream of("stress.prm");
-      prm.print_parameters(of, ParameterHandler::Text);
+      prm.print_parameters(of, prmOutputStyle);
     }
   else
     try
@@ -747,7 +747,7 @@ StressSolver<dim>::StressSolver(const unsigned int order,
         std::cout << e.what() << "\n";
 
         std::ofstream of("stress-default.prm");
-        prm.print_parameters(of, ParameterHandler::Text);
+        prm.print_parameters(of, prmOutputStyle);
       }
 
   initialize_parameters();

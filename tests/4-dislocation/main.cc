@@ -54,7 +54,7 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
   if (use_default_prm)
     {
       std::ofstream of("problem.prm");
-      prm.print_parameters(of, ParameterHandler::Text);
+      prm.print_parameters(of, prmOutputStyle);
     }
   else
     try
@@ -66,9 +66,9 @@ Problem<dim>::Problem(const unsigned int order, const bool use_default_prm)
         std::cout << e.what() << "\n";
 
         std::ofstream of("problem-default.prm");
-        prm.print_parameters(of, ParameterHandler::Text);
+        prm.print_parameters(of, prmOutputStyle);
       }
-  prm.print_parameters(std::cout, ParameterHandler::Text);
+  prm.print_parameters(std::cout, prmOutputStyle);
 }
 
 template <int dim>

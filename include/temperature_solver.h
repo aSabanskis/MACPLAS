@@ -681,7 +681,7 @@ TemperatureSolver<dim>::TemperatureSolver(const unsigned int order,
   if (use_default_prm)
     {
       std::ofstream of("temperature.prm");
-      prm.print_parameters(of, ParameterHandler::Text);
+      prm.print_parameters(of, prmOutputStyle);
     }
   else
     try
@@ -693,7 +693,7 @@ TemperatureSolver<dim>::TemperatureSolver(const unsigned int order,
         std::cout << e.what() << "\n";
 
         std::ofstream of("temperature-default.prm");
-        prm.print_parameters(of, ParameterHandler::Text);
+        prm.print_parameters(of, prmOutputStyle);
       }
 
   initialize_parameters();
