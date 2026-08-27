@@ -26,6 +26,7 @@ macplas-*
 build
 CMakeFiles
 CMakeCache.txt
+CMakeDoxyfile.in
 *cmake*
 [Mm]akefile
 *project
