@@ -630,6 +630,9 @@ StressSolver<dim>::StressSolver(const unsigned int order,
     prm.declare_entry("Linear solver type",
                       "minres",
                       Patterns::Selection("UMFPACK|" +
+#if DEAL_II_VERSION_GTE(9, 7, 0)
+                                          std::string("MUMPS|") +
+#endif
                                           SolverSelector<>::get_solver_names()),
                       "Name of linear solver");
 
@@ -674,6 +677,9 @@ StressSolver<dim>::StressSolver(const unsigned int order,
   prm.declare_entry("Linear solver type",
                     "minres",
                     Patterns::Selection("UMFPACK|" +
+#if DEAL_II_VERSION_GTE(9, 7, 0)
+                                        std::string("MUMPS|") +
+#endif
                                         SolverSelector<>::get_solver_names()),
                     "Name of linear solver");
 
@@ -1617,6 +1623,26 @@ StressSolver<dim>::solve_system()
       A.initialize(system_matrix);
       A.vmult(displacement, system_rhs);
     }
+#if DEAL_II_VERSION_GTE(9, 7, 0)
+  else if (solver_type == "MUMPS")
+    {
+      std::cout << " (" << solver_type << ")";
+
+      // BlockVector is not supported, use a workaround
+      SparsityPattern      sparsity;
+      SparseMatrix<double> matrix;
+      block_to_sparse_matrix(system_matrix, matrix, sparsity);
+
+      Vector<double> tmp(system_rhs.size());
+      tmp = system_rhs;
+
+      SparseDirectMUMPS A;
+      A.initialize(matrix);
+      A.vmult(tmp, tmp);
+
+      displacement = tmp;
+    }
+#endif
   else
     {
       const unsigned int solver_iterations =
@@ -1941,6 +1967,16 @@ StressSolver<dim>::recover_strain_global()
       for (unsigned int k = 0; k < n_components; ++k)
         A.vmult(strain_e.block(k), global_rhs.block(k));
     }
+#if DEAL_II_VERSION_GTE(9, 7, 0)
+  else if (solver_type == "MUMPS")
+    {
+      SparseDirectMUMPS A;
+      A.initialize(global_matrix);
+
+      for (unsigned int k = 0; k < n_components; ++k)
+        A.vmult(strain_e.block(k), global_rhs.block(k));
+    }
+#endif
   else
     {
       prm.enter_subsection("Stress recovery");

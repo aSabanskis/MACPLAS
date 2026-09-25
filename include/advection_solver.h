@@ -311,6 +311,9 @@ AdvectionSolver<dim>::AdvectionSolver(const unsigned int order,
   prm.declare_entry("Linear solver type",
                     "fgmres",
                     Patterns::Selection("UMFPACK|" +
+#if DEAL_II_VERSION_GTE(9, 7, 0)
+                                        std::string("MUMPS|") +
+#endif
                                         SolverSelector<>::get_solver_names()),
                     "Name of linear solver");
 
@@ -859,6 +862,20 @@ AdvectionSolver<dim>::solve_system()
           A.vmult(fields_prev.block(k), system_rhs.block(k));
         }
     }
+#if DEAL_II_VERSION_GTE(9, 7, 0)
+  else if (solver_type == "MUMPS")
+    {
+      std::cout << " (" << solver_type << ")";
+
+      SparseDirectMUMPS A;
+      A.initialize(system_matrix);
+
+      for (unsigned int k = 0; k < n_fields; ++k)
+        {
+          A.vmult(fields_prev.block(k), system_rhs.block(k));
+        }
+    }
+#endif
   else
     {
       const unsigned int solver_iterations =

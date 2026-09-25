@@ -1223,6 +1223,8 @@ Problem<dim>::with_dislocation() const
 int
 main(int argc, char *argv[])
 {
+  Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
+
   const std::vector<std::string> arguments(argv, argv + argc);
 
   bool init      = false;

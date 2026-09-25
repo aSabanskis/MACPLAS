@@ -263,6 +263,8 @@ Problem<dim>::get_degree(const std::vector<std::string> &arguments) const
 int
 main(int argc, char *argv[])
 {
+  Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
+
   const std::vector<std::string> arguments(argv, argv + argc);
 
   int dimension = 1;

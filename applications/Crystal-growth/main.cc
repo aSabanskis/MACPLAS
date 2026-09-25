@@ -1861,6 +1861,8 @@ Problem<dim>::cmp_z(const std::pair<unsigned int, Point<dim>> &it1,
 int
 main(int argc, char *argv[])
 {
+  Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
+
   const std::vector<std::string> arguments(argv, argv + argc);
 
   bool init      = false;

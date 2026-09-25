@@ -589,6 +589,9 @@ TemperatureSolver<dim>::TemperatureSolver(const unsigned int order,
   prm.declare_entry("Linear solver type",
                     "minres",
                     Patterns::Selection("UMFPACK|" +
+#if DEAL_II_VERSION_GTE(9, 7, 0)
+                                        std::string("MUMPS|") +
+#endif
                                         SolverSelector<>::get_solver_names()),
                     "Name of linear solver");
 
@@ -1902,6 +1905,16 @@ TemperatureSolver<dim>::solve_system()
       A.initialize(system_matrix);
       A.vmult(temperature_update, system_rhs);
     }
+#if DEAL_II_VERSION_GTE(9, 7, 0)
+  else if (solver_type == "MUMPS")
+    {
+      std::cout << " (" << solver_type << ")";
+
+      SparseDirectMUMPS A;
+      A.initialize(system_matrix);
+      A.vmult(temperature_update, system_rhs);
+    }
+#endif
   else
     {
       const unsigned int solver_iterations =

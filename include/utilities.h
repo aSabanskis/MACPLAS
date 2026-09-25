@@ -732,6 +732,47 @@ split_string(const std::string &s, const char delimiter)
   return Utilities::string_to_double(s_split);
 }
 
+template <typename number>
+void
+block_to_sparse_matrix(const BlockSparseMatrix<number> &B,
+                       SparseMatrix<number> &           A,
+                       SparsityPattern &                sp)
+{
+  const BlockIndices &row_idx = B.get_row_indices();
+  const BlockIndices &col_idx = B.get_column_indices();
+
+  DynamicSparsityPattern dsp(row_idx.total_size(), col_idx.total_size());
+
+  // Build global sparsity directly from block matrix entries
+  for (unsigned int bi = 0; bi < B.n_block_rows(); ++bi)
+    for (unsigned int bj = 0; bj < B.n_block_cols(); ++bj)
+      {
+        const auto &       M  = B.block(bi, bj);
+        const unsigned int r0 = row_idx.block_start(bi);
+        const unsigned int c0 = col_idx.block_start(bj);
+
+        for (unsigned int i = 0; i < M.m(); ++i)
+          for (auto p = M.begin(i); p != M.end(i); ++p)
+            dsp.add(r0 + i, c0 + p->column());
+      }
+
+  sp.copy_from(dsp);
+  A.reinit(sp);
+
+  // Copy values
+  for (unsigned int bi = 0; bi < B.n_block_rows(); ++bi)
+    for (unsigned int bj = 0; bj < B.n_block_cols(); ++bj)
+      {
+        const auto &       M  = B.block(bi, bj);
+        const unsigned int r0 = row_idx.block_start(bi);
+        const unsigned int c0 = col_idx.block_start(bj);
+
+        for (unsigned int i = 0; i < M.m(); ++i)
+          for (auto p = M.begin(i); p != M.end(i); ++p)
+            A.set(r0 + i, c0 + p->column(), p->value());
+      }
+}
+
 void
 initialize_function(std::unique_ptr<Function<1>> &f,
                     const std::string &           expression,
